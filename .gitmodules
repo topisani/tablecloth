@@ -1,0 +1,3 @@
+[submodule "external/waylandpp"]
+	path = external/waylandpp
+	url = https://github.com/NilsBrause/waylandpp
