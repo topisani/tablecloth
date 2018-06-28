@@ -1,301 +1,283 @@
-#include <algorithm>
-#include <array>
-#include <ctime>
-#include <iostream>
-#include <memory>
-#include <sstream>
-#include <stdexcept>
+#include <csignal>
+#include <cstdlib>
 
-#include <linux/input.h>
-#include <wayland-client-protocol-extra.hpp>
-#include <wayland-client.hpp>
-#include <wayland-cursor.hpp>
-
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
 #include <unistd.h>
+#include <wayland-server.h>
+#include <xkbcommon/xkbcommon.h>
 
-using namespace wayland;
+#include <execinfo.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <iostream>
+#include <vector>
 
-// helper to create a std::function out of a member function and an object
-template <typename R, typename T, typename... Args>
-std::function<R(Args...)> bind_mem_fn(R (T::*func)(Args...), T *t) {
-  return [func, t](Args... args) { return (t->*func)(args...); };
+#include "swc.hpp"
+
+/* Obtain a backtrace and print it to stdout. */
+void print_trace(void)
+{
+  void* array[10];
+  size_t size;
+  char** strings;
+  size_t i;
+
+  size = backtrace(array, 10);
+  strings = backtrace_symbols(array, size);
+
+  printf("Obtained %zd stack frames.\n", size);
+
+  for (i = 0; i < size; i++) printf("%s\n", strings[i]);
+
+  free(strings);
 }
 
-// shared memory helper class
-class shared_mem_t {
-private:
-  std::string name;
-  int fd = 0;
-  size_t len = 0;
-  void *mem = nullptr;
-
-public:
-  shared_mem_t() {}
-
-  shared_mem_t(size_t size) : len(size) {
-    // Very simple shared memory wrapper - do not use this in production code!
-    // The generated memory regions are visible in the file system and can be
-    // stolen by other running processes.
-    // Linux code should use memfd_create when possible (ommited here for
-    // simplicity).
-
-    // create random filename
-    std::stringstream ss;
-    std::srand(std::time(0));
-    ss << '/' << std::rand();
-    name = ss.str();
-
-    // open shared memory file
-    fd = shm_open(name.c_str(), O_RDWR | O_CREAT | O_EXCL, 0600);
-    if (fd < 0)
-      throw std::runtime_error("shm_open failed.");
-
-    // set size
-    if (ftruncate(fd, size) < 0)
-      throw std::runtime_error("ftruncate failed.");
-
-    // map memory
-    mem = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (mem == MAP_FAILED)
-      throw std::runtime_error("mmap failed.");
-  }
-
-  ~shared_mem_t() noexcept(false) {
-    if (fd) {
-      if (munmap(mem, len) < 0)
-        throw std::runtime_error("munmap failed.");
-      if (close(fd) < 0)
-        throw std::runtime_error("close failed.");
-      if (shm_unlink(name.c_str()) < 0)
-        throw std::runtime_error("shm_unlink failed");
-    }
-  }
-
-  int get_fd() { return fd; }
-
-  void *get_mem() { return mem; }
+static void log(const char* str)
+{
+  std::cerr << str << '\n';
 };
 
-// example Wayland client
-class example {
-private:
-  // global objects
-  display_t display;
-  registry_t registry;
-  compositor_t compositor;
-  shell_t shell;
-  xdg_wm_base_t xdg_wm_base;
-  seat_t seat;
-  shm_t shm;
+namespace cloth {
+  struct Screen;
 
-  // local objects
-  surface_t surface;
-  shell_surface_t shell_surface;
-  xdg_surface_t xdg_surface;
-  xdg_toplevel_t xdg_toplevel;
-  pointer_t pointer;
-  keyboard_t keyboard;
-  callback_t frame_cb;
-  cursor_image_t cursor_image;
-  buffer_t cursor_buffer;
-  surface_t cursor_surface;
+  struct Window : swc::Window {
+    Window(Base*, Screen& screen) noexcept;
 
-  std::shared_ptr<shared_mem_t> shared_mem;
-  buffer_t buffer[2];
-  int cur_buf;
+    Window(const Window&) = delete;
+    Window(Window&&) noexcept;
+    Window& operator=(Window&&) noexcept = default;
 
-  bool running;
-  bool has_pointer;
-  bool has_keyboard;
+    void destroyed() noexcept override;
 
-  void draw(uint32_t serial = 0) {
-    float h = ((serial >> 4) & 0xFF) / 255.0;
-    float s = 1, v = 1;
+    void entered() noexcept override;
 
-    int hi = h * 6;
-    float f = h * 6 - hi;
-    float p = v * (1 - s);
-    float q = v * (1 - s * f);
-    float t = v * (1 - s * (1 - f));
-    float r, g, b;
+    Screen* screen;
+  };
 
-    switch (hi) {
-    case 1:
-      r = q;
-      g = v;
-      b = p;
-      break;
-    case 2:
-      r = p;
-      g = v;
-      b = t;
-      break;
-    case 3:
-      r = p;
-      g = q;
-      b = v;
-      break;
-    case 4:
-      r = t;
-      g = p;
-      b = v;
-      break;
-    case 5:
-      r = v;
-      g = p;
-      b = q;
-      break;
-    default: // 0,6
-      r = v;
-      g = t;
-      b = p;
-      break;
+
+  struct Screen : swc::Screen {
+    Screen(Base*) noexcept;
+
+    Screen(const Screen&) = delete;
+    Screen(Screen&&) noexcept = default;
+    Screen& operator=(Screen&&) = default;
+
+    virtual ~Screen() noexcept
+    {
+      log("destruct screen");
     }
 
-    // draw stuff
-    uint32_t pixel = (0x80 << 24) | (static_cast<uint32_t>(r * 255.0) << 16) |
-                     (static_cast<uint32_t>(g * 255.0) << 8) |
-                     static_cast<uint32_t>(b * 255.0);
+    void usable_geometry_changed() noexcept override
+    {
+      /* If the usable geometry of the screen changes, for example when a panel is
+       * docked to the edge of the screen, we need to rearrange the windows to
+       * ensure they are all within the new usable geometry. */
+      arrange();
+    }
 
-    std::fill_n(static_cast<uint32_t *>(shared_mem->get_mem()) +
-                    cur_buf * 320 * 240,
-                320 * 240, pixel);
-    surface.attach(buffer[cur_buf], 0, 0);
-    surface.damage(0, 0, 320, 240);
-    if (!cur_buf)
-      cur_buf = 1;
-    else
-      cur_buf = 0;
+    void entered() noexcept override;
 
-    // schedule next draw
-    frame_cb = surface.frame();
-    frame_cb.on_done() = bind_mem_fn(&example::draw, this);
-    surface.commit();
+    /**
+     * This is a basic grid arrange function that tries to give each window an
+     * equal space.
+     */
+    void arrange() noexcept;
+
+
+    Window& add_window(Window&& window) noexcept;
+
+    void remove_window(Window& window) noexcept;
+
+    Window* focus(Window* window) noexcept;
+
+    std::vector<Window> windows;
+    std::vector<Window>::iterator focused_window = windows.end();
+  };
+
+  static const char* terminal_command[] = {"wterm", NULL};
+  static const char* dmenu_command[] = {"dmenu", NULL};
+  static const uint32_t border_width = 1;
+  static const uint32_t border_color_active = 0xff333388;
+  static const uint32_t border_color_normal = 0xff888888;
+
+  static struct wl_display* display;
+  static struct wl_event_loop* event_loop;
+  static std::vector<Screen> screens;
+  static Screen* active_screen;
+
+  Window::Window(Base* base, Screen& screen) noexcept : ::swc::Window{base}, screen(&screen)
+  {
+    log("Window constructor");
+    set_tiled();
+    screen.focus(this);
   }
 
-public:
-  example() {
-    // retrieve global objects
-    registry = display.get_registry();
-    registry.on_global() = [&](uint32_t name, std::string interface,
-                               uint32_t version) {
-      if (interface == compositor_t::interface_name)
-        registry.bind(name, compositor, version);
-      else if (interface == shell_t::interface_name)
-        registry.bind(name, shell, version);
-      else if (interface == xdg_wm_base_t::interface_name)
-        registry.bind(name, xdg_wm_base, version);
-      else if (interface == seat_t::interface_name)
-        registry.bind(name, seat, version);
-      else if (interface == shm_t::interface_name)
-        registry.bind(name, shm, version);
-    };
-    display.roundtrip();
+  Window::Window(Window&& rhs) noexcept
+    : swc::Window(std::move(rhs))
+  {
+    screen = rhs.screen;
+    rhs.screen = nullptr;
+  }
 
-    seat.on_capabilities() = [&](seat_capability capability) {
-      has_keyboard = capability & seat_capability::keyboard;
-      has_pointer = capability & seat_capability::pointer;
-    };
-
-    // create a surface
-    surface = compositor.create_surface();
-
-    // create a shell surface
-    if (xdg_wm_base) {
-      xdg_wm_base.on_ping() = [&](uint32_t serial) {
-        xdg_wm_base.pong(serial);
-      };
-      xdg_surface = xdg_wm_base.get_xdg_surface(surface);
-      xdg_surface.on_configure() = [&](uint32_t serial) {
-        xdg_surface.ack_configure(serial);
-      };
-      xdg_toplevel = xdg_surface.get_toplevel();
-      xdg_toplevel.set_title("Window");
-      xdg_toplevel.on_close() = [&]() { running = false; };
-    } else {
-      shell_surface = shell.get_shell_surface(surface);
-      shell_surface.on_ping() = [&](uint32_t serial) {
-        shell_surface.pong(serial);
-      };
-      shell_surface.set_title("Window");
-      shell_surface.set_toplevel();
+  void Window::destroyed() noexcept
+  {
+    if (base() != nullptr) {
+      log("Window destroyed");
+      screen->remove_window(*this);
     }
-    surface.commit();
+  }
 
-    display.roundtrip();
+  void Window::entered() noexcept
+  {
+    log("Window entered");
+    screen->focus(this);
+  }
 
-    // Get input devices
-    if (!has_keyboard)
-      throw std::runtime_error("No keyboard found.");
-    if (!has_pointer)
-      throw std::runtime_error("No pointer found.");
+  Screen::Screen(Base* base) noexcept : swc::Screen(base)
+  {
+    log("Screen constructed");
+    active_screen = this;
+  }
 
-    pointer = seat.get_pointer();
-    keyboard = seat.get_keyboard();
+  void Screen::entered() noexcept
+  {
+    log("Entered screen");
+    active_screen = this;
+  }
 
-    // create shared memory
-    shared_mem =
-        std::shared_ptr<shared_mem_t>(new shared_mem_t(2 * 320 * 240 * 4));
-    auto pool = shm.create_pool(shared_mem->get_fd(), 2 * 320 * 240 * 4);
-    for (unsigned int c = 0; c < 2; c++)
-      buffer[c] = pool.create_buffer(c * 320 * 240 * 4, 320, 240, 320 * 4,
-                                     shm_format::argb8888);
-    cur_buf = 0;
+  void Screen::arrange() noexcept
+  {
+    log("Arranging");
+    unsigned num_columns, num_rows, column_index, row_index;
+    swc::Rectangle geometry;
+    swc::Rectangle& screen_geometry = base()->usable_geometry;
 
-    // load cursor theme
-    cursor_theme_t cursor_theme = cursor_theme_t("default", 16, shm);
-    cursor_t cursor = cursor_theme.get_cursor("cross");
-    cursor_image = cursor.image(0);
-    cursor_buffer = cursor_image.get_buffer();
+    if (windows.empty()) return;
 
-    // create cursor surface
-    cursor_surface = compositor.create_surface();
+    num_columns = std::ceil(std::sqrt(windows.size()));
+    num_rows = windows.size() / num_columns + 1;
+    auto iter = windows.begin();
+    for (column_index = 0; iter != windows.end(); ++column_index) {
+      geometry.x =
+        screen_geometry.x + border_width + screen_geometry.width * column_index / num_columns;
+      geometry.width = screen_geometry.width / num_columns - 2 * border_width;
 
-    // draw cursor
-    pointer.on_enter() = [&](uint32_t serial, surface_t, int32_t, int32_t) {
-      cursor_surface.attach(cursor_buffer, 0, 0);
-      cursor_surface.damage(0, 0, cursor_image.width(), cursor_image.height());
-      cursor_surface.commit();
-      pointer.set_cursor(serial, cursor_surface, 0, 0);
-    };
+      if (column_index == windows.size() % num_columns) --num_rows;
 
-    // window movement
-    pointer.on_button() = [&](uint32_t serial, uint32_t time, uint32_t button,
-                              pointer_button_state state) {
-      if (button == BTN_LEFT && state == pointer_button_state::pressed) {
-        if (xdg_toplevel)
-          xdg_toplevel.move(seat, serial);
-        else
-          shell_surface.move(seat, serial);
+      for (row_index = 0; row_index < num_rows && iter != windows.end(); ++row_index) {
+        geometry.y =
+          screen_geometry.y + border_width + screen_geometry.height * row_index / num_rows;
+        geometry.height = screen_geometry.height / num_rows - 2 * border_width;
+
+        iter->set_geometry(geometry);
+        ++iter;
       }
-    };
-
-    // press 'q' to exit
-    keyboard.on_key() = [&](uint32_t, uint32_t, uint32_t key,
-                            keyboard_key_state state) {
-      if (key == KEY_Q && state == keyboard_key_state::pressed)
-        running = false;
-    };
-
-    // draw stuff
-    draw();
+    }
   }
 
-  ~example() {}
-
-  void run() {
-    // event loop
-    running = true;
-    while (running)
-      display.dispatch();
+  Window& Screen::add_window(Window&& window) noexcept
+  {
+    log("Adding window");
+    window.screen = this;
+    auto& ret = windows.emplace_back(std::move(window));
+    ret.show();
+    arrange();
+    return ret;
   }
-};
 
-int main() {
-  example e;
-  e.run();
-  return 0;
+  void Screen::remove_window(Window& window) noexcept
+  {
+    log("removing window");
+    window.screen = NULL;
+    auto iter = std::find(windows.begin(), windows.end(), window);
+    if (iter != windows.end()) {
+      if (iter == focused_window) {
+        focus(nullptr);
+      }
+      iter->hide();
+      windows.erase(iter);
+    }
+    arrange();
+  }
+
+  Window* Screen::focus(Window* window) noexcept
+  {
+    if (focused_window < windows.end() && focused_window >= windows.begin()) {
+      focused_window->set_border(border_color_normal, border_width);
+    }
+
+    if (window != nullptr) {
+      window->set_border(border_color_active, border_width);
+      window->focus();
+      focused_window = std::find(windows.begin(), windows.end(), *window);
+    } else {
+      swc_window_focus(nullptr);
+      focused_window = windows.end();
+    }
+
+    return &*focused_window;
+  }
+
+  static void spawn(void* data, uint32_t time, uint32_t value, uint32_t state)
+  {
+    char* const* command = (char* const*) data;
+
+    if (state != WL_KEYBOARD_KEY_STATE_PRESSED) return;
+
+    if (fork() == 0) {
+      execvp(command[0], command);
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  static void quit(void* data, uint32_t time, uint32_t value, uint32_t state)
+  {
+    if (state != WL_KEYBOARD_KEY_STATE_PRESSED) return;
+
+    wl_display_terminate(display);
+  }
+
+  static const swc::Manager manager = {
+    [](swc::Screen::Base* screen) {
+      log("New screen");
+      active_screen = &screens.emplace_back(screen);
+    },
+    [](swc::Window::Base* base) {
+      log("New window");
+      active_screen->add_window({base, *active_screen});
+    }
+  };
+
+  int main(int argc, char* argv[])
+  {
+    auto sig_handler = [](int sig) {
+      printf("Recieved signal %d\n", sig);
+      print_trace();
+      std::abort();
+    };
+
+    std::signal(SIGSEGV, sig_handler);
+
+    display = wl_display_create();
+    if (!display) return EXIT_FAILURE;
+
+    if (wl_display_add_socket(display, NULL) != 0) return EXIT_FAILURE;
+
+    if (!manager.init(display, nullptr)) return EXIT_FAILURE;
+
+    swc_add_binding(SWC_BINDING_KEY, SWC_MOD_LOGO, XKB_KEY_Return, &spawn, terminal_command);
+    swc_add_binding(SWC_BINDING_KEY, SWC_MOD_LOGO, XKB_KEY_r, &spawn, dmenu_command);
+    swc_add_binding(SWC_BINDING_KEY, SWC_MOD_LOGO, XKB_KEY_q, &quit, NULL);
+
+    event_loop = wl_display_get_event_loop(display);
+    wl_display_run(display);
+    wl_display_destroy(display);
+
+    return EXIT_SUCCESS;
+  }
+
+} // namespace cloth
+
+int main(int argc, char* argv[])
+{
+  return cloth::main(argc, argv);
 }
