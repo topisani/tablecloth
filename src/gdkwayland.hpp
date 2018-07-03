@@ -22,7 +22,7 @@ namespace Gdk::wayland::window {
 
   ::wayland::surface_t get_wl_surface(Gtk::Window& window) noexcept
   {
-    return ::wayland::surface_t(gdk_wayland_window_get_wl_surface(gtk_widget_get_window(GTK_WIDGET(window.gobj()))));
+    return {gdk_wayland_window_get_wl_surface(gtk_widget_get_window(GTK_WIDGET(window.gobj()))), ::wayland::proxy_t::wrapper_type::foreign};
   }
 
   void set_use_custom_surface(Gdk::Window& window) noexcept

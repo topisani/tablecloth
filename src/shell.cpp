@@ -59,11 +59,6 @@ namespace tablecloth {
     wayland::output_t output;
 
     Glib::RefPtr<Gdk::Display> gdk_display;
-    struct Teststruct {
-      GtkWidget* window;
-      GdkPixbuf* pixbuf;
-      wl_surface* surface;
-    } * whatbackground;
     Element background;
     Element curtain;
     Element panel;
@@ -111,16 +106,13 @@ namespace tablecloth {
     box1.show();
 
     window.show_all();
-    Gdk::wayland::window::set_use_custom_surface(window);
-
-    // panel.surface = Gdk::wayland::window::get_wl_surface(window);
 
     window.set_size_request(16, 16);
 
-    // shell.set_panel(output, panel.surface);
-    // shell.set_panel_position((uint32_t) wayland::weston_desktop_shell_panel_position::top);
-    shell.set_panel(
-      output, gdk_wayland_window_get_wl_surface(gtk_widget_get_window(GTK_WIDGET(window.gobj()))));
+    Gdk::wayland::window::set_use_custom_surface(window);
+    panel.surface = Gdk::wayland::window::get_wl_surface(window);
+    shell.set_panel(output, panel.surface);
+    shell.set_panel_position((uint32_t) wayland::weston_desktop_shell_panel_position::top);
   }
 
   void Desktop::create_grab_surface()
@@ -134,9 +126,8 @@ namespace tablecloth {
 
     LOGD("Curtain");
     Gdk::wayland::window::set_use_custom_surface(window);
-    // curtain.surface = Gdk::wayland::window::get_wl_surface(window);
-    // shell.set_grab_surface(curtain.surface);
-    shell.set_grab_surface(gdk_wayland_window_get_wl_surface(gtk_widget_get_window(GTK_WIDGET(window.gobj()))));
+    curtain.surface = Gdk::wayland::window::get_wl_surface(window);
+    shell.set_grab_surface(curtain.surface);
   }
 
 #if true
@@ -170,12 +161,10 @@ namespace tablecloth {
 
     LOGD("Background");
     Gdk::wayland::window::set_use_custom_surface(window);
-    // background.surface = Gdk::wayland::window::get_wl_surface(window);
-    // shell.set_background(output, background.surface);
+    background.surface = Gdk::wayland::window::get_wl_surface(window);
+    shell.set_background(output, background.surface);
 
-    auto* wlsurf = gdk_wayland_window_get_wl_surface(gtk_widget_get_window(GTK_WIDGET(window.gobj())));
-    LOGD("WLSURF: " << wlsurf);
-    shell.set_background( output, wlsurf);
+    shell.set_background(output, background.surface);
   }
 #else
 
@@ -215,8 +204,6 @@ namespace tablecloth {
   {
     Desktop desktop;
 
-    gdk_set_allowed_backends("wayland");
-
     auto main = Gtk::Main(argc, argv);
 
     LOGD("Other FD: " << desktop.display.get_fd());
@@ -228,8 +215,9 @@ namespace tablecloth {
                                               uint32_t version) {
       LOGD("Got registry: " << interface);
       if (interface == wayland::weston_desktop_shell_t::interface_name) {
-        desktop.registry.bind(name, desktop.shell, 1);
+        desktop.registry.bind(name, desktop.shell, version);
         LOGD("Bound desktop shell");
+
         desktop.shell.on_grab_cursor() = [](uint32_t) { LOGD("cursor grabbed"); };
         desktop.shell.on_configure() = [&desktop](uint32_t edges, wayland::surface_t surf,
                                                   int32_t width, int32_t height) {
@@ -239,6 +227,7 @@ namespace tablecloth {
           desktop.background.window->set_size_request(width, height);
           desktop.shell.desktop_ready();
         };
+
       } else if (interface == wayland::output_t::interface_name) {
         /* TODO: create multiple outputs */
         desktop.registry.bind(name, desktop.output, version);
@@ -250,16 +239,13 @@ namespace tablecloth {
      * objects */
     if (!desktop.output || !desktop.shell) {
       LOGE("could not find output or shell modules");
-   }
+     }
     desktop.create_background();
-    //desktop.create_grab_surface();
-    //desktop.create_panel();
+    desktop.create_grab_surface();
+    desktop.create_panel();
     // launch_terminal();
-
-    Gtk::Window window;
-    window.set_default_size(200, 200);
-
-    main.run(window);
+    desktop.shell.desktop_ready();
+    main.run();
 
     /* TODO cleanup */
     return EXIT_SUCCESS;
