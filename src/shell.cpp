@@ -26,12 +26,13 @@
 #include <memory>
 
 #include <gtkmm.h>
-#include <wayland-client.hpp>
+#include <wayland-client.h>
 
 #include "gdkwayland.hpp"
-//#include "weston.hpp"
-#include "weston-desktop-shell-protocol.hpp"
-#include <wayland-client-protocol-extra.hpp>
+#include "weston.hpp"
+#include "wayland.hpp"
+//#include "weston-desktop-shell-protocol.hpp"
+//#include <wayland-client-protocol-extra.hpp>
 
 
 #define LOGD(...) std::cout << "[DEBUG]: " << __VA_ARGS__ << '\n'
@@ -47,16 +48,16 @@ namespace tablecloth {
   struct Element {
     std::unique_ptr<Gtk::Window> window;
     Glib::RefPtr<Gdk::Pixbuf> pixbuf;
-    wayland::surface_t surface;
+    wayland::Surface surface;
   };
 
   struct Desktop {
     Desktop() = default;
 
-    wayland::display_t display;
-    wayland::registry_t registry;
-    wayland::weston_desktop_shell_t shell;
-    wayland::output_t output;
+    wayland::Display display;
+    wayland::Registry registry;
+    weston::DesktopShell shell;
+    wayland::Output output;
 
     Glib::RefPtr<Gdk::Display> gdk_display;
     Element background;
@@ -112,7 +113,7 @@ namespace tablecloth {
     Gdk::wayland::window::set_use_custom_surface(window);
     panel.surface = Gdk::wayland::window::get_wl_surface(window);
     shell.set_panel(output, panel.surface);
-    shell.set_panel_position((uint32_t) wayland::weston_desktop_shell_panel_position::top);
+    shell.set_panel_position(weston::DesktopShell::PanelPosition::Top);
   }
 
   void Desktop::create_grab_surface()
@@ -130,7 +131,6 @@ namespace tablecloth {
     shell.set_grab_surface(curtain.surface);
   }
 
-#if true
   void Desktop::create_background()
   {
     const char* xpm_data[] = {"1 1 1 1", "_ c SteelBlue", "_"};
@@ -166,39 +166,6 @@ namespace tablecloth {
 
     shell.set_background(output, background.surface);
   }
-#else
-
-  void Desktop::create_background()
-  {
-    GdkWindow* gdk_window;
-
-    const gchar* xpm_data[] = {"1 1 1 1", "_ c SteelBlue", "_"};
-
-    background = (Teststruct*) malloc(sizeof *background);
-    memset(background, 0, sizeof *background);
-
-    /* TODO: get the "right" directory */
-    background->pixbuf = gdk_pixbuf_new_from_xpm_data(xpm_data);
-    if (!background->pixbuf) {
-      g_message("Could not load background.");
-      exit(EXIT_FAILURE);
-    }
-
-    background->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-
-    gtk_window_set_title(GTK_WINDOW(background->window), "gtk shell");
-    gtk_window_set_decorated(GTK_WINDOW(background->window), FALSE);
-    gtk_widget_realize(background->window);
-    gtk_widget_set_size_request(background->window, 200, 200);
-
-    gdk_window = gtk_widget_get_window(background->window);
-    gdk_wayland_window_set_use_custom_surface(gdk_window);
-
-    background->surface = gdk_wayland_window_get_wl_surface(gdk_window);
-    shell.set_background(output, wayland::surface_t(background->surface));
-    gtk_widget_show_all(background->window);
-  }
-#endif
 
   int main(int argc, char* argv[])
   {

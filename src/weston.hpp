@@ -88,6 +88,8 @@ namespace weston {
       grab_cursor_t _grab_cursor;
     };
 
+    inline static const std::string interface_name = "weston_desktop_shell";
+
     // Methods //
 
     int add_listener(DesktopShell::Listener& listener) noexcept

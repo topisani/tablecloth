@@ -33,9 +33,12 @@ wayland_scanner_code = generator(wayland_scanner_prog, output: '@BASENAME@-proto
 sources = run_command('find', 'src', '-name', '*.cpp').stdout().strip().split('\n')
 
 sources += [
-    wayland_scannerpp.process('protocol/weston-desktop-shell.xml'),
-    wayland_scannerpp.process(join_paths(wp_protocol_dir, 'unstable', 'input-method', 'input-method-unstable-v1.xml')),
-    wayland_scannerpp.process('protocol/workspaces.xml'),
+    wayland_scanner_client.process('protocol/weston-desktop-shell.xml'),
+    wayland_scanner_code.process('protocol/weston-desktop-shell.xml'),
+    wayland_scanner_client.process(join_paths(wp_protocol_dir, 'unstable', 'input-method', 'input-method-unstable-v1.xml')),
+    wayland_scanner_code.process(join_paths(wp_protocol_dir, 'unstable', 'input-method', 'input-method-unstable-v1.xml')),
+    wayland_scanner_client.process('protocol/workspaces.xml'),
+    wayland_scanner_code.process('protocol/workspaces.xml'),
 ]
 
 executable('tablecloth', sources, dependencies : [thread_dep, xkbcommon_dep, waylandpp, waylandpp_extra, libweston_desktop, libweston, libinput, gtk, gtkmm])

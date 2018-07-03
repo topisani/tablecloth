@@ -4,9 +4,8 @@
 
 #include <gdk/gdkwayland.h>
 #include <gtkmm.h>
-#include <wayland-client.hpp>
 
-#include "util/bindings.hpp"
+#include "wayland.hpp"
 
 namespace Gdk::wayland::window {
 
@@ -15,14 +14,14 @@ namespace Gdk::wayland::window {
     return gdk_wayland_window_get_type();
   }
 
-  ::wayland::surface_t get_wl_surface(Gdk::Window& window) noexcept
+  ::wayland::Surface get_wl_surface(Gdk::Window& window) noexcept
   {
-    return ::wayland::surface_t(gdk_wayland_window_get_wl_surface(window.gobj()));
+    return gdk_wayland_window_get_wl_surface(window.gobj());
   }
 
-  ::wayland::surface_t get_wl_surface(Gtk::Window& window) noexcept
+  ::wayland::Surface get_wl_surface(Gtk::Window& window) noexcept
   {
-    return {gdk_wayland_window_get_wl_surface(gtk_widget_get_window(GTK_WIDGET(window.gobj()))), ::wayland::proxy_t::wrapper_type::foreign};
+    return gdk_wayland_window_get_wl_surface(gtk_widget_get_window(GTK_WIDGET(window.gobj())));
   }
 
   void set_use_custom_surface(Gdk::Window& window) noexcept
