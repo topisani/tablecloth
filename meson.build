@@ -11,8 +11,9 @@ libinput = dependency('libinput')
 
 wayland_protocols = dependency('wayland-protocols')
 wayland_wall = dependency('wayland-wall')
-waylandpp = dependency('wayland-client++')
-waylandpp_extra = dependency('wayland-client-extra++')
+#waylandpp = dependency('wayland-client++')
+#waylandpp_extra = dependency('wayland-client-extra++')
+wlroots        = dependency('wlroots', fallback: ['wlroots', 'wlroots'])
 gtk = dependency('gtk+-3.0')
 gtkmm = dependency('gtkmm-3.0')
 wp_protocol_dir = wayland_protocols.get_pkgconfig_variable('pkgdatadir')
@@ -27,18 +28,14 @@ wayland_scannerpp = generator(find_program('wayland-scanner++'), output: [
 
 wayland_scanner_prog = find_program('wayland-scanner')
 wayland_scanner_client = generator(wayland_scanner_prog, output: '@BASENAME@-client-protocol.h', arguments: ['client-header', '@INPUT@', '@OUTPUT@'])
-wayland_scanner_server = generator(wayland_scanner_prog, output: '@BASENAME@-server-protocol.h', arguments: ['server-header', '@INPUT@', '@OUTPUT@'])
+wayland_scanner_server = generator(wayland_scanner_prog, output: '@BASENAME@-protocol.h', arguments: ['server-header', '@INPUT@', '@OUTPUT@'])
 wayland_scanner_code = generator(wayland_scanner_prog, output: '@BASENAME@-protocol.c', arguments: ['code', '@INPUT@', '@OUTPUT@'])
 
 sources = run_command('find', 'src', '-name', '*.cpp').stdout().strip().split('\n')
 
 sources += [
-    wayland_scanner_client.process('protocol/weston-desktop-shell.xml'),
-    wayland_scanner_code.process('protocol/weston-desktop-shell.xml'),
-    wayland_scanner_client.process(join_paths(wp_protocol_dir, 'unstable', 'input-method', 'input-method-unstable-v1.xml')),
-    wayland_scanner_code.process(join_paths(wp_protocol_dir, 'unstable', 'input-method', 'input-method-unstable-v1.xml')),
-    wayland_scanner_client.process('protocol/workspaces.xml'),
-    wayland_scanner_code.process('protocol/workspaces.xml'),
+    wayland_scanner_server.process(join_paths(wp_protocol_dir, 'unstable', 'xdg-shell', 'xdg-shell-unstable-v6.xml')),
+    wayland_scanner_code.process(join_paths(wp_protocol_dir, 'unstable', 'xdg-shell', 'xdg-shell-unstable-v6.xml')),
 ]
 
-executable('tablecloth', sources, dependencies : [thread_dep, xkbcommon_dep, waylandpp, waylandpp_extra, libweston_desktop, libweston, libinput, gtk, gtkmm])
+executable('tablecloth', sources, dependencies : [thread_dep, xkbcommon_dep, wlroots, libinput, gtk, gtkmm])
