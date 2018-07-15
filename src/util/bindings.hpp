@@ -24,9 +24,9 @@ namespace cloth {
 /// Generate conversions to Base
 #define CLOTH_BIND_BASE(Class, BaseClass)                                                          \
 public:                                                                                            \
-  using Base = struct ::BaseClass;                                                                 \
+  using Base = BaseClass;                                                                          \
   using deleter = cloth::util::deleter<Class>;                                                     \
-  Class(Base* base = nullptr) noexcept : _base(base) {}                                                      \
+  Class(Base* base = nullptr) noexcept : _base(base) {}                                            \
                                                                                                    \
   Class(cloth::owner<Base> base) noexcept : _base({static_cast<Base*>(base), deleter{*this}}) {}   \
                                                                                                    \

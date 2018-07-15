@@ -4,20 +4,6 @@
 #include <time.h>
 #include <wayland-server.h>
 
-extern "C" {
-#include <wlr/backend.h>
-#include <wlr/types/wlr_buffer.h>
-#include <wlr/types/wlr_compositor.h>
-#include <wlr/types/wlr_gamma_control.h>
-#include <wlr/types/wlr_idle.h>
-#include <wlr/types/wlr_matrix.h>
-#include <wlr/types/wlr_primary_selection.h>
-#include <wlr/types/wlr_screenshooter.h>
-#include <wlr/types/wlr_xdg_shell_v6.h>
-}
-
-#include <functional>
-
 #include "server.hpp"
 
 namespace cloth {
@@ -42,6 +28,7 @@ namespace cloth {
 
     if (!wlr_backend_start(backend)) {
       fprintf(stderr, "Failed to start backend\n");
+      wlr_backend_destroy(backend);
       wl_display_destroy(wl_display);
       exit(1);
     }
