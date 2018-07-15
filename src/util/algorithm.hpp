@@ -23,6 +23,36 @@ namespace cloth::util {
     return result;
   }
 
+  bool iequals(std::string_view a, std::string_view b)
+  {
+    return std::equal(a.begin(), a.end(), b.begin(), b.end(),
+                      [](char a, char b) { return tolower(a) == tolower(b); });
+  }
+
+  bool starts_with(std::string_view prefix, std::string_view a)
+  {
+    return a.compare(0, prefix.size(), prefix);
+  }
+
+  bool ends_with(std::string_view prefix, std::string_view a)
+  {
+    return a.compare(a.size() - prefix.size(), prefix.size(), prefix);
+  }
+
+  template<typename Cont, typename T>
+  bool erase_this(Cont&& cont, T* el)
+  {
+    if (el < cont.data() && el >= cont.data() + cont.size()) return false;
+    cont.erase(cont.begin() + (el - cont.data()));
+    return true;
+  }
+
+  template<typename Cont, typename T>
+  bool erase_this(Cont&& cont, T& el)
+  {
+    return erase_this(cont, &el);
+  }
+
   namespace detail {
     template<class Func, int... ns>
     constexpr auto generate_array_impl(std::integer_sequence<int, ns...>&&, Func&& gen)
@@ -38,6 +68,74 @@ namespace cloth::util {
     auto intseq = std::make_integer_sequence<int, n>();
     return detail::generate_array_impl(std::move(intseq), std::forward<Func>(gen));
   }
+
+  namespace view {
+
+    template<typename Cont>
+    struct reverse {
+
+      reverse(Cont& cont) noexcept : _container(cont) {}
+
+      auto begin()
+      {
+        return std::rbegin(_container);
+      }
+
+      auto end()
+      {
+        return std::rend(_container);
+      }
+
+      auto begin() const
+      {
+        return std::rbegin(_container);
+      }
+
+      auto end() const
+      {
+        return std::rend(_container);
+      }
+
+      auto cbegin() const
+      {
+        return std::crbegin(_container);
+      }
+
+      auto cend() const
+      {
+        return std::crend(_container);
+      }
+
+      Cont& _container;
+    };
+
+    template<typename Cont>
+    struct constant {
+      constant(Cont& cont) noexcept : _container(cont){};
+
+      auto begin() const
+      {
+        return std::cbegin(_container);
+      }
+
+      auto end() const
+      {
+        return std::cend(_container);
+      }
+
+      auto cbegin() const
+      {
+        return std::cbegin(_container);
+      }
+
+      auto cend() const
+      {
+        return std::cend(_container);
+      }
+
+      Cont& _container;
+    };
+  } // namespace view
 
 
   /*

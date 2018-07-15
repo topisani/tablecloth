@@ -1,13 +1,29 @@
+#include <assert.h>
+#include <stdlib.h>
+
+#include "wlroots.hpp"
+
+#include "config.hpp"
 #include "input.hpp"
-
-#include "util/algorithm.hpp"
-#include "util/logging.hpp"
-
-#include <string>
+#include "keyboard.hpp"
+#include "seat.hpp"
+#include "server.hpp"
 
 namespace cloth {
 
-  static const char* to_string(enum wlr_input_device_type type)
+  Seat* Input::last_active_seat()
+  {
+    Seat* _seat = nullptr;
+    for (auto& seat : seats) {
+      if (!_seat || (_seat->wlr_seat->last_event.tv_sec > seat.wlr_seat->last_event.tv_sec &&
+                     _seat->wlr_seat->last_event.tv_nsec > seat.wlr_seat->last_event.tv_nsec)) {
+        _seat = &seat;
+      }
+    }
+    return _seat;
+  }
+
+  static const char* device_type(enum wlr_input_device_type type)
   {
     switch (type) {
     case WLR_INPUT_DEVICE_KEYBOARD: return "keyboard";
@@ -19,29 +35,103 @@ namespace cloth {
     return NULL;
   }
 
-  Input::Input(Server& server) noexcept : server(server)
+  struct roots_seat* input_get_seat(struct roots_input* input, char* name)
   {
-    LOGD("Initializing Input");
+    struct roots_seat* seat = NULL;
+    wl_list_for_each(seat, &input->seats, link)
+    {
+      if (strcmp(seat->seat->name, name) == 0) {
+        return seat;
+      }
+    }
 
-    new_input = [this](void* data) {
-      auto& device = *(wlr::input_device_t*) data;
-      std::string seat_name = "seat0";
-
-      auto& seat = get_seat(seat_name);
-
-      LOGD("New input device: {} ({}:{}) {} seat: {}", device.name, device.vendor, device.product,
-           to_string(device.type), seat_name);
-
-      seat.add_device(device);
-    };
-    new_input.add_to(server.backend->events.new_input);
+    seat = roots_seat_create(input, name);
+    return seat;
   }
 
-  Seat& Input::get_seat(std::string_view name) noexcept
+  static void handle_new_input(struct wl_listener* listener, void* data)
   {
-    auto found = util::find_if(seats, [name](Seat& s) { return s.name == name; });
+    struct wlr_input_device* device = data;
+    struct roots_input* input = wl_container_of(listener, input, new_input);
 
-    if (found != seats.end()) return *found;
-    return seats.emplace_back(*this, name);
+    char* seat_name = ROOTS_CONFIG_DEFAULT_SEAT_NAME;
+    struct roots_device_config* dc = roots_config_get_device(input->config, device);
+    if (dc) {
+      seat_name = dc->seat;
+    }
+
+    struct roots_seat* seat = input_get_seat(input, seat_name);
+    if (!seat) {
+      wlr_log(WLR_ERROR, "could not create roots seat");
+      return;
+    }
+
+    wlr_log(WLR_DEBUG, "New input device: %s (%d:%d) %s seat:%s", device->name, device->vendor,
+            device->product, device_type(device->type), seat_name);
+
+    roots_seat_add_device(seat, device);
+
+    if (dc && wlr_input_device_is_libinput(device)) {
+      struct libinput_device* libinput_dev = wlr_libinput_get_device_handle(device);
+
+      wlr_log(WLR_DEBUG, "input has config, tap_enabled: %d\n", dc->tap_enabled);
+      if (dc->tap_enabled) {
+        libinput_device_config_tap_set_enabled(libinput_dev, LIBINPUT_CONFIG_TAP_ENABLED);
+      }
+    }
+  }
+
+  struct roots_input* input_create(struct roots_server* server, struct roots_config* config)
+  {
+    wlr_log(WLR_DEBUG, "Initializing roots input");
+    assert(server->desktop);
+
+    struct roots_input* input = calloc(1, sizeof(struct roots_input));
+    if (input == NULL) {
+      return NULL;
+    }
+
+    input->config = config;
+    input->server = server;
+
+    wl_list_init(&input->seats);
+
+    input->new_input.notify = handle_new_input;
+    wl_signal_add(&server->backend->events.new_input, &input->new_input);
+
+    return input;
+  }
+
+  void input_destroy(struct roots_input* input)
+  {
+    // TODO
+  }
+
+  struct roots_seat* input_seat_from_wlr_seat(struct roots_input* input, struct wlr_seat* wlr_seat)
+  {
+    struct roots_seat* seat = NULL;
+    wl_list_for_each(seat, &input->seats, link)
+    {
+      if (seat->seat == wlr_seat) {
+        return seat;
+      }
+    }
+    return seat;
+  }
+
+  bool input_view_has_focus(struct roots_input* input, struct roots_view* view)
+  {
+    if (!view) {
+      return false;
+    }
+    struct roots_seat* seat;
+    wl_list_for_each(seat, &input->seats, link)
+    {
+      if (view == roots_seat_get_focus(seat)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 } // namespace cloth

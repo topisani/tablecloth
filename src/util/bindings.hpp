@@ -3,9 +3,6 @@
 #include <memory>
 #include <variant>
 
-/// No-function macro to mark implicit conversions
-#define implicit
-
 namespace cloth {
   template<typename T>
   struct owner {
@@ -35,7 +32,7 @@ public:                                                                         
     return &*_base;                                                                                \
   }                                                                                                \
                                                                                                    \
-  implicit operator Base*() noexcept                                                               \
+  operator Base*() noexcept                                                                        \
   {                                                                                                \
     return base();                                                                                 \
   }                                                                                                \
@@ -45,7 +42,7 @@ public:                                                                         
     return &*_base;                                                                                \
   }                                                                                                \
                                                                                                    \
-  implicit operator const Base*() const noexcept                                                   \
+  operator const Base*() const noexcept                                                            \
   {                                                                                                \
     return base();                                                                                 \
   }                                                                                                \
@@ -59,6 +56,75 @@ private:                                                                        
   ::cloth::util::raw_or_unique_ptr<Base, Class::deleter> _base;                                    \
                                                                                                    \
 public:
+
+#define CLOTH_ENABLE_BITMASK_OPS(Enum)                                                             \
+  template<>                                                                                       \
+  struct ::cloth::enable_bitmask_ops<Enum> : std::true_type {};
+
+namespace cloth {
+
+  template<typename Enum>
+  struct enable_bitmask_ops : std::false_type {};
+  template<typename Enum>
+  auto operator|(Enum lhs, Enum rhs)
+    -> std::enable_if_t<cloth::enable_bitmask_ops<Enum>::value, Enum>
+  {
+    return static_cast<Enum>(static_cast<std::underlying_type_t<Enum>>(lhs) |
+                             static_cast<std::underlying_type_t<Enum>>(rhs));
+  }
+
+  template<typename Enum>
+  auto operator&(Enum lhs, Enum rhs)
+    -> std::enable_if_t<cloth::enable_bitmask_ops<Enum>::value, Enum>
+  {
+    return static_cast<Enum>(static_cast<std::underlying_type_t<Enum>>(lhs) &
+                             static_cast<std::underlying_type_t<Enum>>(rhs));
+  }
+
+  template<typename Enum>
+  auto operator^(Enum lhs, Enum rhs)
+    -> std::enable_if_t<cloth::enable_bitmask_ops<Enum>::value, Enum>
+  {
+    return static_cast<Enum>(static_cast<std::underlying_type_t<Enum>>(lhs) ^
+                             static_cast<std::underlying_type_t<Enum>>(rhs));
+  }
+
+  template<typename Enum>
+  auto operator~(Enum rhs) -> std::enable_if_t<cloth::enable_bitmask_ops<Enum>::value, Enum>
+  {
+    return static_cast<Enum>(~static_cast<std::underlying_type_t<Enum>>(rhs));
+  }
+
+  template<typename Enum>
+  auto operator|=(Enum& lhs, Enum rhs)
+    -> std::enable_if_t<cloth::enable_bitmask_ops<Enum>::value, Enum&>
+  {
+    lhs = static_cast<Enum>(static_cast<std::underlying_type_t<Enum>>(lhs) |
+                            static_cast<std::underlying_type_t<Enum>>(rhs));
+
+    return lhs;
+  }
+
+  template<typename Enum>
+  auto operator&=(Enum& lhs, Enum rhs)
+    -> std::enable_if_t<cloth::enable_bitmask_ops<Enum>::value, Enum&>
+  {
+    lhs = static_cast<Enum>(static_cast<std::underlying_type_t<Enum>>(lhs) &
+                            static_cast<std::underlying_type_t<Enum>>(rhs));
+
+    return lhs;
+  }
+
+  template<typename Enum>
+  auto operator^=(Enum& lhs, Enum rhs)
+    -> std::enable_if_t<cloth::enable_bitmask_ops<Enum>::value, Enum&>
+  {
+    lhs = static_cast<Enum>(static_cast<std::underlying_type_t<Enum>>(
+      lhs) static_cast<std::underlying_type_t<Enum>>(rhs));
+
+    return lhs;
+  }
+} // namespace cloth
 
 namespace cloth::util {
 

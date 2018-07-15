@@ -6,60 +6,37 @@
 #include <vector>
 
 #include <wayland-server.h>
-
 #include "wlroots.hpp"
+
+#include "config.hpp"
+#include "desktop.hpp"
+#include "input.hpp"
 
 namespace cloth {
 
-  namespace chrono {
-    using namespace std::chrono;
-
-    using clock = std::chrono::system_clock;
-    using duration = clock::duration;
-    using time_point = std::chrono::time_point<clock, duration>;
-
-    inline struct timespec to_timespec(time_point t) noexcept
-    {
-      long secs = duration_cast<seconds>(t.time_since_epoch()).count();
-      long nsc = nanoseconds(t.time_since_epoch()).count() % 1000000000;
-      return {secs, nsc};
-    }
-  } // namespace chrono
-
-  struct Server;
-
-  struct Output {
-    Output(struct wlr_output* wlr, Server& server) noexcept : server(server), wlr_output(wlr) {}
-
-    Output(const Output&) = delete;
-    Output& operator=(const Output&) noexcept = delete;
-
-    Output(Output&& rhs) noexcept = default;
-    Output& operator=(Output&&) noexcept = default;
-
-    void frame_notify(void*);
-
-    Server& server;
-    struct wlr_output* wlr_output;
-
-    chrono::time_point last_frame;
-
-    wlr::Listener destroy;
-    wlr::Listener frame;
-  };
-
   struct Server {
-    Server() noexcept;
 
-    wl_display* wl_display;
-    wl_event_loop* wl_event_loop;
+    ~Server() noexcept;
 
-    wlr_backend* backend;
-    wlr_compositor* compositor;
+    Config config;
+    Desktop desktop;
+    Input input;
 
-    wlr::Listener new_output;
+    wl::display_t* wl_display = nullptr;
+    wl::event_loop_t* wl_event_loop = nullptr;
 
-    std::vector<std::unique_ptr<Output>> outputs;
+    wlr::backend_t* backend = nullptr;
+    wlr::renderer_t* renderer = nullptr;
+
+    wlr::data_device_manager_t* data_device_manager = nullptr;
+
+    static Server& get() noexcept {
+      static Server instance;
+      return instance;
+    }
+
+  private:
+    explicit Server() noexcept;
   };
 
 } // namespace cloth

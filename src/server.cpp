@@ -8,43 +8,18 @@
 
 namespace cloth {
 
-  void new_output_notify(Server& server, void* data);
-
   Server::Server() noexcept
-  {
-    wl_display = wl_display_create();
-    assert(wl_display);
-    wl_event_loop = wl_display_get_event_loop(wl_display);
-    assert(wl_event_loop);
+  { }
 
-    backend = wlr_backend_autocreate(wl_display, nullptr);
-    assert(backend);
-
-    new_output = [&](void* data) { new_output_notify(*this, data); };
-    new_output.add_to(backend->events.new_output);
-
-    const char* socket = wl_display_add_socket_auto(wl_display);
-    assert(socket);
-
-    if (!wlr_backend_start(backend)) {
-      fprintf(stderr, "Failed to start backend\n");
-      wlr_backend_destroy(backend);
+  Server::~Server() noexcept {
+    if (wl_display) {
+      wl_display_destroy_clients(wl_display);
       wl_display_destroy(wl_display);
-      exit(1);
     }
-
-    printf("Running compositor on wayland display '%s'\n", socket);
-    setenv("WAYLAND_DISPLAY", socket, true);
-
-    wl_display_init_shm(wl_display);
-    wlr_gamma_control_manager_create(wl_display);
-    wlr_screenshooter_create(wl_display);
-    wlr_primary_selection_device_manager_create(wl_display);
-    wlr_idle_create(wl_display);
-
-    compositor = wlr_compositor_create(wl_display, wlr_backend_get_renderer(backend));
-
-    wlr_xdg_shell_v6_create(wl_display);
+    if (wl_event_loop) wl_event_loop_destroy(wl_event_loop);
+    if (backend) wlr_backend_destroy(backend);
+    if (renderer) wlr_renderer_destroy(renderer);
+    if (data_device_manager) wlr_data_device_manager_destroy(data_device_manager);
   }
 
   void Output::frame_notify(void* data)
