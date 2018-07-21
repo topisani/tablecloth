@@ -255,6 +255,38 @@ namespace cloth::util {
     {
       return _order.rend();
     }
+
+    value_type& front() 
+    {
+      return *_order.front();
+    }
+
+    value_type& back() 
+    {
+      return *_order.back();
+    }  
+
+    const value_type& front() const
+    {
+      return *_order.front();
+    }
+
+    const value_type& back() const
+    {
+      return *_order.back();
+    }  
   };
+
+  template<typename T, typename T2>
+  std::unique_ptr<T> erase_this(ptr_vec<T>& vec, T2* el)
+  {
+    return vec.erase(*el);
+  }
+
+  template<typename T, typename T2>
+  std::unique_ptr<T> erase_this(ptr_vec<T>& vec, T2& el)
+  {
+    return vec.erase(el);
+  }
 
 } // namespace cloth::util

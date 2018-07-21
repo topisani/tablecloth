@@ -1,34 +1,52 @@
 #pragma once
 
+#include "util/ptr_vec.hpp"
 #include "wlroots.hpp"
 
 namespace cloth {
 
-  struct LayerSurface {
-    wlr::layer_surface_t* layer_surface;
+  struct LayerPopup;
+  struct Output;
 
-    wlr::Listener destroy;
-    wlr::Listener map;
-    wlr::Listener unmap;
-    wlr::Listener surface_commit;
-    wlr::Listener output_destroy;
-    wlr::Listener new_popup;
+  struct LayerSurface {
+    LayerSurface(Output& output, wlr::layer_surface_t& layer_surface);
+
+    LayerPopup& create_popup(wlr::xdg_popup_v6_t& wlr_popup);
+
+    Output& output;
+    wlr::layer_surface_t& layer_surface;
 
     bool configured;
     wlr::box_t geo;
+
+    util::ptr_vec<LayerPopup> children;
+
+  protected:
+    wl::Listener on_destroy;
+    wl::Listener on_map;
+    wl::Listener on_unmap;
+    wl::Listener on_surface_commit;
+    wl::Listener on_output_destroy;
+    wl::Listener on_new_popup;
   };
 
   struct LayerPopup {
-    wlr::xdg_popup_v6_t* wlr_popup;
-    LayerSurface& parent;
+    LayerPopup(LayerSurface& parent, wlr::xdg_popup_v6_t& layer_surface);
 
-    wlr::Listener map;
-    wlr::Listener unmap;
-    wlr::Listener destroy;
-    wlr::Listener commit;
+    LayerSurface& parent;
+    wlr::xdg_popup_v6_t& wlr_popup;
+
+  protected:
+    wl::Listener on_map;
+    wl::Listener on_unmap;
+    wl::Listener on_destroy;
+    wl::Listener on_commit;
+    wl::Listener on_new_popup;
   };
 
   struct Output;
   void arrange_layers(Output& output);
 
 } // namespace cloth
+
+// kak: other_file=layer_shell.cpp

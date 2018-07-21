@@ -18,4 +18,9 @@ namespace cloth::chrono {
       return {secs, nsc};
     }
 
+    inline time_point to_time_point(struct timespec t) noexcept
+    {
+      return time_point() + seconds(t.tv_sec) + nanoseconds(t.tv_nsec);
+    }
+
 }

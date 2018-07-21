@@ -1,444 +1,329 @@
-#include <assert.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <wayland-server.h>
-#include <wlr/types/wlr_box.h>
-#include <wlr/types/wlr_surface.h>
-#include <wlr/types/wlr_layer_shell.h>
-#include <wlr/util/log.h>
-#include "rootston/desktop.h"
-#include "rootston/layers.h"
-#include "rootston/output.h"
-#include "rootston/server.h"
+#include "layers.hpp"
 
-static void apply_exclusive(struct wlr_box *usable_area,
-		uint32_t anchor, int32_t exclusive,
-		int32_t margin_top, int32_t margin_right,
-		int32_t margin_bottom, int32_t margin_left) {
-	if (exclusive <= 0) {
-		return;
-	}
-	struct {
-		uint32_t anchors;
-		int *positive_axis;
-		int *negative_axis;
-		int margin;
-	} edges[] = {
-		{
-			.anchors =
-				ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
-				ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT |
-				ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP,
-			.positive_axis = &usable_area->y,
-			.negative_axis = &usable_area->height,
-			.margin = margin_top,
-		},
-		{
-			.anchors =
-				ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
-				ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT |
-				ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM,
-			.positive_axis = NULL,
-			.negative_axis = &usable_area->height,
-			.margin = margin_bottom,
-		},
-		{
-			.anchors =
-				ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
-				ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP |
-				ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM,
-			.positive_axis = &usable_area->x,
-			.negative_axis = &usable_area->width,
-			.margin = margin_left,
-		},
-		{
-			.anchors =
-				ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT |
-				ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP |
-				ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM,
-			.positive_axis = NULL,
-			.negative_axis = &usable_area->width,
-			.margin = margin_right,
-		},
-	};
-	for (size_t i = 0; i < sizeof(edges) / sizeof(edges[0]); ++i) {
-		if ((anchor & edges[i].anchors) == edges[i].anchors) {
-			if (edges[i].positive_axis) {
-				*edges[i].positive_axis += exclusive + edges[i].margin;
-			}
-			if (edges[i].negative_axis) {
-				*edges[i].negative_axis -= exclusive + edges[i].margin;
-			}
-		}
-	}
-}
+#include "util/algorithm.hpp"
+#include "util/logging.hpp"
+#include "util/exception.hpp"
+#include "wlroots.hpp"
 
-static void arrange_layer(struct wlr_output *output, struct wl_list *list,
-		struct wlr_box *usable_area, bool exclusive) {
-	struct roots_layer_surface *roots_surface;
-	struct wlr_box full_area = { 0 };
-	wlr_output_effective_resolution(output,
-			&full_area.width, &full_area.height);
-	wl_list_for_each(roots_surface, list, link) {
-		struct wlr_layer_surface *layer = roots_surface->layer_surface;
-		struct wlr_layer_surface_state *state = &layer->current;
-		if (exclusive != (state->exclusive_zone > 0)) {
-			continue;
-		}
-		struct wlr_box bounds;
-		if (state->exclusive_zone == -1) {
-			bounds = full_area;
-		} else {
-			bounds = *usable_area;
-		}
-		struct wlr_box box = {
-			.width = state->desired_width,
-			.height = state->desired_height
-		};
-		// Horizontal axis
-		const uint32_t both_horiz = ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT
-			| ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT;
-		if ((state->anchor & both_horiz) && box.width == 0) {
-			box.x = bounds.x;
-			box.width = bounds.width;
-		} else if ((state->anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT)) {
-			box.x = bounds.x;
-		} else if ((state->anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT)) {
-			box.x = bounds.x + (bounds.width - box.width);
-		} else {
-			box.x = bounds.x + ((bounds.width / 2) - (box.width / 2));
-		}
-		// Vertical axis
-		const uint32_t both_vert = ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP
-			| ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM;
-		if ((state->anchor & both_vert) && box.height == 0) {
-			box.y = bounds.y;
-			box.height = bounds.height;
-		} else if ((state->anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP)) {
-			box.y = bounds.y;
-		} else if ((state->anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM)) {
-			box.y = bounds.y + (bounds.height - box.height);
-		} else {
-			box.y = bounds.y + ((bounds.height / 2) - (box.height / 2));
-		}
-		// Margin
-		if ((state->anchor & both_horiz) == both_horiz) {
-			box.x += state->margin.left;
-			box.width -= state->margin.left + state->margin.right;
-		} else if ((state->anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT)) {
-			box.x += state->margin.left;
-		} else if ((state->anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT)) {
-			box.x -= state->margin.right;
-		}
-		if ((state->anchor & both_vert) == both_vert) {
-			box.y += state->margin.top;
-			box.height -= state->margin.top + state->margin.bottom;
-		} else if ((state->anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP)) {
-			box.y += state->margin.top;
-		} else if ((state->anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM)) {
-			box.y -= state->margin.bottom;
-		}
-		if (box.width < 0 || box.height < 0) {
-			// TODO: Bubble up a protocol error?
-			wlr_layer_surface_close(layer);
-			continue;
-		}
-		// Apply
-		roots_surface->geo = box;
-		apply_exclusive(usable_area, state->anchor, state->exclusive_zone,
-				state->margin.top, state->margin.right,
-				state->margin.bottom, state->margin.left);
-		wlr_layer_surface_configure(layer, box.width, box.height);
-	}
-}
+#include "desktop.hpp"
+#include "output.hpp"
+#include "server.hpp"
+#include "seat.hpp"
 
-void arrange_layers(struct roots_output *output) {
-	struct wlr_box usable_area = { 0 };
-	wlr_output_effective_resolution(output->wlr_output,
-			&usable_area.width, &usable_area.height);
+namespace cloth {
 
-	// Arrange exclusive surfaces from top->bottom
-	arrange_layer(output->wlr_output,
-			&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY],
-			&usable_area, true);
-	arrange_layer(output->wlr_output,
-			&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP],
-			&usable_area, true);
-	arrange_layer(output->wlr_output,
-			&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM],
-			&usable_area, true);
-	arrange_layer(output->wlr_output,
-			&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND],
-			&usable_area, true);
-	memcpy(&output->usable_area, &usable_area, sizeof(struct wlr_box));
+  LayerPopup::LayerPopup(LayerSurface& parent, wlr::xdg_popup_v6_t& wlr_popup)
+    : parent(parent), wlr_popup(wlr_popup)
+  {
+    on_destroy.add_to(wlr_popup.base->events.destroy);
+    on_destroy = [&] { util::erase_this(parent.children, this); };
+    on_new_popup.add_to(wlr_popup.base->events.new_popup);
+    on_new_popup = [&](void* data) { parent.create_popup(*((wlr::xdg_popup_v6_t*) data)); };
 
-	struct roots_view *view;
-	wl_list_for_each(view, &output->desktop->views, link) {
-		if (view->maximized) {
-			view_arrange_maximized(view);
-		}
-	}
+    auto damage_whole = [&] {
+      int ox = wlr_popup.geometry.x + parent.geo.x;
+      int oy = wlr_popup.geometry.y + parent.geo.y;
+      parent.output.damage_whole_local_surface(*wlr_popup.base->surface, ox, oy, 0);
+    };
 
-	// Arrange non-exlusive surfaces from top->bottom
-	arrange_layer(output->wlr_output,
-			&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY],
-			&usable_area, false);
-	arrange_layer(output->wlr_output,
-			&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP],
-			&usable_area, false);
-	arrange_layer(output->wlr_output,
-			&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM],
-			&usable_area, false);
-	arrange_layer(output->wlr_output,
-			&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND],
-			&usable_area, false);
+    on_unmap.add_to(wlr_popup.base->events.unmap);
+    on_unmap = damage_whole;
+    on_map.add_to(wlr_popup.base->events.map);
+    on_map = damage_whole;
+    on_commit.add_to(wlr_popup.base->surface->events.commit);
+    on_commit = damage_whole;
 
-	// Find topmost keyboard interactive layer, if such a layer exists
-	uint32_t layers_above_shell[] = {
-		ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY,
-		ZWLR_LAYER_SHELL_V1_LAYER_TOP,
-	};
-	size_t nlayers = sizeof(layers_above_shell) / sizeof(layers_above_shell[0]);
-	struct roots_layer_surface *layer, *topmost = NULL;
-	for (size_t i = 0; i < nlayers; ++i) {
-		wl_list_for_each_reverse(layer,
-				&output->layers[layers_above_shell[i]], link) {
-			if (layer->layer_surface->current.keyboard_interactive) {
-				topmost = layer;
-				break;
-			}
-		}
-		if (topmost != NULL) {
-			break;
-		}
-	}
+    // TODO: Desired behaviour?
+  }
 
-	struct roots_input *input = output->desktop->server->input;
-	struct roots_seat *seat;
-	wl_list_for_each(seat, &input->seats, link) {
-		roots_seat_set_focus_layer(seat,
-				topmost ? topmost->layer_surface : NULL);
-	}
-}
 
-static void handle_output_destroy(struct wl_listener *listener, void *data) {
-	struct roots_layer_surface *layer =
-		wl_container_of(listener, layer, output_destroy);
-	layer->layer_surface->output = NULL;
-	wl_list_remove(&layer->output_destroy.link);
-	wlr_layer_surface_close(layer->layer_surface);
-}
+  static void apply_exclusive(wlr::box_t& usable_area,
+                              uint32_t anchor,
+                              int32_t exclusive,
+                              int32_t margin_top,
+                              int32_t margin_right,
+                              int32_t margin_bottom,
+                              int32_t margin_left)
+  {
+    if (exclusive <= 0) {
+      return;
+    }
+    struct {
+      uint32_t anchors;
+      int* positive_axis;
+      int* negative_axis;
+      int margin;
+    } edges[] = {
+      {
+        .anchors = ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT |
+                   ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP,
+        .positive_axis = &usable_area.y,
+        .negative_axis = &usable_area.height,
+        .margin = margin_top,
+      },
+      {
+        .anchors = ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT |
+                   ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM,
+        .positive_axis = nullptr,
+        .negative_axis = &usable_area.height,
+        .margin = margin_bottom,
+      },
+      {
+        .anchors = ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT | ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP |
+                   ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM,
+        .positive_axis = &usable_area.x,
+        .negative_axis = &usable_area.width,
+        .margin = margin_left,
+      },
+      {
+        .anchors = ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT | ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP |
+                   ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM,
+        .positive_axis = nullptr,
+        .negative_axis = &usable_area.width,
+        .margin = margin_right,
+      },
+    };
+    for (size_t i = 0; i < sizeof(edges) / sizeof(edges[0]); ++i) {
+      if ((anchor & edges[i].anchors) == edges[i].anchors) {
+        if (edges[i].positive_axis) {
+          *edges[i].positive_axis += exclusive + edges[i].margin;
+        }
+        if (edges[i].negative_axis) {
+          *edges[i].negative_axis -= exclusive + edges[i].margin;
+        }
+      }
+    }
+  }
 
-static void handle_surface_commit(struct wl_listener *listener, void *data) {
-	struct roots_layer_surface *layer =
-		wl_container_of(listener, layer, surface_commit);
-	struct wlr_layer_surface *layer_surface = layer->layer_surface;
-	struct wlr_output *wlr_output = layer_surface->output;
-	if (wlr_output != NULL) {
-		struct roots_output *output = wlr_output->data;
-		struct wlr_box old_geo = layer->geo;
-		arrange_layers(output);
-		if (memcmp(&old_geo, &layer->geo, sizeof(struct wlr_box)) != 0) {
-			output_damage_whole_local_surface(output, layer_surface->surface,
-					old_geo.x, old_geo.y, 0);
-			output_damage_whole_local_surface(output, layer_surface->surface,
-					layer->geo.x, layer->geo.y, 0);
-		} else {
-			output_damage_from_local_surface(output, layer_surface->surface,
-					layer->geo.x, layer->geo.y, 0);
-		}
-	}
-}
+  static void arrange_layer(wlr::output_t& output,
+                            util::ptr_vec<LayerSurface>& list,
+                            wlr::box_t& usable_area,
+                            bool exclusive)
+  {
+    wlr::box_t full_area = {0};
+    wlr_output_effective_resolution(&output, &full_area.width, &full_area.height);
+    for (auto& surface : list) {
+      wlr::layer_surface_t& layer = surface.layer_surface;
+      wlr::layer_surface_state_t& state = layer.current;
+      if (exclusive != (state.exclusive_zone > 0)) {
+        continue;
+      }
+      wlr::box_t bounds;
+      if (state.exclusive_zone == -1) {
+        bounds = full_area;
+      } else {
+        bounds = usable_area;
+      }
+      wlr::box_t box = {.width = (int) state.desired_width, .height = (int) state.desired_height};
+      // Horizontal axis
+      const uint32_t both_horiz =
+        ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT;
+      if ((state.anchor & both_horiz) && box.width == 0) {
+        box.x = bounds.x;
+        box.width = bounds.width;
+      } else if ((state.anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT)) {
+        box.x = bounds.x;
+      } else if ((state.anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT)) {
+        box.x = bounds.x + (bounds.width - box.width);
+      } else {
+        box.x = bounds.x + ((bounds.width / 2) - (box.width / 2));
+      }
+      // Vertical axis
+      const uint32_t both_vert =
+        ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM;
+      if ((state.anchor & both_vert) && box.height == 0) {
+        box.y = bounds.y;
+        box.height = bounds.height;
+      } else if ((state.anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP)) {
+        box.y = bounds.y;
+      } else if ((state.anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM)) {
+        box.y = bounds.y + (bounds.height - box.height);
+      } else {
+        box.y = bounds.y + ((bounds.height / 2) - (box.height / 2));
+      }
+      // Margin
+      if ((state.anchor & both_horiz) == both_horiz) {
+        box.x += state.margin.left;
+        box.width -= state.margin.left + state.margin.right;
+      } else if ((state.anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT)) {
+        box.x += state.margin.left;
+      } else if ((state.anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT)) {
+        box.x -= state.margin.right;
+      }
+      if ((state.anchor & both_vert) == both_vert) {
+        box.y += state.margin.top;
+        box.height -= state.margin.top + state.margin.bottom;
+      } else if ((state.anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP)) {
+        box.y += state.margin.top;
+      } else if ((state.anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM)) {
+        box.y -= state.margin.bottom;
+      }
+      if (box.width < 0 || box.height < 0) {
+        // TODO: Bubble up a protocol error?
+        wlr_layer_surface_close(&layer);
+        continue;
+      }
+      // Apply
+      surface.geo = box;
+      apply_exclusive(usable_area, state.anchor, state.exclusive_zone, state.margin.top,
+                      state.margin.right, state.margin.bottom, state.margin.left);
+      wlr_layer_surface_configure(&layer, box.width, box.height);
+    }
+  }
 
-static void unmap(struct wlr_layer_surface *layer_surface) {
-	struct roots_layer_surface *layer = layer_surface->data;
-	struct wlr_output *wlr_output = layer_surface->output;
-	if (wlr_output != NULL) {
-		struct roots_output *output = wlr_output->data;
-		output_damage_whole_local_surface(output, layer_surface->surface,
-			layer->geo.x, layer->geo.y, 0);
-	}
-}
+  void arrange_layers(Output& output)
+  {
+    wlr::box_t usable_area = {0};
+    wlr_output_effective_resolution(&output.wlr_output, &usable_area.width, &usable_area.height);
 
-static void handle_destroy(struct wl_listener *listener, void *data) {
-	struct roots_layer_surface *layer = wl_container_of(
-			listener, layer, destroy);
-	if (layer->layer_surface->mapped) {
-		unmap(layer->layer_surface);
-	}
-	wl_list_remove(&layer->link);
-	wl_list_remove(&layer->destroy.link);
-	wl_list_remove(&layer->map.link);
-	wl_list_remove(&layer->unmap.link);
-	wl_list_remove(&layer->surface_commit.link);
-	if (layer->layer_surface->output) {
-		wl_list_remove(&layer->output_destroy.link);
-		arrange_layers((struct roots_output *)layer->layer_surface->output->data);
-	}
-	free(layer);
-}
+    // Arrange exclusive surfaces from top->bottom
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], usable_area,
+                  true);
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], usable_area,
+                  true);
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], usable_area,
+                  true);
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND],
+                  usable_area, true);
+    memcpy(&output.usable_area, &usable_area, sizeof(wlr::box_t));
 
-static void handle_map(struct wl_listener *listener, void *data) {
-	struct wlr_layer_surface *layer_surface = data;
-	struct roots_layer_surface *layer = layer_surface->data;
-	struct wlr_output *wlr_output = layer_surface->output;
-	struct roots_output *output = wlr_output->data;
-	output_damage_whole_local_surface(output, layer_surface->surface,
-		layer->geo.x, layer->geo.y, 0);
-	wlr_surface_send_enter(layer_surface->surface, wlr_output);
-}
+    for (auto& view : output.desktop.views) {
+      if (view.maximized) view.arrange_maximized();
+    }
 
-static void handle_unmap(struct wl_listener *listener, void *data) {
-	struct roots_layer_surface *layer = wl_container_of(
-			listener, layer, unmap);
-	unmap(layer->layer_surface);
-}
+    // Arrange non-exlusive surfaces from top->bottom
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], usable_area,
+                  false);
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], usable_area,
+                  false);
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], usable_area,
+                  false);
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND],
+                  usable_area, false);
 
-static void popup_handle_map(struct wl_listener *listener, void *data) {
-	struct roots_layer_popup *popup = wl_container_of(listener, popup, map);
-	struct roots_layer_surface *layer = popup->parent;
-	struct wlr_output *wlr_output = layer->layer_surface->output;
-	struct roots_output *output = wlr_output->data;
-	int ox = popup->wlr_popup->geometry.x + layer->geo.x;
-	int oy = popup->wlr_popup->geometry.y + layer->geo.y;
-	output_damage_whole_local_surface(output, popup->wlr_popup->base->surface,
-		ox, oy, 0);
-}
+    // Find topmost keyboard interactive layer, if such a layer exists
+    uint32_t layers_above_shell[] = {
+      ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY,
+      ZWLR_LAYER_SHELL_V1_LAYER_TOP,
+    };
+    size_t nlayers = sizeof(layers_above_shell) / sizeof(layers_above_shell[0]);
+    LayerSurface* topmost = nullptr;
+    for (size_t i = 0; i < nlayers; ++i) {
+      for (auto& layer : util::view::reverse(output.layers[layers_above_shell[i]])) {
+        if (layer.layer_surface.current.keyboard_interactive) {
+          topmost = &layer;
+          break;
+        }
+      }
+      if (topmost != nullptr) {
+        break;
+      }
+    }
 
-static void popup_handle_unmap(struct wl_listener *listener, void *data) {
-	struct roots_layer_popup *popup = wl_container_of(listener, popup, unmap);
-	struct roots_layer_surface *layer = popup->parent;
-	struct wlr_output *wlr_output = layer->layer_surface->output;
-	struct roots_output *output = wlr_output->data;
-	int ox = popup->wlr_popup->geometry.x + layer->geo.x;
-	int oy = popup->wlr_popup->geometry.y + layer->geo.y;
-	output_damage_whole_local_surface(output, popup->wlr_popup->base->surface,
-		ox, oy, 0);
-}
+    for (auto& seat : output.desktop.server.input.seats) {
+      seat.set_focus_layer(topmost ? &topmost->layer_surface : nullptr);
+    }
+  }
 
-static void popup_handle_commit(struct wl_listener *listener, void *data) {
-	struct roots_layer_popup *popup = wl_container_of(listener, popup, commit);
-	struct roots_layer_surface *layer = popup->parent;
-	struct wlr_output *wlr_output = layer->layer_surface->output;
-	struct roots_output *output = wlr_output->data;
-	int ox = popup->wlr_popup->geometry.x + layer->geo.x;
-	int oy = popup->wlr_popup->geometry.y + layer->geo.y;
-	output_damage_from_local_surface(output, popup->wlr_popup->base->surface,
-		ox, oy, 0);
-}
+  void Desktop::handle_layer_shell_surface(void* data)
+  {
+    auto& layer_surface = *(wlr::layer_surface_t*) data;
 
-static void popup_handle_destroy(struct wl_listener *listener, void *data) {
-	struct roots_layer_popup *popup =
-		wl_container_of(listener, popup, destroy);
+    LOGD("new layer surface: namespace {} layer {} anchor {} size {}x{} margin {},{},{},{}",
+         layer_surface.namespace_, layer_surface.layer, layer_surface.layer,
+         layer_surface.client_pending.desired_width, layer_surface.client_pending.desired_height,
+         layer_surface.client_pending.margin.top, layer_surface.client_pending.margin.right,
+         layer_surface.client_pending.margin.bottom, layer_surface.client_pending.margin.left);
 
-	wl_list_remove(&popup->map.link);
-	wl_list_remove(&popup->unmap.link);
-	wl_list_remove(&popup->destroy.link);
-	wl_list_remove(&popup->commit.link);
-	free(popup);
-}
+    if (!layer_surface.output) {
+      Seat* seat = server.input.last_active_seat();
+      assert(seat); // TODO: Technically speaking we should handle this case
+      wlr::output_t* output = wlr_output_layout_output_at(layout, seat->cursor.wlr_cursor->x,
+                                                          seat->cursor.wlr_cursor->y);
+      if (!output) {
+        LOGE("Couldn't find output at (%.0f,%.0f)", seat->cursor.wlr_cursor->x,
+                seat->cursor.wlr_cursor->y);
+        output = wlr_output_layout_get_center_output(layout);
+      }
+      if (output) {
+        layer_surface.output = output;
+      } else {
+        wlr_layer_surface_close(&layer_surface);
+        return;
+      }
+    }
 
-static struct roots_layer_popup *popup_create(struct roots_layer_surface *parent,
-		struct wlr_xdg_popup *wlr_popup) {
-	struct roots_layer_popup *popup =
-		calloc(1, sizeof(struct roots_layer_popup));
-	if (popup == NULL) {
-		return NULL;
-	}
-	popup->wlr_popup = wlr_popup;
-	popup->parent = parent;
-	popup->map.notify = popup_handle_map;
-	wl_signal_add(&wlr_popup->base->events.map, &popup->map);
-	popup->unmap.notify = popup_handle_unmap;
-	wl_signal_add(&wlr_popup->base->events.unmap, &popup->unmap);
-	popup->destroy.notify = popup_handle_destroy;
-	wl_signal_add(&wlr_popup->base->events.destroy, &popup->destroy);
-	popup->commit.notify = popup_handle_commit;
-	wl_signal_add(&wlr_popup->base->surface->events.commit, &popup->commit);
-	/* TODO: popups can have popups, see xdg_shell::popup_create */
+    auto* output = (Output*) layer_surface.data;
+    if (!output)  throw util::exception("layer_surface.data not set");
 
-	return popup;
-}
+    [[maybe_unused]]
+    auto& layer = output->layers[layer_surface.layer].emplace_back(*output, layer_surface);
 
-static void handle_new_popup(struct wl_listener *listener, void *data) {
-	struct roots_layer_surface *roots_layer_surface =
-		wl_container_of(listener, roots_layer_surface, new_popup);
-	struct wlr_xdg_popup *wlr_popup = data;
-	popup_create(roots_layer_surface, wlr_popup);
-}
+    // Temporarily set the layer's current state to client_pending
+    // So that we can easily arrange it
+    wlr::layer_surface_state_t old_state = layer_surface.current;
+    layer_surface.current = layer_surface.client_pending;
 
-void handle_layer_shell_surface(struct wl_listener *listener, void *data) {
-	struct wlr_layer_surface *layer_surface = data;
-	struct roots_desktop *desktop =
-		wl_container_of(listener, desktop, layer_shell_surface);
-	wlr_log(WLR_DEBUG, "new layer surface: namespace %s layer %d anchor %d "
-			"size %dx%d margin %d,%d,%d,%d",
-		layer_surface->namespace, layer_surface->layer, layer_surface->layer,
-		layer_surface->client_pending.desired_width,
-		layer_surface->client_pending.desired_height,
-		layer_surface->client_pending.margin.top,
-		layer_surface->client_pending.margin.right,
-		layer_surface->client_pending.margin.bottom,
-		layer_surface->client_pending.margin.left);
+    arrange_layers(*output);
 
-	if (!layer_surface->output) {
-		struct roots_input *input = desktop->server->input;
-		struct roots_seat *seat = input_last_active_seat(input);
-		assert(seat); // Technically speaking we should handle this case
-		struct wlr_output *output =
-			wlr_output_layout_output_at(desktop->layout,
-					seat->cursor->cursor->x,
-					seat->cursor->cursor->y);
-		if (!output) {
-			wlr_log(WLR_ERROR, "Couldn't find output at (%.0f,%.0f)",
-				seat->cursor->cursor->x,
-				seat->cursor->cursor->y);
-			output = wlr_output_layout_get_center_output(desktop->layout);
-		}
-		if (output) {
-			layer_surface->output = output;
-		} else {
-			wlr_layer_surface_close(layer_surface);
-			return;
-		}
-	}
+    layer_surface.current = old_state;
+  }
 
-	struct roots_layer_surface *roots_surface =
-		calloc(1, sizeof(struct roots_layer_surface));
-	if (!roots_surface) {
-		return;
-	}
+  LayerPopup& LayerSurface::create_popup(wlr::xdg_popup_v6_t& wlr_popup) {
+    auto popup = std::make_unique<LayerPopup>(*this, wlr_popup);
+    return children.push_back(std::move(popup));
+  }
 
-	roots_surface->surface_commit.notify = handle_surface_commit;
-	wl_signal_add(&layer_surface->surface->events.commit,
-		&roots_surface->surface_commit);
+  LayerSurface::LayerSurface(Output& output, wlr::layer_surface_t& layer_surface)
+    : output(output), layer_surface(layer_surface)
+  {
+    layer_surface.data = this;
 
-	roots_surface->output_destroy.notify = handle_output_destroy;
-	wl_signal_add(&layer_surface->output->events.destroy,
-		&roots_surface->output_destroy);
+    on_surface_commit.add_to(layer_surface.surface->events.commit);
+    on_surface_commit = [&] (void* data) {
+      wlr::box_t old_geo = geo;
+      arrange_layers(output);
+      if (old_geo == geo) {
+        output.damage_whole_local_surface(*layer_surface.surface, old_geo.x, old_geo.y);
+        output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
+      } else {
+        output.damage_from_local_surface(*layer_surface.surface, geo.x, geo.y);
+      }
+    };
 
-	roots_surface->destroy.notify = handle_destroy;
-	wl_signal_add(&layer_surface->events.destroy, &roots_surface->destroy);
-	roots_surface->map.notify = handle_map;
-	wl_signal_add(&layer_surface->events.map, &roots_surface->map);
-	roots_surface->unmap.notify = handle_unmap;
-	wl_signal_add(&layer_surface->events.unmap, &roots_surface->unmap);
-	roots_surface->new_popup.notify = handle_new_popup;
-	wl_signal_add(&layer_surface->events.new_popup, &roots_surface->new_popup);
-	// TODO: Listen for subsurfaces
+    on_output_destroy.add_to(layer_surface.output->events.destroy);
+    on_output_destroy = [&] (void* data) {
+      layer_surface.output = nullptr;
+      on_output_destroy.remove();
+      wlr_layer_surface_close(&layer_surface);
+    };
 
-	roots_surface->layer_surface = layer_surface;
-	layer_surface->data = roots_surface;
+    on_destroy.add_to(layer_surface.events.destroy);
+    on_destroy = [&] (void* data) {
+      if (layer_surface.mapped) {
+        output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
+      }
+      util::erase_this(output.layers[layer_surface.layer], this);
+      arrange_layers(output);
+    };
+    on_map.add_to(layer_surface.events.map);
+    on_map = [&] (void* data) {
+      output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
+      wlr_surface_send_enter(layer_surface.surface, &output.wlr_output);
+    };
+    on_unmap.add_to(layer_surface.events.unmap);
+    on_unmap = [&] (void* data) {
+       output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
+    };
+    on_new_popup.add_to(layer_surface.events.new_popup);
+    on_new_popup = [&] (void* data) {
+      auto& wlr_popup = *(wlr::xdg_popup_v6_t*) data;
+      create_popup(wlr_popup);
+    };
+    // TODO: Listen for subsurfaces
 
-	struct roots_output *output = layer_surface->output->data;
-	wl_list_insert(&output->layers[layer_surface->layer], &roots_surface->link);
+  }
 
-	// Temporarily set the layer's current state to client_pending
-	// So that we can easily arrange it
-	struct wlr_layer_surface_state old_state = layer_surface->current;
-	layer_surface->current = layer_surface->client_pending;
+} // namespace cloth
 
-	arrange_layers(output);
-
-	layer_surface->current = old_state;
-}
+// kak: other_file=layers.hpp

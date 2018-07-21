@@ -41,9 +41,9 @@ namespace cloth {
 
     // DATA //
 
-    std::vector<View> views; // roots_view::link
+    util::ptr_vec<View> views; // roots_view::link
 
-    std::vector<Output> outputs; // roots_output::link
+    util::ptr_vec<Output> outputs; // roots_output::link
     chrono::time_point last_frame;
 
     Server& server;
@@ -69,19 +69,24 @@ namespace cloth {
     wlr::virtual_keyboard_manager_v1_t* virtual_keyboard;
     wlr::screencopy_manager_v1_t* screencopy;
 
-    wlr::Listener on_new_output;
-    wlr::Listener on_layout_change;
-    wlr::Listener on_xdg_shell_v6_surface;
-    wlr::Listener on_xdg_shell_surface;
-    wlr::Listener on_wl_shell_surface;
-    wlr::Listener on_layer_shell_surface;
-    wlr::Listener on_decoration_new;
-    wlr::Listener on_input_inhibit_activate;
-    wlr::Listener on_input_inhibit_deactivate;
-    wlr::Listener on_virtual_keyboard_new;
+  protected:
+    wl::Listener on_new_output;
+    wl::Listener on_layout_change;
+    wl::Listener on_xdg_shell_v6_surface;
+    wl::Listener on_xdg_shell_surface;
+    wl::Listener on_wl_shell_surface;
+    wl::Listener on_layer_shell_surface;
+    wl::Listener on_decoration_new;
+    wl::Listener on_input_inhibit_activate;
+    wl::Listener on_input_inhibit_deactivate;
+    wl::Listener on_virtual_keyboard_new;
+
+    wl::listener_t test;
 
 #ifdef WLR_HAS_XWAYLAND
+  public:
     wlr::xwayland_t* xwayland;
+  protected:
     wl::Listener on_xwayland_surface;
 #endif
   };

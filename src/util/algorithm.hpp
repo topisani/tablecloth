@@ -23,32 +23,32 @@ namespace cloth::util {
     return result;
   }
 
-  bool iequals(std::string_view a, std::string_view b)
+  inline bool iequals(std::string_view a, std::string_view b)
   {
     return std::equal(a.begin(), a.end(), b.begin(), b.end(),
                       [](char a, char b) { return tolower(a) == tolower(b); });
   }
 
-  bool starts_with(std::string_view prefix, std::string_view a)
+  inline bool starts_with(std::string_view prefix, std::string_view a)
   {
-    return a.compare(0, prefix.size(), prefix);
+    return a.compare(0, prefix.size(), prefix) == 0;
   }
 
-  bool ends_with(std::string_view prefix, std::string_view a)
+  inline bool ends_with(std::string_view prefix, std::string_view a)
   {
-    return a.compare(a.size() - prefix.size(), prefix.size(), prefix);
+    return a.compare(a.size() - prefix.size(), prefix.size(), prefix) == 0;
   }
 
-  template<typename Cont, typename T>
-  bool erase_this(Cont&& cont, T* el)
+  template<typename T>
+  bool erase_this(std::vector<T>& cont, T* el)
   {
     if (el < cont.data() && el >= cont.data() + cont.size()) return false;
     cont.erase(cont.begin() + (el - cont.data()));
     return true;
   }
 
-  template<typename Cont, typename T>
-  bool erase_this(Cont&& cont, T& el)
+  template<typename T>
+  bool erase_this(std::vector<T>& cont, T& el)
   {
     return erase_this(cont, &el);
   }

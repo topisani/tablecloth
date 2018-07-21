@@ -1,6 +1,6 @@
 #pragma once
 
-#include <vector>
+#include "util/ptr_vec.hpp"
 
 #include "cursor.hpp"
 #include "keyboard.hpp"
@@ -14,7 +14,8 @@ namespace cloth {
   struct View;
 
   struct DragIcon {
-    ~DragIcon() noexcept;
+    DragIcon(Seat&, wlr::drag_icon_t&) noexcept;
+    ~DragIcon() noexcept = default;
     void update_position();
     void damage_whole();
 
@@ -27,37 +28,28 @@ namespace cloth {
     wl::Listener on_map;
     wl::Listener on_unmap;
     wl::Listener on_destroy;
-
-  private:
-    friend struct Seat;
-    DragIcon(Seat&, wlr::drag_icon_t&) noexcept;
   };
 
   struct Pointer {
+    Pointer(Seat&, wlr::input_device_t&) noexcept;
     ~Pointer() noexcept;
     Seat& seat;
 
     wlr::input_device_t& device;
     wl::Listener on_device_destroy;
-
-  private:
-    friend struct Seat;
-    Pointer(Seat&, wlr::input_device_t&) noexcept;
   };
 
   struct Touch {
+    Touch(Seat&, wlr::input_device_t&) noexcept;
     ~Touch() noexcept;
     Seat& seat;
 
     wlr::input_device_t& device;
     wl::Listener on_device_destroy;
-
-  private:
-    friend struct Seat;
-    Touch(Seat&, wlr::input_device_t&) noexcept;
   };
 
   struct TabletTool {
+    TabletTool(Seat&, wlr::input_device_t&) noexcept;
     ~TabletTool() noexcept;
     Seat& seat;
 
@@ -68,14 +60,15 @@ namespace cloth {
     wl::Listener on_proximity;
     wl::Listener on_tip;
     wl::Listener on_button;
-
-  private:
-    friend struct Seat;
-    TabletTool(Seat&, wlr::input_device_t&) noexcept;
   };
 
   struct SeatView {
+    SeatView(Seat&, View&) noexcept;
     ~SeatView() noexcept;
+
+    void deco_motion(double deco_sx, double deco_sy);
+    void deco_leave();
+    void deco_button(double sx, double sy, wlr::Button button, wlr::button_state_t state);
     Seat& seat;
     View& view;
 
@@ -85,13 +78,10 @@ namespace cloth {
 
     wl::Listener on_view_unmap;
     wl::Listener on_view_destroy;
-
-  private:
-    friend struct Seat;
-    SeatView(Seat&, View&) noexcept;
   };
 
   struct Seat {
+    Seat(Input& input, const std::string& name);
     ~Seat();
 
     void add_device(wlr::input_device_t& device) noexcept;
@@ -127,22 +117,19 @@ namespace cloth {
     // If non-null, only this client can receive input events
     wl::client_t* exclusive_client;
 
-    std::vector<SeatView> views;
+    util::ptr_vec<SeatView> views;
     bool has_focus;
 
-    std::vector<DragIcon> drag_icons; // roots_drag_icon::link
+    util::ptr_vec<DragIcon> drag_icons; // roots_drag_icon::link
 
-    std::vector<Keyboard> keyboards;
-    std::vector<Pointer> pointers;
-    std::vector<Touch> touch;
-    std::vector<TabletTool> tablet_tools;
+    util::ptr_vec<Keyboard> keyboards;
+    util::ptr_vec<Pointer> pointers;
+    util::ptr_vec<Touch> touch;
+    util::ptr_vec<TabletTool> tablet_tools;
 
     wl::Listener on_new_drag_icon;
     wl::Listener on_destroy;
 
-  private:
-    Seat(Input& input, const char* name);
-    friend struct Input;
 
     void reset_device_mappings(wlr::input_device_t& device) noexcept;
     void set_device_output_mappings(wlr::input_device_t& device, wlr::output_t* output) noexcept;

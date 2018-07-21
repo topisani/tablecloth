@@ -13,30 +13,19 @@ namespace cloth {
     Cursor(Seat& seat, wlr::cursor_t* cursor) noexcept;
     ~Cursor() noexcept;
 
-    void handle_motion(wlr::event_pointer_motion_t& event);
-    void handle_motion_absolute(wlr::event_pointer_motion_absolute_t& event);
-    void handle_button(wlr::event_pointer_button_t& event);
-    void handle_axis(wlr::event_pointer_axis_t& event);
-    void handle_touch_down(wlr::event_touch_down_t& event);
-    void handle_touch_up(wlr::event_touch_up_t& event);
-    void handle_touch_motion(wlr::event_touch_motion_t& event);
-    void handle_tool_axis(wlr::event_tablet_tool_axis_t& event);
-    void handle_tool_tip(wlr::event_tablet_tool_tip_t& event);
-    void handle_request_set_cursor(wlr::seat_pointer_request_set_cursor_event_t& event);
-
     // Member data
 
     Seat& seat;
-    wlr::cursor_t* wlr_cursor;
+    wlr::cursor_t* wlr_cursor = nullptr;
 
     Mode mode;
 
     std::string default_xcursor;
 
     // state from input (review if this is necessary)
-    wlr::xcursor_manager_t* xcursor_manager;
-    wlr::seat_t* wl_seat;
-    wl::client_t* cursor_client;
+    wlr::xcursor_manager_t* xcursor_manager = nullptr;
+    wlr::seat_t* wl_seat = nullptr;
+    wl::client_t* cursor_client = nullptr;
 
     int offs_x, offs_y;
     int view_x, view_y, view_width, view_height;
@@ -58,6 +47,16 @@ namespace cloth {
     wl::Listener on_tool_tip;
 
     wl::Listener on_request_set_cursor;
+
+  private:
+    void passthrough_cursor(uint32_t time);
+    void update_position(uint32_t time);
+    void press_button(wlr::input_device_t& device,
+                      uint32_t time,
+                      wlr::Button button,
+                      wlr::button_state_t state,
+                      double lx,
+                      double ly);
   };
 
 } // namespace cloth

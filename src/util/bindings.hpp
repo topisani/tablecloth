@@ -64,9 +64,29 @@ public:
 namespace cloth {
 
   template<typename Enum>
-  struct enable_bitmask_ops : std::false_type {};
+  struct enum_or_bool {
+    constexpr enum_or_bool(Enum e) : e(e){};
+    constexpr enum_or_bool(bool e) : e(static_cast<Enum>(e)){};
+    constexpr operator Enum&() noexcept
+    {
+      return e;
+    }
+    constexpr operator const Enum&() const noexcept
+    {
+      return e;
+    }
+    constexpr operator bool() const noexcept
+    {
+      return static_cast<bool>(e);
+    }
+    Enum e;
+  };
+
   template<typename Enum>
-  auto operator|(Enum lhs, Enum rhs)
+  struct enable_bitmask_ops : std::false_type {};
+
+  template<typename Enum>
+  constexpr auto operator|(Enum lhs, Enum rhs)
     -> std::enable_if_t<cloth::enable_bitmask_ops<Enum>::value, Enum>
   {
     return static_cast<Enum>(static_cast<std::underlying_type_t<Enum>>(lhs) |
@@ -74,15 +94,15 @@ namespace cloth {
   }
 
   template<typename Enum>
-  auto operator&(Enum lhs, Enum rhs)
-    -> std::enable_if_t<cloth::enable_bitmask_ops<Enum>::value, Enum>
+  constexpr auto operator&(Enum lhs, Enum rhs)
+    -> std::enable_if_t<cloth::enable_bitmask_ops<Enum>::value, enum_or_bool<Enum>>
   {
     return static_cast<Enum>(static_cast<std::underlying_type_t<Enum>>(lhs) &
                              static_cast<std::underlying_type_t<Enum>>(rhs));
   }
 
   template<typename Enum>
-  auto operator^(Enum lhs, Enum rhs)
+  constexpr auto operator^(Enum lhs, Enum rhs)
     -> std::enable_if_t<cloth::enable_bitmask_ops<Enum>::value, Enum>
   {
     return static_cast<Enum>(static_cast<std::underlying_type_t<Enum>>(lhs) ^
@@ -90,13 +110,14 @@ namespace cloth {
   }
 
   template<typename Enum>
-  auto operator~(Enum rhs) -> std::enable_if_t<cloth::enable_bitmask_ops<Enum>::value, Enum>
+  constexpr auto operator~(Enum rhs)
+    -> std::enable_if_t<cloth::enable_bitmask_ops<Enum>::value, Enum>
   {
     return static_cast<Enum>(~static_cast<std::underlying_type_t<Enum>>(rhs));
   }
 
   template<typename Enum>
-  auto operator|=(Enum& lhs, Enum rhs)
+  constexpr auto operator|=(Enum& lhs, Enum rhs)
     -> std::enable_if_t<cloth::enable_bitmask_ops<Enum>::value, Enum&>
   {
     lhs = static_cast<Enum>(static_cast<std::underlying_type_t<Enum>>(lhs) |
@@ -106,7 +127,7 @@ namespace cloth {
   }
 
   template<typename Enum>
-  auto operator&=(Enum& lhs, Enum rhs)
+  constexpr auto operator&=(Enum& lhs, Enum rhs)
     -> std::enable_if_t<cloth::enable_bitmask_ops<Enum>::value, Enum&>
   {
     lhs = static_cast<Enum>(static_cast<std::underlying_type_t<Enum>>(lhs) &
@@ -116,17 +137,48 @@ namespace cloth {
   }
 
   template<typename Enum>
-  auto operator^=(Enum& lhs, Enum rhs)
+  constexpr auto operator^=(Enum& lhs, Enum rhs)
     -> std::enable_if_t<cloth::enable_bitmask_ops<Enum>::value, Enum&>
   {
-    lhs = static_cast<Enum>(static_cast<std::underlying_type_t<Enum>>(
-      lhs) static_cast<std::underlying_type_t<Enum>>(rhs));
+    lhs = static_cast<Enum>(static_cast<std::underlying_type_t<Enum>>(lhs) ^
+                            static_cast<std::underlying_type_t<Enum>>(rhs));
 
     return lhs;
   }
 } // namespace cloth
 
 namespace cloth::util {
+
+  template<typename T1, typename T2>
+  constexpr auto dynamic_is(const T2& t) -> std::enable_if_t<!std::is_pointer_v<T2>, bool>
+  {
+    return dynamic_cast<T1*>(&t) != nullptr;
+  }
+
+  template<typename T1, typename T2>
+  constexpr auto dynamic_is(T2* t) -> std::enable_if_t<!std::is_pointer_v<T2>, bool>
+  {
+    return dynamic_cast<T1*>(t) != nullptr;
+  }
+
+  template<typename E, typename T>
+  constexpr auto enum_cast(E e) noexcept -> std::enable_if_t<std::is_enum_v<E>, E>
+  {
+    return static_cast<E>(e);
+  }
+
+  /// Cast scoped enums to their underlying numeric type
+  template<typename E>
+  constexpr auto enum_cast(E e) noexcept -> std::enable_if_t<!std::is_enum_v<E>, E>
+  {
+    return e;
+  }
+
+  template<typename E, typename = std::enable_if_t<std::is_enum_v<E>>>
+  constexpr auto enum_cast(E e) noexcept
+  {
+    return static_cast<std::underlying_type_t<E>>(e);
+  }
 
   template<typename T, typename = int>
   struct has_destroy : std::false_type {};
@@ -159,13 +211,13 @@ namespace cloth::util {
     using raw_ptr = value_type*;
     using unique_ptr = std::unique_ptr<value_type, Del>;
 
-    implicit raw_or_unique_ptr(raw_ptr ptr) noexcept : _data(ptr) {}
+    raw_or_unique_ptr(raw_ptr ptr) noexcept : _data(ptr) {}
 
-    implicit raw_or_unique_ptr(unique_ptr&& ptr) noexcept : _data(std::move(ptr)) {}
+    raw_or_unique_ptr(unique_ptr&& ptr) noexcept : _data(std::move(ptr)) {}
 
-    implicit raw_or_unique_ptr(value_type& data) noexcept : _data(&data) {}
+    raw_or_unique_ptr(value_type& data) noexcept : _data(&data) {}
 
-    implicit raw_or_unique_ptr(value_type&& data) noexcept
+    raw_or_unique_ptr(value_type&& data) noexcept
       : _data(std::make_unique<value_type, Del>(std::move(data)))
     {}
 

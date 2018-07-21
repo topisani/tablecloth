@@ -31,8 +31,8 @@ namespace cloth {
               "usage: %s [-C <FILE>] [-E <COMMAND>]\n"
               "\n"
               " -C <FILE>      Path to the configuration file\n"
-              "                (default: rootston.ini).\n"
-              "                See `rootston.ini.example` for config\n"
+              "                (default: tablecloth.ini).\n"
+              "                See `tablecloth.ini.example` for config\n"
               "                file documentation.\n"
               " -E <COMMAND>   Command that will be ran at startup.\n"
               " -D             Enable damage tracking debugging.\n",
@@ -210,10 +210,10 @@ namespace cloth {
                                 std::string_view name,
                                 std::string_view value)
     {
-      auto* found = &*util::find_if(config.cursors, [&](auto& c) { return c.seat == device_name; });
+      auto* found = &*util::find_if(config.keyboards, [&](auto& c) { return c.seat == device_name; });
 
-      if (found == &*config.cursors.end()) {
-        found = &config.cursors.emplace_back();
+      if (found == &*config.keyboards.end()) {
+        found = &config.keyboards.emplace_back();
         found->name = device_name;
       }
 
@@ -275,7 +275,7 @@ namespace cloth {
           &*util::find_if(config.outputs, [&](auto& o) { return o.name == output_name; });
 
         if (found == &*config.outputs.end()) {
-          found = &config.cursors.emplace_back();
+          found = &config.outputs.emplace_back();
           found->name = output_name;
           found->transform = WL_OUTPUT_TRANSFORM_NORMAL;
           found->scale = 1;
@@ -408,7 +408,7 @@ namespace cloth {
       char cwd[MAXPATHLEN];
       if (getcwd(cwd, sizeof(cwd)) != nullptr) {
         char buf[MAXPATHLEN];
-        if (snprintf(buf, MAXPATHLEN, "%s/%s", cwd, "rootston.ini") >= MAXPATHLEN) {
+        if (snprintf(buf, MAXPATHLEN, "%s/%s", cwd, "tablecloth.ini") >= MAXPATHLEN) {
           LOGE("config path too long");
           exit(1);
         }
@@ -471,7 +471,7 @@ namespace cloth {
   Config::Cursor* Config::get_cursor(std::string_view seat_name) noexcept
   {
     auto name = seat_name.empty() ? Config::default_seat_name : seat_name;
-    auto found = util::find_if(cursors, [&] (auto& el) { return el.name == name; });
+    auto found = util::find_if(cursors, [&] (auto& el) { return el.seat == name; });
     if (found != cursors.end()) return &*found;
     return nullptr;
   }

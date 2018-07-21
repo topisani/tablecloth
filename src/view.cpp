@@ -7,7 +7,6 @@
 #include "layers.hpp"
 #include "seat.hpp"
 #include "server.hpp"
-#include "virtual_keyboard.hpp"
 #include "wlroots.hpp"
 #include "xcursor.hpp"
 
@@ -21,17 +20,16 @@ namespace cloth {
   {
     events.destroy.emit();
     if (!wlr_surface) unmap();
-
-    if (vtbl.destroy) vtbl.destroy(*this);
   }
 
   ViewType View::type() noexcept {
-    if (std::holds_alternative<XdgSurfaceV6>(surface)) return ViewType::xdg_shell_v6;
-    if (std::holds_alternative<XdgSurface>(surface)) return ViewType::xdg_shell;
-    if (std::holds_alternative<WlShellSurface>(surface)) return ViewType::wl_shell;
+    if (util::dynamic_is<XdgSurfaceV6>(this)) return ViewType::xdg_shell_v6;
+    if (util::dynamic_is<XdgSurface>(this)) return ViewType::xdg_shell;
+    if (util::dynamic_is<WlShellSurface>(this)) return ViewType::wl_shell;
     #ifdef WLR_HAS_XWAYLAND
-    if (std::holds_alternative<WlShellSurface>(surface)) return ViewType::xwayland;
+    if (util::dynamic_is<XwaylandSurface>(this)) return ViewType::xwayland;
     #endif
+    assert(false);
   }
 
   wlr::box_t View::get_box() const
@@ -93,15 +91,19 @@ namespace cloth {
     auto box = get_box();
 
     for (auto& output : desktop.outputs) {
-      bool intersected = before.has_value() && wlr_output_layout_intersects(desktop.layout, output.wlr_output, &before.value());
-      bool intersects = wlr_output_layout_intersects(desktop.layout, output.wlr_output, &box);
+      bool intersected = before.has_value() && wlr_output_layout_intersects(desktop.layout, &output.wlr_output, &before.value());
+      bool intersects = wlr_output_layout_intersects(desktop.layout, &output.wlr_output, &box);
       if (intersected && !intersects) {
-        wlr_surface_send_leave(wlr_surface, output.wlr_output);
+        wlr_surface_send_leave(wlr_surface, &output.wlr_output);
       }
       if (!intersected && intersects) {
-        wlr_surface_send_enter(wlr_surface, output.wlr_output);
+        wlr_surface_send_enter(wlr_surface, &output.wlr_output);
       }
     }
+  }
+
+  void View::do_move(double x, double y) {
+      update_position(x, y);
   }
 
   void View::move(double x, double y)
@@ -111,28 +113,30 @@ namespace cloth {
     }
 
     auto before = get_box();
-    if (vtbl.move) {
-      vtbl.move(*this, x, y);
-    } else {
-      update_position(x, y);
-    }
+    do_move(x, y);
     update_output(before);
   }
 
   void View::activate(bool activate)
   {
-    if (vtbl.activate) {
-      vtbl.activate(*this, activate);
-    }
+    do_activate(activate);
   }
 
   void View::resize(int width, int height)
   {
     auto before = get_box();
-    if (vtbl.resize) {
-      vtbl.resize(*this, width, height);
-    }
+    do_resize(width, height);
     update_output(before);
+  }
+
+  void View::do_move_resize(double x, double y, int width, int height)
+  {
+      pending_move_resize.update_x = x != this->x;
+      pending_move_resize.update_y = y != this->y;
+      pending_move_resize.x = x;
+      pending_move_resize.y = y;
+      pending_move_resize.width = width;
+      pending_move_resize.height = height;
   }
 
   void View::move_resize(double x, double y, int width, int height)
@@ -140,16 +144,7 @@ namespace cloth {
     bool update_x = x != this->x;
     bool update_y = y != this->y;
     if (update_x || update_y) {
-      if (vtbl.move_resize) {
-        vtbl.move_resize(*this, x, y, width, height);
-        return;
-      }
-      pending_move_resize.update_x = update_x;
-      pending_move_resize.update_y = update_y;
-      pending_move_resize.x = x;
-      pending_move_resize.y = y;
-      pending_move_resize.width = width;
-      pending_move_resize.height = height;
+        do_move_resize(x, y, width, height);
     }
     resize(width, height);
   }
@@ -187,9 +182,7 @@ namespace cloth {
   {
     if (this->maximized == maximized) return;
 
-    if (vtbl.maximize) {
-      vtbl.maximize(*this, maximized);
-    }
+    do_maximize(maximized);
 
     if (!this->maximized && maximized) {
       this->maximized = true;
@@ -219,10 +212,7 @@ namespace cloth {
     }
 
     // TODO: check if client is focused?
-
-    if (vtbl.set_fullscreen) {
-      vtbl.set_fullscreen(*this, fullscreen);
-    }
+    do_set_fullscreen(fullscreen);
 
     if (!was_fullscreen && fullscreen) {
       if (wlr_output == nullptr) {
@@ -284,9 +274,7 @@ namespace cloth {
 
   void View::close()
   {
-    if (vtbl.close) {
-      vtbl.close(*this);
-    }
+    do_close();
   }
 
   bool View::center()
@@ -300,7 +288,7 @@ namespace cloth {
     }
 
     auto* wlr_output =
-      wlr_output_layout_output_at(desktop.layout, seat->cursor->cursor->x, seat->cursor->cursor->y);
+      wlr_output_layout_output_at(desktop.layout, seat->cursor.wlr_cursor->x, seat->cursor.wlr_cursor->y);
     if (!wlr_output) {
       // empty layout
       return false;
@@ -319,9 +307,7 @@ namespace cloth {
   }
 
   ViewChild::~ViewChild() noexcept
-  {
-    util::erase_this(view.children, this);
-  }
+  {}
 
   void ViewChild::finish()
   {
@@ -340,26 +326,26 @@ namespace cloth {
     view.create_subsurface(wlr_subsurface);
   }
 
-  ViewChild::ViewChild(View& view, wlr::surface_t* wlr_surface)
+  ViewChild::ViewChild(View& view, wlr::surface_t& wlr_surface)
     : view(view), wlr_surface(wlr_surface)
   {
     on_commit = [this](void* data) { handle_commit(data); };
-    on_commit.add_to(wlr_surface->events.commit);
+    on_commit.add_to(wlr_surface.events.commit);
 
     on_new_subsurface = [this](void* data) { handle_commit(data); };
-    on_new_subsurface.add_to(wlr_surface->events.new_subsurface);
+    on_new_subsurface.add_to(wlr_surface.events.new_subsurface);
   }
 
-  ViewChild& View::create_child(wlr::surface_t* wlr_surface)
+  ViewChild& View::create_child(wlr::surface_t& wlr_surface)
   {
     return children.emplace_back(*this, wlr_surface);
   }
 
-  Subsurface::Subsurface(View& view, wlr::subsurface_t* wlr_subsurface)
-    : ViewChild(view, wlr_subsurface->surface), wlr_subsurface(wlr_subsurface)
+  Subsurface::Subsurface(View& view, wlr::subsurface_t& wlr_subsurface)
+    : ViewChild(view, *wlr_subsurface.surface), wlr_subsurface(wlr_subsurface)
   {
     on_destroy = [this](void*) { finish(); };
-    on_destroy.add_to(wlr_subsurface->events.destroy);
+    on_destroy.add_to(wlr_subsurface.events.destroy);
   }
 
   Subsurface& View::create_subsurface(wlr::subsurface_t& wlr_subsurface)
@@ -370,7 +356,6 @@ namespace cloth {
 
   void View::map(wlr::surface_t& surface)
   {
-    assert(wlr_surface == nullptr);
     wlr_surface = &surface;
 
     wlr::subsurface_t* subsurface;
@@ -418,7 +403,7 @@ namespace cloth {
   {
     // TODO what seat gets focus? the one with the last input event?
     for (auto& seat : desktop.server.input.seats) {
-      seat.set_focus(*this);
+      seat.set_focus(this);
     }
   }
 
@@ -472,8 +457,8 @@ namespace cloth {
 
   bool View::at(double lx, double ly, wlr::surface_t*& wlr_surface, double& sx, double& sy)
   {
-    if (std::holds_alternative<WlShellSurface>(this->surface) &&
-        std::get<WlShellSurface>(this->surface).wlr_surface->state == WLR_WL_SHELL_SURFACE_STATE_POPUP) {
+    if (util::dynamic_is<WlShellSurface>(this) &&
+        dynamic_cast<WlShellSurface*>(this)->wl_shell_surface->state == WLR_WL_SHELL_SURFACE_STATE_POPUP) {
       return false;
     }
 
@@ -499,13 +484,13 @@ namespace cloth {
 
     double _sx, _sy;
     wlr::surface_t* _surface = nullptr;
-    if (std::holds_alternative<XdgSurfaceV6>(surface)) {
-      _surface = wlr_xdg_surface_v6_surface_at(std::get<XdgSurfaceV6>(surface).wlr_surface, view_sx, view_sy, &_sx, &_sy);
-    } else if (std::holds_alternative<XdgSurface>(surface)) {
-      _surface = wlr_xdg_surface_surface_at(std::get<XdgSurface>(surface).wlr_surface, view_sx, view_sy, &_sx, &_sy);
+    if (util::dynamic_is<XdgSurfaceV6>(this)) {
+      _surface = wlr_xdg_surface_v6_surface_at(dynamic_cast<XdgSurfaceV6&>(*this).xdg_surface, view_sx, view_sy, &_sx, &_sy);
+    } else if (util::dynamic_is<XdgSurface>(this)) {
+      _surface = wlr_xdg_surface_surface_at(dynamic_cast<XdgSurface&>(*this).xdg_surface, view_sx, view_sy, &_sx, &_sy);
 #ifdef WLR_HAS_XWAYLAND
-    } else if (std::holds_alternative<XwaylandSurface>(surface)) {
-      _surface = wlr_surface_surface_at(std::get<XwaylandSurface>(surface).wlr_surface->surface, view_sx, view_sy, &_sx, &_sy);
+    } else if (util::dynamic_is<XwaylandSurface>(this)) {
+      _surface = wlr_surface_surface_at(dynamic_cast<XwaylandSurface&>(*this).xwayland_surface->surface, view_sx, view_sy, &_sx, &_sy);
 #endif
     }
     if (_surface != nullptr) {

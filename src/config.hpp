@@ -10,7 +10,7 @@ namespace cloth {
 
   struct Config {
 
-    static constexpr std::string_view default_seat_name = "seat0";
+    inline static const std::string default_seat_name = "seat0";
 
     struct OutputMode {
       drmModeModeInfo info;
@@ -40,7 +40,7 @@ namespace cloth {
     struct Binding {
       uint32_t modifiers;
       std::vector<xkb_keysym_t> keysyms;
-      size_t keysyms_len;
+      size_t keysyms_len = 0;
       std::string command;
     };
 
@@ -63,6 +63,8 @@ namespace cloth {
       std::string theme;
       std::string default_image;
     };
+
+    Config() noexcept = default;
 
     /// Create a roots config from the given command line arguments. Command line
     /// arguments can specify the location of the config file. If it is not

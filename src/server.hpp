@@ -15,12 +15,7 @@
 namespace cloth {
 
   struct Server {
-
     ~Server() noexcept;
-
-    Config config;
-    Desktop desktop;
-    Input input;
 
     wl::display_t* wl_display = nullptr;
     wl::event_loop_t* wl_event_loop = nullptr;
@@ -30,13 +25,11 @@ namespace cloth {
 
     wlr::data_device_manager_t* data_device_manager = nullptr;
 
-    static Server& get() noexcept {
-      static Server instance;
-      return instance;
-    }
+    Config config;
+    Desktop desktop;
+    Input input;
 
-  private:
-    explicit Server() noexcept;
+    Server(int argc, char* argv[]) noexcept;
   };
 
 } // namespace cloth

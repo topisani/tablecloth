@@ -32,7 +32,7 @@ namespace cloth {
   }
 
   static wlr::surface_t* layer_surface_at(Output& output,
-                                          std::vector<LayerSurface>& layer,
+                                          util::ptr_vec<LayerSurface>& layer,
                                           double ox,
                                           double oy,
                                           double& sx,
@@ -42,7 +42,8 @@ namespace cloth {
       double _sx = ox - surface.geo.x;
       double _sy = oy - surface.geo.y;
 
-      wlr::surface_t* sub = wlr_layer_surface_surface_at(surface.layer_surface, _sx, _sy, &sx, &sy);
+      wlr::surface_t* sub =
+        wlr_layer_surface_surface_at(&surface.layer_surface, _sx, _sy, &sx, &sy);
 
       if (sub) {
         return sub;
@@ -100,7 +101,10 @@ namespace cloth {
   {
     LOGD("Initializing tablecloth desktop");
 
-    // TODO: new_output.notify = handle_new_output;
+    on_new_output = [&](void* data) {
+      LOGD("New output");
+      outputs.emplace_back(*this, *(wlr::output_t*) data);
+    };
     on_new_output.add_to(server.backend->events.new_output);
 
     layout = wlr_output_layout_create();
@@ -125,20 +129,20 @@ namespace cloth {
     compositor = wlr_compositor_create(server.wl_display, server.renderer);
 
     xdg_shell_v6 = wlr_xdg_shell_v6_create(server.wl_display);
-    on_xdg_shell_v6_surface = [this] (void* data) { handle_xdg_shell_v6_surface(data); };
+    on_xdg_shell_v6_surface = [this](void* data) { handle_xdg_shell_v6_surface(data); };
     on_xdg_shell_v6_surface.add_to(xdg_shell_v6->events.new_surface);
 
     xdg_shell = wlr_xdg_shell_create(server.wl_display);
     on_xdg_shell_surface.add_to(xdg_shell->events.new_surface);
-    on_xdg_shell_surface = [this] (void* data) { handle_xdg_shell_surface(data); };
+    on_xdg_shell_surface = [this](void* data) { handle_xdg_shell_surface(data); };
 
     wl_shell = wlr_wl_shell_create(server.wl_display);
     on_wl_shell_surface.add_to(wl_shell->events.new_surface);
-    on_wl_shell_surface = [this] (void* data) { handle_wl_shell_surface(data); };
+    on_wl_shell_surface = [this](void* data) { handle_wl_shell_surface(data); };
 
     layer_shell = wlr_layer_shell_create(server.wl_display);
     on_layer_shell_surface.add_to(layer_shell->events.new_surface);
-    on_layer_shell_surface = [this] (void* data) { handle_layer_shell_surface(data); };
+    on_layer_shell_surface = [this](void* data) { handle_layer_shell_surface(data); };
 
 #ifdef WLR_HAS_XWAYLAND
     const char* cursor_theme = nullptr;
@@ -159,7 +163,7 @@ namespace cloth {
     if (config.xwayland) {
       xwayland = wlr_xwayland_create(server.wl_display, compositor, config.xwayland_lazy);
       on_xwayland_surface.add_to(xwayland->events.new_surface);
-      on_xwayland_surface = [this] (void* data) { handle_xwayland_surface(data); };
+      on_xwayland_surface = [this](void* data) { handle_xwayland_surface(data); };
 
       if (wlr_xcursor_manager_load(xcursor_manager, 1)) {
         LOGE("Cannot load XWayland XCursor theme");
@@ -227,7 +231,7 @@ namespace cloth {
   Output* Desktop::output_from_wlr_output(wlr::output_t* wlr_output)
   {
     for (auto& output : outputs) {
-      if (output.wlr_output == wlr_output) return &output;
+      if (&output.wlr_output == wlr_output) return &output;
     }
     return nullptr;
   }

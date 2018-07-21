@@ -1,324 +1,216 @@
-#include <assert.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <wayland-server.h>
-#include <wlr/config.h>
-#include <wlr/types/wlr_box.h>
-#include <wlr/types/wlr_surface.h>
-#include <wlr/util/log.h>
-#include <wlr/xwayland.h>
-#include "rootston/server.h"
-#include "rootston/server.h"
+#include "view.hpp"
 
-static void activate(struct roots_view *view, bool active) {
-	assert(view->type == ROOTS_XWAYLAND_VIEW);
-	wlr_xwayland_surface_activate(view->xwayland_surface, active);
-}
+#include "util/algorithm.hpp"
+#include "util/logging.hpp"
+#include "wlroots.hpp"
 
-static void move(struct roots_view *view, double x, double y) {
-	assert(view->type == ROOTS_XWAYLAND_VIEW);
-	struct wlr_xwayland_surface *xwayland_surface = view->xwayland_surface;
-	view_update_position(view, x, y);
-	wlr_xwayland_surface_configure(xwayland_surface, x, y,
-		xwayland_surface->width, xwayland_surface->height);
-}
+#include "desktop.hpp"
+#include "input.hpp"
+#include "seat.hpp"
+#include "server.hpp"
 
-static void apply_size_constraints(
-		struct wlr_xwayland_surface *xwayland_surface, uint32_t width,
-		uint32_t height, uint32_t *dest_width, uint32_t *dest_height) {
-	*dest_width = width;
-	*dest_height = height;
+namespace cloth {
 
-	struct wlr_xwayland_surface_size_hints *size_hints =
-		xwayland_surface->size_hints;
-	if (size_hints != NULL) {
-		if (width < (uint32_t)size_hints->min_width) {
-			*dest_width = size_hints->min_width;
-		} else if (size_hints->max_width > 0 &&
-				width > (uint32_t)size_hints->max_width) {
-			*dest_width = size_hints->max_width;
-		}
-		if (height < (uint32_t)size_hints->min_height) {
-			*dest_height = size_hints->min_height;
-		} else if (size_hints->max_height > 0 &&
-				height > (uint32_t)size_hints->max_height) {
-			*dest_height = size_hints->max_height;
-		}
-	}
-}
+  void XwaylandSurface::do_activate(bool active)
+  {
+    wlr_xwayland_surface_activate(xwayland_surface, active);
+  }
 
-static void resize(struct roots_view *view, uint32_t width, uint32_t height) {
-	assert(view->type == ROOTS_XWAYLAND_VIEW);
-	struct wlr_xwayland_surface *xwayland_surface = view->xwayland_surface;
+  void XwaylandSurface::apply_size_constraints(int width,
+                                               int height,
+                                               int& dest_width,
+                                               int& dest_height)
+  {
+    dest_width = width;
+    dest_height = height;
 
-	uint32_t constrained_width, constrained_height;
-	apply_size_constraints(xwayland_surface, width, height, &constrained_width,
-		&constrained_height);
+    auto* size_hints = xwayland_surface->size_hints;
+    if (size_hints != nullptr) {
+      if (width < size_hints->min_width) {
+        dest_width = size_hints->min_width;
+      } else if (size_hints->max_width > 0 && width > size_hints->max_width) {
+        dest_width = size_hints->max_width;
+      }
+      if (height < size_hints->min_height) {
+        dest_height = size_hints->min_height;
+      } else if (size_hints->max_height > 0 && height > size_hints->max_height) {
+        dest_height = size_hints->max_height;
+      }
+    }
+  }
 
-	wlr_xwayland_surface_configure(xwayland_surface, xwayland_surface->x,
-			xwayland_surface->y, constrained_width, constrained_height);
-}
+  void XwaylandSurface::do_resize(int width, int height)
+  {
+    int constrained_width, constrained_height;
+    apply_size_constraints(width, height, constrained_width, constrained_height);
 
-static void move_resize(struct roots_view *view, double x, double y,
-		uint32_t width, uint32_t height) {
-	assert(view->type == ROOTS_XWAYLAND_VIEW);
-	struct wlr_xwayland_surface *xwayland_surface = view->xwayland_surface;
+    wlr_xwayland_surface_configure(xwayland_surface, xwayland_surface->x, xwayland_surface->y, constrained_width,
+                                   constrained_height);
+  }
 
-	bool update_x = x != view->x;
-	bool update_y = y != view->y;
+  void XwaylandSurface::do_move_resize(double x, double y, int width, int height)
+  {
+    bool update_x = x != this->x;
+    bool update_y = y != this->y;
 
-	uint32_t constrained_width, constrained_height;
-	apply_size_constraints(xwayland_surface, width, height, &constrained_width,
-		&constrained_height);
+    int constrained_width, constrained_height;
+    apply_size_constraints(width, height, constrained_width, constrained_height);
 
-	if (update_x) {
-		x = x + width - constrained_width;
-	}
-	if (update_y) {
-		y = y + height - constrained_height;
-	}
+    if (update_x) {
+      x = x + width - constrained_width;
+    }
+    if (update_y) {
+      y = y + height - constrained_height;
+    }
 
-	view->pending_move_resize.update_x = update_x;
-	view->pending_move_resize.update_y = update_y;
-	view->pending_move_resize.x = x;
-	view->pending_move_resize.y = y;
-	view->pending_move_resize.width = constrained_width;
-	view->pending_move_resize.height = constrained_height;
+    this->pending_move_resize.update_x = update_x;
+    this->pending_move_resize.update_y = update_y;
+    this->pending_move_resize.x = x;
+    this->pending_move_resize.y = y;
+    this->pending_move_resize.width = constrained_width;
+    this->pending_move_resize.height = constrained_height;
 
-	wlr_xwayland_surface_configure(xwayland_surface, x, y, constrained_width,
-		constrained_height);
-}
+    wlr_xwayland_surface_configure(xwayland_surface, x, y, constrained_width, constrained_width);
+  }
 
-static void close(struct roots_view *view) {
-	assert(view->type == ROOTS_XWAYLAND_VIEW);
-	wlr_xwayland_surface_close(view->xwayland_surface);
-}
+  void XwaylandSurface::do_maximize(bool maximized)
+  {
+    wlr_xwayland_surface_set_maximized(xwayland_surface, maximized);
+  }
 
-static void maximize(struct roots_view *view, bool maximized) {
-	assert(view->type == ROOTS_XWAYLAND_VIEW);
+  void XwaylandSurface::do_set_fullscreen(bool fullscreen)
+  {
+    wlr_xwayland_surface_set_fullscreen(xwayland_surface, fullscreen);
+  }
 
-	wlr_xwayland_surface_set_maximized(view->xwayland_surface, maximized);
-}
+  void XwaylandSurface::do_close()
+  {
+    wlr_xwayland_surface_close(xwayland_surface);
+  }
 
-static void set_fullscreen(struct roots_view *view, bool fullscreen) {
-	assert(view->type == ROOTS_XWAYLAND_VIEW);
+  void XwaylandSurface::do_move(double x, double y)
+  {
+    update_position(x, y);
+    wlr_xwayland_surface_configure(xwayland_surface, x, y, xwayland_surface->width,
+                                   xwayland_surface->height);
+  }
 
-	wlr_xwayland_surface_set_fullscreen(view->xwayland_surface, fullscreen);
-}
+  static Seat* guess_seat_for_view(View& view)
+  {
+    // the best we can do is to pick the first seat that has the surface focused
+    // for the pointer
+    auto& input = view.desktop.server.input;
+    for (auto& seat : input.seats) {
+      if (seat.wlr_seat->pointer_state.focused_surface == view.wlr_surface) {
+        return &seat;
+      }
+    }
+    return nullptr;
+  }
 
-static void destroy(struct roots_view *view) {
-	assert(view->type == ROOTS_XWAYLAND_VIEW);
-	struct roots_xwayland_surface *roots_surface = view->roots_xwayland_surface;
-	wl_list_remove(&roots_surface->destroy.link);
-	wl_list_remove(&roots_surface->request_configure.link);
-	wl_list_remove(&roots_surface->request_move.link);
-	wl_list_remove(&roots_surface->request_resize.link);
-	wl_list_remove(&roots_surface->request_maximize.link);
-	wl_list_remove(&roots_surface->map.link);
-	wl_list_remove(&roots_surface->unmap.link);
-	free(roots_surface);
-}
+  XwaylandSurface::XwaylandSurface(Desktop& desktop, wlr::xwayland_surface_t* xwayland_surface)
+    : View(desktop), xwayland_surface(xwayland_surface)
+  {
+    width = xwayland_surface->surface->current.width;
+    height = xwayland_surface->surface->current.height;
 
-static void handle_destroy(struct wl_listener *listener, void *data) {
-	struct roots_xwayland_surface *roots_surface =
-		wl_container_of(listener, roots_surface, destroy);
-	view_destroy(roots_surface->view);
-}
+    on_request_configure.add_to(xwayland_surface->events.request_configure);
+    on_request_configure = [&](void* data) {
+      auto& e = *(wlr::xwayland_surface_configure_event_t*) data;
+      update_position(e.x, e.y);
+    };
 
-static void handle_request_configure(struct wl_listener *listener, void *data) {
-	struct roots_xwayland_surface *roots_surface =
-		wl_container_of(listener, roots_surface, request_configure);
-	struct wlr_xwayland_surface *xwayland_surface =
-		roots_surface->view->xwayland_surface;
-	struct wlr_xwayland_surface_configure_event *event = data;
+    on_request_move.add_to(xwayland_surface->events.request_move);
+    on_request_move = [&](void* data) {
+      Seat* seat = guess_seat_for_view(*this);
+      if (!seat || seat->cursor.mode != Cursor::Mode::Passthrough) {
+        return;
+      }
+      seat->begin_move(*this);
+    };
 
-	view_update_position(roots_surface->view, event->x, event->y);
+    on_request_resize.add_to(xwayland_surface->events.request_resize);
+    on_request_resize = [&](void* data) {
+      Seat* seat = guess_seat_for_view(*this);
+      auto& e = *(wlr::xwayland_resize_event_t*) data;
+      if (!seat || seat->cursor.mode != Cursor::Mode::Passthrough) {
+        return;
+      }
+      seat->begin_resize(*this, wlr::edges_t(e.edges));
+    };
 
-	wlr_xwayland_surface_configure(xwayland_surface, event->x, event->y,
-		event->width, event->height);
-}
+    on_request_maximize.add_to(xwayland_surface->events.request_maximize);
+    on_request_maximize = [&](void* data) {
+      maximize(xwayland_surface->maximized_vert && xwayland_surface->maximized_horz);
+    };
 
-static struct roots_seat *guess_seat_for_view(struct roots_view *view) {
-	// the best we can do is to pick the first seat that has the surface focused
-	// for the pointer
-	struct roots_input *input = view->desktop->server->input;
-	struct roots_seat *seat;
-	wl_list_for_each(seat, &input->seats, link) {
-		if (seat->seat->pointer_state.focused_surface == view->wlr_surface) {
-			return seat;
-		}
-	}
-	return NULL;
-}
+    on_request_fullscreen.add_to(xwayland_surface->events.request_fullscreen);
+    on_request_fullscreen = [&](void* data) { set_fullscreen(xwayland_surface->fullscreen, nullptr); };
 
-static void handle_request_move(struct wl_listener *listener, void *data) {
-	struct roots_xwayland_surface *roots_surface =
-		wl_container_of(listener, roots_surface, request_move);
-	struct roots_view *view = roots_surface->view;
-	struct roots_seat *seat = guess_seat_for_view(view);
+    // Added/removed on map/unmap
+    on_surface_commit = [&](void* data) {
+      apply_damage();
 
-	if (!seat || seat->cursor->mode != ROOTS_CURSOR_PASSTHROUGH) {
-		return;
-	}
+      int width = xwayland_surface->surface->current.width;
+      int height = xwayland_surface->surface->current.height;
+      update_size(width, height);
 
-	roots_seat_begin_move(seat, view);
-}
+      double x = this->x;
+      double y = this->y;
+      if (pending_move_resize.update_x) {
+        x = pending_move_resize.x + pending_move_resize.width - width;
+        pending_move_resize.update_x = false;
+      }
+      if (pending_move_resize.update_y) {
+        y = pending_move_resize.y + pending_move_resize.height - height;
+        pending_move_resize.update_y = false;
+      }
+      update_position(x, y);
+    };
 
-static void handle_request_resize(struct wl_listener *listener, void *data) {
-	struct roots_xwayland_surface *roots_surface =
-		wl_container_of(listener, roots_surface, request_resize);
-	struct roots_view *view = roots_surface->view;
-	struct roots_seat *seat = guess_seat_for_view(view);
-	struct wlr_xwayland_resize_event *e = data;
+    on_map.add_to(xwayland_surface->events.map);
+    on_map = [&](void* data) {
+      auto& surface = *(wlr::xwayland_surface_t*) data;
+      x = surface.x;
+      y = surface.y;
+      width = surface.surface->current.width;
+      height = surface.surface->current.height;
 
-	if (!seat || seat->cursor->mode != ROOTS_CURSOR_PASSTHROUGH) {
-		return;
-	}
-	roots_seat_begin_resize(seat, view, e->edges);
-}
+      on_surface_commit.add_to(surface.surface->events.commit);
 
-static void handle_request_maximize(struct wl_listener *listener, void *data) {
-	struct roots_xwayland_surface *roots_surface =
-		wl_container_of(listener, roots_surface, request_maximize);
-	struct roots_view *view = roots_surface->view;
-	struct wlr_xwayland_surface *xwayland_surface = view->xwayland_surface;
+      map(*xwayland_surface->surface);
+      if (!surface.override_redirect) {
+        if (surface.decorations == WLR_XWAYLAND_SURFACE_DECORATIONS_ALL) {
+          // TODO: Desired behaviour?
+          decorated = true;
+          border_width = 4;
+          titlebar_height = 12;
+        }
+        setup();
+      } else {
+        initial_focus();
+      }
+    };
 
-	bool maximized = xwayland_surface->maximized_vert &&
-		xwayland_surface->maximized_horz;
-	view_maximize(view, maximized);
-}
+    on_unmap.add_to(xwayland_surface->events.unmap);
+    on_unmap = [&](void* data) {
+      on_surface_commit.remove();
+      unmap();
+    };
 
-static void handle_request_fullscreen(struct wl_listener *listener,
-		void *data) {
-	struct roots_xwayland_surface *roots_surface =
-		wl_container_of(listener, roots_surface, request_fullscreen);
-	struct roots_view *view = roots_surface->view;
-	struct wlr_xwayland_surface *xwayland_surface = view->xwayland_surface;
+    on_destroy.add_to(xwayland_surface->events.destroy);
+    on_destroy = [&] { util::erase_this(desktop.views, this); };
+  }
 
-	view_set_fullscreen(view, xwayland_surface->fullscreen, NULL);
-}
+  void Desktop::handle_xwayland_surface(void* data)
+  {
+    auto& surface = *(wlr::xwayland_surface_t*) data;
 
-static void handle_surface_commit(struct wl_listener *listener, void *data) {
-	struct roots_xwayland_surface *roots_surface =
-		wl_container_of(listener, roots_surface, surface_commit);
-	struct roots_view *view = roots_surface->view;
-	struct wlr_surface *wlr_surface = view->wlr_surface;
+    LOGD("New xwayland surface: title={}, class={}, instance={}", surface.title, surface.class_,
+         surface.instance);
+    wlr_xwayland_surface_ping(&surface);
 
-	view_apply_damage(view);
-
-	int width = wlr_surface->current.width;
-	int height = wlr_surface->current.height;
-	view_update_size(view, width, height);
-
-	double x = view->x;
-	double y = view->y;
-	if (view->pending_move_resize.update_x) {
-		x = view->pending_move_resize.x + view->pending_move_resize.width -
-			width;
-		view->pending_move_resize.update_x = false;
-	}
-	if (view->pending_move_resize.update_y) {
-		y = view->pending_move_resize.y + view->pending_move_resize.height -
-			height;
-		view->pending_move_resize.update_y = false;
-	}
-	view_update_position(view, x, y);
-}
-
-static void handle_map(struct wl_listener *listener, void *data) {
-	struct roots_xwayland_surface *roots_surface =
-		wl_container_of(listener, roots_surface, map);
-	struct wlr_xwayland_surface *surface = data;
-	struct roots_view *view = roots_surface->view;
-
-	view->x = surface->x;
-	view->y = surface->y;
-	view->width = surface->surface->current.width;
-	view->height = surface->surface->current.height;
-
-	roots_surface->surface_commit.notify = handle_surface_commit;
-	wl_signal_add(&surface->surface->events.commit,
-		&roots_surface->surface_commit);
-
-	view_map(view, surface->surface);
-
-	if (!surface->override_redirect) {
-		if (surface->decorations == WLR_XWAYLAND_SURFACE_DECORATIONS_ALL) {
-			view->decorated = true;
-			view->border_width = 4;
-			view->titlebar_height = 12;
-		}
-
-		view_setup(view);
-	} else {
-		view_initial_focus(view);
-	}
-}
-
-static void handle_unmap(struct wl_listener *listener, void *data) {
-	struct roots_xwayland_surface *roots_surface =
-		wl_container_of(listener, roots_surface, unmap);
-	struct roots_view *view = roots_surface->view;
-
-	wl_list_remove(&roots_surface->surface_commit.link);
-
-	view_unmap(view);
-}
-
-void handle_xwayland_surface(struct wl_listener *listener, void *data) {
-	struct roots_desktop *desktop =
-		wl_container_of(listener, desktop, xwayland_surface);
-
-	struct wlr_xwayland_surface *surface = data;
-	wlr_log(WLR_DEBUG, "new xwayland surface: title=%s, class=%s, instance=%s",
-		surface->title, surface->class, surface->instance);
-	wlr_xwayland_surface_ping(surface);
-
-	struct roots_xwayland_surface *roots_surface =
-		calloc(1, sizeof(struct roots_xwayland_surface));
-	if (roots_surface == NULL) {
-		return;
-	}
-
-	roots_surface->destroy.notify = handle_destroy;
-	wl_signal_add(&surface->events.destroy, &roots_surface->destroy);
-	roots_surface->request_configure.notify = handle_request_configure;
-	wl_signal_add(&surface->events.request_configure,
-		&roots_surface->request_configure);
-	roots_surface->map.notify = handle_map;
-	wl_signal_add(&surface->events.map, &roots_surface->map);
-	roots_surface->unmap.notify = handle_unmap;
-	wl_signal_add(&surface->events.unmap, &roots_surface->unmap);
-	roots_surface->request_move.notify = handle_request_move;
-	wl_signal_add(&surface->events.request_move, &roots_surface->request_move);
-	roots_surface->request_resize.notify = handle_request_resize;
-	wl_signal_add(&surface->events.request_resize,
-		&roots_surface->request_resize);
-	roots_surface->request_maximize.notify = handle_request_maximize;
-	wl_signal_add(&surface->events.request_maximize,
-		&roots_surface->request_maximize);
-	roots_surface->request_fullscreen.notify = handle_request_fullscreen;
-	wl_signal_add(&surface->events.request_fullscreen,
-		&roots_surface->request_fullscreen);
-
-	struct roots_view *view = view_create(desktop);
-	if (view == NULL) {
-		free(roots_surface);
-		return;
-	}
-	view->type = ROOTS_XWAYLAND_VIEW;
-	view->x = (double)surface->x;
-	view->y = (double)surface->y;
-
-	view->xwayland_surface = surface;
-	view->roots_xwayland_surface = roots_surface;
-	view->activate = activate;
-	view->resize = resize;
-	view->move = move;
-	view->move_resize = move_resize;
-	view->maximize = maximize;
-	view->set_fullscreen = set_fullscreen;
-	view->close = close;
-	view->destroy = destroy;
-	roots_surface->view = view;
-}
+    auto view_ptr = std::make_unique<XwaylandSurface>(*this, &surface);
+    views.push_back(std::move(view_ptr));
+  }
+} // namespace cloth

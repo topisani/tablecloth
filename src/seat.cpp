@@ -5,6 +5,7 @@
 #include "keyboard.hpp"
 #include "seat.hpp"
 #include "xcursor.hpp"
+#include "server.hpp"
 
 #include "util/algorithm.hpp"
 #include "util/exception.hpp"
@@ -12,8 +13,8 @@
 
 namespace cloth {
 
-  Seat::Seat(Input& input, const char* name)
-    : wlr_seat(wlr_seat_create(input.server.wl_display, name)), input(input), cursor(*this, nullptr)
+  Seat::Seat(Input& input, const std::string& name)
+    : wlr_seat(wlr_seat_create(input.server.wl_display, name.c_str())), input(input), cursor(*this, wlr_cursor_create())
   {
     if (!wlr_seat) throw util::exception("Could not create wlr_seat from name {}", name);
 
@@ -87,28 +88,24 @@ namespace cloth {
       mapped_output = cc->mapped_output;
     }
     for (auto& output : desktop.outputs) {
-      if (mapped_output == output.wlr_output->name) {
-        wlr_cursor_map_to_output(cursor, output.wlr_output);
+      if (mapped_output == output.wlr_output.name) {
+        wlr_cursor_map_to_output(cursor, &output.wlr_output);
       }
 
       for (auto& pointer : pointers) {
-        set_device_output_mappings(pointer.device, output.wlr_output);
+        set_device_output_mappings(pointer.device, &output.wlr_output);
       }
       for (auto& tablet_tool : tablet_tools) {
-        set_device_output_mappings(tablet_tool.device, output.wlr_output);
+        set_device_output_mappings(tablet_tool.device, &output.wlr_output);
       }
       for (auto& touch : this->touch) {
-        set_device_output_mappings(touch.device, output.wlr_output);
+        set_device_output_mappings(touch.device, &output.wlr_output);
       }
     }
   }
 
   void Seat::init_cursor()
   {
-    wlr::cursor_t* wlr_cursor = this->cursor.wlr_cursor;
-    Desktop& desktop = input.server.desktop;
-    wlr_cursor_attach_output_layout(wlr_cursor, desktop.layout);
-
     configure_cursor();
     configure_xcursor();
   }
@@ -117,21 +114,25 @@ namespace cloth {
   {
     auto& wlr_drag_icon = *(wlr::drag_icon_t*) data;
 
-    DragIcon& icon = drag_icons.emplace_back(*this, &wlr_drag_icon);
+    drag_icons.emplace_back(*this, wlr_drag_icon);
+  }
 
-    icon.on_surface_commit = [&] { icon.update_position(); };
-    icon.on_surface_commit.add_to(wlr_drag_icon.surface->events.commit);
+  DragIcon::DragIcon(Seat& seat, wlr::drag_icon_t& wlr_icon) noexcept
+   : seat(seat), wlr_drag_icon(wlr_icon)
+  {
+    on_surface_commit = [&] { update_position(); };
+    on_surface_commit.add_to(wlr_drag_icon.surface->events.commit);
 
-    auto handle_damage_whole = [&] { icon.damage_whole(); };
+    auto handle_damage_whole = [&] { damage_whole(); };
 
-    icon.on_unmap = handle_damage_whole;
-    icon.on_unmap.add_to(wlr_drag_icon.events.unmap);
-    icon.on_map = handle_damage_whole;
-    icon.on_map.add_to(wlr_drag_icon.events.map);
-    icon.on_destroy = handle_damage_whole;
-    icon.on_destroy.add_to(wlr_drag_icon.events.destroy);
+    on_unmap = handle_damage_whole;
+    on_unmap.add_to(wlr_drag_icon.events.unmap);
+    on_map = handle_damage_whole;
+    on_map.add_to(wlr_drag_icon.events.map);
+    on_destroy = handle_damage_whole;
+    on_destroy.add_to(wlr_drag_icon.events.destroy);
 
-    icon.update_position();
+    update_position();
   }
 
   void DragIcon::update_position()
@@ -194,8 +195,9 @@ namespace cloth {
 
     on_device_destroy.add_to(device.events.destroy);
     on_device_destroy = [this] {
+      auto& seat = this->seat;
       util::erase_this(this->seat.pointers, this);
-      this->seat.update_capabilities();
+      seat.update_capabilities();
     };
     seat.configure_cursor();
   }
@@ -316,9 +318,9 @@ namespace cloth {
     }
 
     for (auto& output : input.server.desktop.outputs) {
-      float scale = output.wlr_output->scale;
+      float scale = output.wlr_output.scale;
       if (wlr_xcursor_manager_load(cursor.xcursor_manager, scale)) {
-        LOGE("Cannot load xcursor theme for output '{}' with scale {}", output.wlr_output->name,
+        LOGE("Cannot load xcursor theme for output '{}' with scale {}", output.wlr_output.name,
              scale);
       }
     }
@@ -335,7 +337,7 @@ namespace cloth {
         continue;
       }
 
-      uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard.device->keyboard);
+      uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard.device.keyboard);
       if ((modifiers ^ keyboard.config.meta_key) == 0) {
         return true;
       }
@@ -354,9 +356,9 @@ namespace cloth {
 
   SeatView::SeatView(Seat& seat, View& view) noexcept : seat(seat), view(view)
   {
-    on_view_unmap = [&] { util::erase_this(seat, this); };
+    on_view_unmap = [&] { util::erase_this(seat.views, this); };
     on_view_unmap.add_to(view.events.unmap);
-    on_view_destroy = [&] { util::erase_this(seat, this); };
+    on_view_destroy = [&] { util::erase_this(seat.views, this); };
     on_view_destroy.add_to(view.events.destroy);
   }
 
@@ -373,9 +375,76 @@ namespace cloth {
 
     // Focus first view
     if (!seat.views.empty()) {
-      seat.set_focus(seat.views.front().view);
+      seat.set_focus(&seat.views.front().view);
     }
   }
+
+  void SeatView::deco_motion(double deco_sx, double deco_sy)
+  {
+    double sx = deco_sx;
+    double sy = deco_sy;
+    if (has_button_grab) {
+      sx = grab_sx;
+      sy = grab_sy;
+    }
+
+    DecoPart parts = view.get_deco_part(sx, sy);
+
+    bool is_titlebar = parts & DecoPart::titlebar;
+    wlr::edges_t edges = WLR_EDGE_NONE;
+    if (parts & DecoPart::left_border) {
+      edges |= WLR_EDGE_LEFT;
+    } else if (parts & DecoPart::right_border) {
+      edges |= WLR_EDGE_RIGHT;
+    } else if (parts & DecoPart::bottom_border) {
+      edges |= WLR_EDGE_BOTTOM;
+    } else if (parts & DecoPart::top_border) {
+      edges |= WLR_EDGE_TOP;
+    }
+
+    if (has_button_grab) {
+      if (is_titlebar) {
+        seat.begin_move(view);
+      } else if (edges) {
+        seat.begin_resize(view, edges);
+      }
+      has_button_grab = false;
+    } else {
+      if (is_titlebar) {
+        wlr_xcursor_manager_set_cursor_image(
+          seat.cursor.xcursor_manager, seat.cursor.default_xcursor.c_str(), seat.cursor.wlr_cursor);
+      } else if (edges) {
+        const char* resize_name = wlr_xcursor_get_resize_name(edges);
+        wlr_xcursor_manager_set_cursor_image(seat.cursor.xcursor_manager, resize_name,
+                                             seat.cursor.wlr_cursor);
+      }
+    }
+  }
+
+  void SeatView::deco_leave()
+  {
+    wlr_xcursor_manager_set_cursor_image(
+      seat.cursor.xcursor_manager, seat.cursor.default_xcursor.c_str(), seat.cursor.wlr_cursor);
+    has_button_grab = false;
+  }
+
+  void SeatView::deco_button(double sx, double sy, wlr::Button button, wlr::button_state_t state)
+  {
+    if (button == wlr::Button::left && state == WLR_BUTTON_PRESSED) {
+      has_button_grab = true;
+      grab_sx = sx;
+      grab_sy = sy;
+    } else {
+      has_button_grab = false;
+    }
+
+    auto parts = view.get_deco_part(sx, sy);
+    if (state == WLR_BUTTON_RELEASED && (parts & DecoPart::titlebar)) {
+      wlr_xcursor_manager_set_cursor_image(
+        seat.cursor.xcursor_manager, seat.cursor.default_xcursor.c_str(), seat.cursor.wlr_cursor);
+    }
+  }
+
 
   SeatView& Seat::add_view(View& view)
   {
@@ -385,7 +454,7 @@ namespace cloth {
 
   SeatView& Seat::seat_view_from_view(View& view)
   {
-    auto found = util::find_if(views, [&](auto& sv) { return &sv.view == view; });
+    auto found = util::find_if(views, [&](auto& sv) { return &sv.view == &view; });
     if (found == views.end()) {
       return add_view(view);
     }
@@ -413,8 +482,8 @@ namespace cloth {
     bool unfullscreen = true;
 
 #ifdef WLR_HAS_XWAYLAND
-    if (view && view->type() == ViewType::xwayland &&
-        view->get_surface<ViewType::xwayland>().wlr_surface->override_redirect) {
+    if (auto* xwl_view = dynamic_cast<XwaylandSurface*>(view);
+        xwl_view && xwl_view->xwayland_surface->override_redirect) {
       unfullscreen = false;
     }
 #endif
@@ -422,10 +491,9 @@ namespace cloth {
     if (view && unfullscreen) {
       Desktop& desktop = view->desktop;
       wlr::box_t box = view->get_box();
-      for (auto& output : desktop.outputs)
-      {
+      for (auto& output : desktop.outputs) {
         if (output.fullscreen_view && output.fullscreen_view != view &&
-            wlr_output_layout_intersects(desktop.layout, output.wlr_output, &box)) {
+            wlr_output_layout_intersects(desktop.layout, &output.wlr_output, &box)) {
           output.fullscreen_view->set_fullscreen(false, nullptr);
         }
       }
@@ -437,8 +505,8 @@ namespace cloth {
     }
 
 #ifdef WLR_HAS_XWAYLAND
-    if (view && view->type() == ViewType::xwayland &&
-        wlr_xwayland_surface_is_unmanaged(view->get_surface<ViewType::xwayland>().wlr_surface)) {
+    if (auto* xwl_view = dynamic_cast<XwaylandSurface*>(view);
+        xwl_view && wlr_xwayland_surface_is_unmanaged(xwl_view->xwayland_surface)) {
       return;
     }
 #endif
@@ -464,8 +532,8 @@ namespace cloth {
       return;
     }
 
-    //wl_list_remove(&seat_view->link);
-    //wl_list_insert(&seat->views, &seat_view->link);
+    // PREV: wl_list_remove(&seat_view->link);
+    // wl_list_insert(&seat->views, &seat_view->link);
 
     view->damage_whole();
 
@@ -598,8 +666,7 @@ namespace cloth {
     view.maximize(false);
     wlr_seat_pointer_clear_focus(wlr_seat);
 
-    wlr_xcursor_manager_set_cursor_image(cursor.xcursor_manager, xcursor_move,
-                                         cursor.wlr_cursor);
+    wlr_xcursor_manager_set_cursor_image(cursor.xcursor_manager, xcursor_move, cursor.wlr_cursor);
   }
 
   void Seat::begin_resize(View& view, wlr::edges_t edges)
@@ -624,8 +691,7 @@ namespace cloth {
     wlr_seat_pointer_clear_focus(wlr_seat);
 
     const char* resize_name = wlr_xcursor_get_resize_name(edges);
-    wlr_xcursor_manager_set_cursor_image(cursor.xcursor_manager, resize_name,
-                                         cursor.wlr_cursor);
+    wlr_xcursor_manager_set_cursor_image(cursor.xcursor_manager, resize_name, cursor.wlr_cursor);
   }
 
   void Seat::begin_rotate(View& view)
@@ -637,8 +703,7 @@ namespace cloth {
     view.maximize(false);
     wlr_seat_pointer_clear_focus(wlr_seat);
 
-    wlr_xcursor_manager_set_cursor_image(cursor.xcursor_manager, xcursor_rotate,
-                                         cursor.wlr_cursor);
+    wlr_xcursor_manager_set_cursor_image(cursor.xcursor_manager, xcursor_rotate, cursor.wlr_cursor);
   }
 
   void Seat::end_compositor_grab()
@@ -649,8 +714,7 @@ namespace cloth {
     switch (cursor.mode) {
     case Cursor::Mode::Move: view->move(cursor.view_x, cursor.view_y); break;
     case Cursor::Mode::Resize:
-      view->move_resize(cursor.view_x, cursor.view_y, cursor.view_width,
-                       cursor.view_height);
+      view->move_resize(cursor.view_x, cursor.view_y, cursor.view_width, cursor.view_height);
       break;
     case Cursor::Mode::Rotate: view->rotation = cursor.view_rotation; break;
     case Cursor::Mode::Passthrough: break;

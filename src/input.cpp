@@ -1,6 +1,10 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include <any>
+
+#include "util/algorithm.hpp"
+#include "util/logging.hpp"
 #include "wlroots.hpp"
 
 #include "config.hpp"
@@ -10,18 +14,6 @@
 #include "server.hpp"
 
 namespace cloth {
-
-  Seat* Input::last_active_seat()
-  {
-    Seat* _seat = nullptr;
-    for (auto& seat : seats) {
-      if (!_seat || (_seat->wlr_seat->last_event.tv_sec > seat.wlr_seat->last_event.tv_sec &&
-                     _seat->wlr_seat->last_event.tv_nsec > seat.wlr_seat->last_event.tv_nsec)) {
-        _seat = &seat;
-      }
-    }
-    return _seat;
-  }
 
   static const char* device_type(enum wlr_input_device_type type)
   {
@@ -35,103 +27,80 @@ namespace cloth {
     return NULL;
   }
 
-  struct roots_seat* input_get_seat(struct roots_input* input, char* name)
+  Input::Input(Server& server, Config& config) noexcept : server(server), config(config)
   {
-    struct roots_seat* seat = NULL;
-    wl_list_for_each(seat, &input->seats, link)
-    {
-      if (strcmp(seat->seat->name, name) == 0) {
-        return seat;
+    LOGD("Initializing roots input");
+
+    on_new_input = [&](void* data) {
+      auto* device = (wlr::input_device_t*) data;
+
+      auto seat_name = Config::default_seat_name;
+      auto* dc = config.get_device(*device);
+      if (dc) {
+        seat_name = dc->seat;
       }
-    }
 
-    seat = roots_seat_create(input, name);
-    return seat;
-  }
+      auto& seat = get_seat(seat_name);
+      LOGD("New input device: {} ({}:{}) {} seat:{}", device->name, device->vendor,
+              device->product, device_type(device->type), seat_name);
 
-  static void handle_new_input(struct wl_listener* listener, void* data)
-  {
-    struct wlr_input_device* device = data;
-    struct roots_input* input = wl_container_of(listener, input, new_input);
+      seat.add_device(*device);
 
-    char* seat_name = ROOTS_CONFIG_DEFAULT_SEAT_NAME;
-    struct roots_device_config* dc = roots_config_get_device(input->config, device);
-    if (dc) {
-      seat_name = dc->seat;
-    }
+      if (dc && wlr_input_device_is_libinput(device)) {
+        struct libinput_device* libinput_dev = wlr_libinput_get_device_handle(device);
 
-    struct roots_seat* seat = input_get_seat(input, seat_name);
-    if (!seat) {
-      wlr_log(WLR_ERROR, "could not create roots seat");
-      return;
-    }
-
-    wlr_log(WLR_DEBUG, "New input device: %s (%d:%d) %s seat:%s", device->name, device->vendor,
-            device->product, device_type(device->type), seat_name);
-
-    roots_seat_add_device(seat, device);
-
-    if (dc && wlr_input_device_is_libinput(device)) {
-      struct libinput_device* libinput_dev = wlr_libinput_get_device_handle(device);
-
-      wlr_log(WLR_DEBUG, "input has config, tap_enabled: %d\n", dc->tap_enabled);
-      if (dc->tap_enabled) {
-        libinput_device_config_tap_set_enabled(libinput_dev, LIBINPUT_CONFIG_TAP_ENABLED);
+        LOGD("input has config, tap_enabled: {}", dc->tap_enabled);;
+        if (dc->tap_enabled) {
+          libinput_device_config_tap_set_enabled(libinput_dev, LIBINPUT_CONFIG_TAP_ENABLED);
+        }
       }
-    }
+    };
+    on_new_input.add_to(server.backend->events.new_input);
   }
 
-  struct roots_input* input_create(struct roots_server* server, struct roots_config* config)
-  {
-    wlr_log(WLR_DEBUG, "Initializing roots input");
-    assert(server->desktop);
-
-    struct roots_input* input = calloc(1, sizeof(struct roots_input));
-    if (input == NULL) {
-      return NULL;
-    }
-
-    input->config = config;
-    input->server = server;
-
-    wl_list_init(&input->seats);
-
-    input->new_input.notify = handle_new_input;
-    wl_signal_add(&server->backend->events.new_input, &input->new_input);
-
-    return input;
-  }
-
-  void input_destroy(struct roots_input* input)
+  Input::~Input() noexcept
   {
     // TODO
   }
 
-  struct roots_seat* input_seat_from_wlr_seat(struct roots_input* input, struct wlr_seat* wlr_seat)
+  Seat* Input::last_active_seat()
   {
-    struct roots_seat* seat = NULL;
-    wl_list_for_each(seat, &input->seats, link)
-    {
-      if (seat->seat == wlr_seat) {
-        return seat;
+    Seat* _seat = nullptr;
+    for (auto& seat : seats) {
+      if (!_seat || (_seat->wlr_seat->last_event.tv_sec > seat.wlr_seat->last_event.tv_sec &&
+                     _seat->wlr_seat->last_event.tv_nsec > seat.wlr_seat->last_event.tv_nsec)) {
+        _seat = &seat;
       }
     }
-    return seat;
+    return _seat;
   }
 
-  bool input_view_has_focus(struct roots_input* input, struct roots_view* view)
+  Seat& Input::create_seat(const std::string& name)
   {
-    if (!view) {
-      return false;
-    }
-    struct roots_seat* seat;
-    wl_list_for_each(seat, &input->seats, link)
-    {
-      if (view == roots_seat_get_focus(seat)) {
-        return true;
-      }
-    }
+    return seats.emplace_back(*this, name);
+  }
 
+  Seat& Input::get_seat(const std::string& name)
+  {
+    for (auto& seat : seats) {
+      if (seat.wlr_seat->name == name) return seat;
+    }
+    return create_seat(name);
+  }
+
+  Seat* Input::seat_from_wlr_seat(wlr::seat_t& wlr_seat)
+  {
+    for (auto& seat : seats) {
+      if (seat.wlr_seat == &wlr_seat) return &seat;
+    }
+    return nullptr;
+  }
+
+  bool Input::view_has_focus(View& view)
+  {
+    for (auto& seat : seats) {
+      if (&view == seat.get_focus()) return true;
+    }
     return false;
   }
 } // namespace cloth

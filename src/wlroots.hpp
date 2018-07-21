@@ -2,11 +2,46 @@
 
 #include <functional>
 
+// All includes used in wlr files
+// This is done to make sure the keyword macros don't bleed into 
+// these files, which may be c++-aware
+// 
+// Generate:
+// grep -rP "#include <(?\!wlr)" subprojects/wlroots/include/wlr | cut -d: -f2 | sort | uniq
+
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <errno.h>
+#include <libinput.h>
+#include <libudev.h>
+#include <pixman.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+#include <sys/types.h>
+#include <time.h>
+#include <wayland-client.h>
+#include <wayland-server.h>
+#include <wayland-server-protocol.h>
+#include <wayland-util.h>
+#include <xcb/xcb.h>
+#include <xkbcommon/xkbcommon.h>
+#include <xf86drmMode.h>
+
+// Rename fields which use reserved names
+#define class class_
+#define namespace namespace_
+// wlroots does not do this itself
 extern "C" {
 
+#include <backend/drm/drm.h>
 #include <wlr/backend.h>
 #include <wlr/backend/headless.h>
+#include <wlr/backend/libinput.h>
 #include <wlr/backend/multi.h>
+#include <wlr/backend/drm.h>
 #include <wlr/config.h>
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_buffer.h>
@@ -37,19 +72,30 @@ extern "C" {
 #include <wlr/types/wlr_xdg_output.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/types/wlr_xdg_shell_v6.h>
+#include <wlr/util/region.h>
 
 #ifdef WLR_HAS_XWAYLAND
 #include <wlr/xwayland.h>
 #endif
 }
 
+// make sure to undefine these again
+#undef class
+#undef namespace
+
 #include "util/bindings.hpp"
+
+#ifdef __linux__
+#include <linux/input-event-codes.h>
+#elif __FreeBSD__
+#include <dev/evdev/input-event-codes.h>
+#endif
 
 namespace cloth::wl {
 
-  using argument_t = struct wl_argument;
+  using argument_t = union wl_argument;
   using array_t = struct wl_array;
-  using buffer_t = struct wl_buffer;
+  //using buffer_t = struct wl_buffer;
   using callback_t = struct wl_callback;
   using client_t = struct wl_client;
   using compositor_t = struct wl_compositor;
@@ -92,28 +138,33 @@ namespace cloth::wl {
   using touch_t = struct wl_touch;
 
   struct Signal {
-
-    Signal() noexcept {
+    Signal() noexcept
+    {
       wl_signal_init(&signal);
     }
 
-    ~Signal() noexcept { }
+    ~Signal() noexcept {}
 
-    void add(listener_t& listener) {
+    void add(listener_t& listener)
+    {
       wl_signal_add(&signal, &listener);
     }
 
-    void emit(void* data = nullptr) {
+    void emit(void* data = nullptr)
+    {
       wl_signal_emit(&signal, data);
     }
 
-    operator signal_t&() {
+    operator signal_t&()
+    {
       return signal;
     }
 
-    operator signal_t*() {
+    operator signal_t*()
+    {
       return &signal;
     }
+
   private:
     signal_t signal;
   };
@@ -129,13 +180,10 @@ namespace cloth::wl {
       };
     }
 
-    Listener(std::function<void()> func) noexcept
-      : Listener([f = std::move(func)] (void*) { f(); })
+    Listener(std::function<void()> func) noexcept : Listener([f = std::move(func)](void*) { f(); })
     {}
 
-    Listener(std::nullptr_t) noexcept
-      : Listener(std::function<void(void*)>(nullptr))
-    {}
+    Listener(std::nullptr_t) noexcept : Listener(std::function<void(void*)>(nullptr)) {}
 
     Listener() noexcept : Listener(nullptr) {}
 
@@ -160,17 +208,20 @@ namespace cloth::wl {
 
     Listener& operator=(std::function<void(void*)> func) noexcept
     {
-      return this->operator=(Listener(func));
+      *_func = func;
+      return *this;
     }
 
     Listener& operator=(std::function<void()> func) noexcept
     {
-      return this->operator=(Listener(func));
+      *_func = [func] (void*) { func(); };
+      return *this;
     }
 
     Listener& operator=(std::nullptr_t func) noexcept
     {
-      return this->operator=(Listener(func));
+      *_func = func;
+      return *this;
     }
 
     operator wl_listener&() noexcept
@@ -194,7 +245,8 @@ namespace cloth::wl {
       wl_signal_add(&sig, &_listener);
     }
 
-    void remove() noexcept {
+    void remove() noexcept
+    {
       wl_list_remove(&_listener.link);
       _listener.link = {nullptr, nullptr};
     }
@@ -257,9 +309,9 @@ namespace cloth::wlr {
   using output_cursor_t = struct wlr_output_cursor;
   using output_damage_t = struct wlr_output_damage;
   using output_impl_t = struct wlr_output_impl;
-  using output_layout_state_t = struct wlr_output_layout_state;
-  using output_layout_output_t = struct wlr_output_layout_output;
   using output_layout_output_state_t = struct wlr_output_layout_output_state;
+  using output_layout_output_t = struct wlr_output_layout_output;
+  using output_layout_state_t = struct wlr_output_layout_state;
   using output_layout_t = struct wlr_output_layout;
   using output_mode_t = struct wlr_output_mode;
   using output_t = struct wlr_output;
@@ -294,8 +346,15 @@ namespace cloth::wlr {
   using touch_impl_t = struct wlr_touch_impl;
   using touch_point_t = struct wlr_touch_point;
   using touch_t = struct wlr_touch;
-  using virtual_keyboard_v1_t = struct wlr_virtual_keyboard_v1;
   using virtual_keyboard_manager_v1_t = struct wlr_virtual_keyboard_manager_v1;
+  using virtual_keyboard_v1_t = struct wlr_virtual_keyboard_v1;
+  using wl_shell_popup_grab_t = struct wlr_wl_shell_popup_grab;
+  using wl_shell_surface_maximize_event_t = struct wlr_wl_shell_surface_maximize_event;
+  using wl_shell_surface_move_event_t = struct wlr_wl_shell_surface_move_event;
+  using wl_shell_surface_popup_state_t = struct wlr_wl_shell_surface_popup_state;
+  using wl_shell_surface_resize_event_t = struct wlr_wl_shell_surface_resize_event;
+  using wl_shell_surface_set_fullscreen_event_t = struct wlr_wl_shell_surface_set_fullscreen_event;
+  using wl_shell_surface_transient_state_t = struct wlr_wl_shell_surface_transient_state;
   using wl_shell_surface_t = struct wlr_wl_shell_surface;
   using wl_shell_t = struct wlr_wl_shell;
   using xcursor_image_t = struct wlr_xcursor_image;
@@ -304,6 +363,8 @@ namespace cloth::wlr {
   using xcursor_t = struct wlr_xcursor;
   using xdg_client_t = struct wlr_xdg_client;
   using xdg_client_v6_t = struct wlr_xdg_client_v6;
+  using xdg_output_manager_t = struct wlr_xdg_output_manager;
+  using xdg_output_t = struct wlr_xdg_output;
   using xdg_popup_grab_t = struct wlr_xdg_popup_grab;
   using xdg_popup_grab_v6_t = struct wlr_xdg_popup_grab_v6;
   using xdg_popup_t = struct wlr_xdg_popup;
@@ -312,17 +373,138 @@ namespace cloth::wlr {
   using xdg_positioner_v6_t = struct wlr_xdg_positioner_v6;
   using xdg_shell_t = struct wlr_xdg_shell;
   using xdg_shell_v6_t = struct wlr_xdg_shell_v6;
+  using xdg_surface_configure_t = struct wlr_xdg_surface_configure;
+  using xdg_surface_role_t = enum wlr_xdg_surface_role;
   using xdg_surface_t = struct wlr_xdg_surface;
+  using xdg_surface_v6_configure_t = struct wlr_xdg_surface_v6_configure;
+  using xdg_surface_v6_role_t = enum wlr_xdg_surface_v6_role;
   using xdg_surface_v6_t = struct wlr_xdg_surface_v6;
+  using xdg_toplevel_move_event_t = struct wlr_xdg_toplevel_move_event;
+  using xdg_toplevel_resize_event_t = struct wlr_xdg_toplevel_resize_event;
+  using xdg_toplevel_set_fullscreen_event_t = struct wlr_xdg_toplevel_set_fullscreen_event;
+  using xdg_toplevel_show_window_menu_event_t = struct wlr_xdg_toplevel_show_window_menu_event;
+  using xdg_toplevel_state_t = struct wlr_xdg_toplevel_state;
   using xdg_toplevel_t = struct wlr_xdg_toplevel;
+  using xdg_toplevel_v6_move_event_t = struct wlr_xdg_toplevel_v6_move_event;
+  using xdg_toplevel_v6_resize_event_t = struct wlr_xdg_toplevel_v6_resize_event;
+  using xdg_toplevel_v6_set_fullscreen_event_t = struct wlr_xdg_toplevel_v6_set_fullscreen_event;
+  using xdg_toplevel_v6_show_window_menu_event_t = struct wlr_xdg_toplevel_v6_show_window_menu_event;
+  using xdg_toplevel_v6_state_t = struct wlr_xdg_toplevel_v6_state;
   using xdg_toplevel_v6_t = struct wlr_xdg_toplevel_v6;
+  using xwayland_cursor_t = struct wlr_xwayland_cursor;
+  using xwayland_move_event_t = struct wlr_xwayland_move_event;
+  using xwayland_resize_event_t = struct wlr_xwayland_resize_event;
+  using xwayland_surface_configure_event_t = struct wlr_xwayland_surface_configure_event;
+  using xwayland_surface_decorations_t = enum wlr_xwayland_surface_decorations;
+  using xwayland_surface_hints_t = struct wlr_xwayland_surface_hints;
+  using xwayland_surface_size_hints_t = struct wlr_xwayland_surface_size_hints;
+  using xwayland_surface_t = struct wlr_xwayland_surface;
+  using xwayland_t = struct wlr_xwayland;
   using xwm_t = struct wlr_xwm;
+  using layer_surface_state_t = struct wlr_layer_surface_state;
 
 #ifdef WLR_HAS_XWAYLAND
   using xwayland_surface_t = struct wlr_xwayland_surface;
   using xwayland_t = struct wlr_xwayland;
 #endif
 
-  [[deprecated]]
-  using Listener = wl::Listener;
+  using Listener [[deprecated("Use wl::Listener instead")]] = wl::Listener;
+
+  /// Linux input event buttons
+  enum struct Button {
+    misc = BTN_MISC,
+    n0 = BTN_0,
+    n1 = BTN_1,
+    n2 = BTN_2,
+    n3 = BTN_3,
+    n4 = BTN_4,
+    n5 = BTN_5,
+    n6 = BTN_6,
+    n7 = BTN_7,
+    n8 = BTN_8,
+    n9 = BTN_9,
+
+    mouse = BTN_MOUSE,
+    left = BTN_LEFT,
+    right = BTN_RIGHT,
+    middle = BTN_MIDDLE,
+    side = BTN_SIDE,
+    extra = BTN_EXTRA,
+    forward = BTN_FORWARD,
+    back = BTN_BACK,
+    task = BTN_TASK,
+
+    joystick = BTN_JOYSTICK,
+    trigger = BTN_TRIGGER,
+    thumb = BTN_THUMB,
+    thumb2 = BTN_THUMB2,
+    top = BTN_TOP,
+    top2 = BTN_TOP2,
+    pinkie = BTN_PINKIE,
+    base = BTN_BASE,
+    base2 = BTN_BASE2,
+    base3 = BTN_BASE3,
+    base4 = BTN_BASE4,
+    base5 = BTN_BASE5,
+    base6 = BTN_BASE6,
+    dead = BTN_DEAD,
+
+    gamepad = BTN_GAMEPAD,
+    south = BTN_SOUTH,
+    a = BTN_A,
+    east = BTN_EAST,
+    b = BTN_B,
+    c = BTN_C,
+    north = BTN_NORTH,
+    x = BTN_X,
+    west = BTN_WEST,
+    y = BTN_Y,
+    z = BTN_Z,
+    tl = BTN_TL,
+    tr = BTN_TR,
+    tl2 = BTN_TL2,
+    tr2 = BTN_TR2,
+    select = BTN_SELECT,
+    start = BTN_START,
+    mode = BTN_MODE,
+    thumbl = BTN_THUMBL,
+    thumbr = BTN_THUMBR,
+
+    digi = BTN_DIGI,
+    tool_pen = BTN_TOOL_PEN,
+    tool_rubber = BTN_TOOL_RUBBER,
+    tool_brush = BTN_TOOL_BRUSH,
+    tool_pencil = BTN_TOOL_PENCIL,
+    tool_airbrush = BTN_TOOL_AIRBRUSH,
+    tool_finger = BTN_TOOL_FINGER,
+    tool_mouse = BTN_TOOL_MOUSE,
+    tool_lens = BTN_TOOL_LENS,
+    tool_quinttap = BTN_TOOL_QUINTTAP,
+    stylus3 = BTN_STYLUS3,
+    touch = BTN_TOUCH,
+    stylus = BTN_STYLUS,
+    stylus2 = BTN_STYLUS2,
+    tool_doubletap = BTN_TOOL_DOUBLETAP,
+    tool_tripletap = BTN_TOOL_TRIPLETAP,
+    tool_quadtap = BTN_TOOL_QUADTAP,
+
+    wheel = BTN_WHEEL,
+    gear_down = BTN_GEAR_DOWN,
+    gear_up = BTN_GEAR_UP,
+  };
+
 } // namespace cloth::wlr
+
+  inline bool operator==(const cloth::wlr::box_t& lhs, const cloth::wlr::box_t& rhs) noexcept
+  {
+    return memcmp(&lhs, &rhs, sizeof(cloth::wlr::box_t)) == 0;
+  }
+
+  inline bool operator!=(const cloth::wlr::box_t& lhs, const cloth::wlr::box_t& rhs) noexcept
+  {
+    return memcmp(&lhs, &rhs, sizeof(cloth::wlr::box_t)) != 0;
+  }
+namespace cloth {
+  CLOTH_ENABLE_BITMASK_OPS(wlr::edges_t);
+
+}
