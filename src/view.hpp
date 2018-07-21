@@ -15,7 +15,7 @@ namespace cloth {
   struct View;
 
   struct ViewChild {
-    ViewChild(View& view, wlr::surface_t& wlr_surface);
+    ViewChild(View& view, wlr::surface_t* wlr_surface);
     virtual ~ViewChild() noexcept;
     void finish();
 
@@ -24,7 +24,7 @@ namespace cloth {
 
     View& view;
 
-    wlr::surface_t& wlr_surface;
+    wlr::surface_t* wlr_surface;
 
   protected:
     wl::Listener on_commit;
@@ -32,16 +32,16 @@ namespace cloth {
   };
 
   struct Subsurface : ViewChild {
-    Subsurface(View& view, wlr::subsurface_t& wlr_subsurface);
-    wlr::subsurface_t& wlr_subsurface;
+    Subsurface(View& view, wlr::subsurface_t* wlr_subsurface);
+    wlr::subsurface_t* wlr_subsurface;
 
   protected:
     wl::Listener on_destroy;
   };
 
   struct WlShellPopup : ViewChild {
-    WlShellPopup(View&, wlr::wl_shell_surface_t& wlr_popup);
-    wlr::wl_shell_surface_t& wlr_popup;
+    WlShellPopup(View&, wlr::wl_shell_surface_t* wlr_popup);
+    wlr::wl_shell_surface_t* wlr_popup;
 
   protected:
     wl::Listener on_destroy;
@@ -50,8 +50,8 @@ namespace cloth {
   };
 
   struct XdgPopupV6 : ViewChild {
-    XdgPopupV6(View&, wlr::xdg_popup_v6_t& wlr_popup);
-    wlr::xdg_popup_v6_t& wlr_popup;
+    XdgPopupV6(View&, wlr::xdg_popup_v6_t* wlr_popup);
+    wlr::xdg_popup_v6_t* wlr_popup;
 
     void unconstrain();
 
@@ -63,8 +63,8 @@ namespace cloth {
   };
 
   struct XdgPopup : ViewChild {
-    XdgPopup(View&, wlr::xdg_popup_t& wlr_popup);
-    wlr::xdg_popup_t& wlr_popup;
+    XdgPopup(View&, wlr::xdg_popup_t* wlr_popup);
+    wlr::xdg_popup_t* wlr_popup;
 
     void unconstrain();
 
@@ -129,14 +129,13 @@ namespace cloth {
     ViewChild& create_child(wlr::surface_t&);
     Subsurface& create_subsurface(wlr::subsurface_t& wlr_subsurface);
 
-    virtual ViewChild& create_popup(wlr::surface_t&) = 0;
-
     bool at(double lx, double ly, wlr::surface_t*& surface, double& sx, double& sy);
 
     ViewType type() noexcept;
 
     Desktop& desktop;
 
+    bool mapped = false;
     double x, y;
     uint32_t width, height;
     float rotation = 0;
@@ -192,6 +191,8 @@ namespace cloth {
     WlShellSurface(Desktop& desktop, wlr::wl_shell_surface_t* wlr_surface);
     wlr::wl_shell_surface_t* wl_shell_surface;
 
+    WlShellPopup& create_popup(wlr::wl_shell_surface_t& wlr_popup);
+
   protected:
     wl::Listener on_destroy;
     wl::Listener on_new_popup;
@@ -205,8 +206,6 @@ namespace cloth {
 
     void do_resize(int width, int height) override;
     void do_close() override;
-
-    ViewChild& create_popup(wlr::surface_t& wlr_popup) override;
   };
 
   struct XdgSurfaceV6 : View {
@@ -214,6 +213,8 @@ namespace cloth {
     wlr::xdg_surface_v6_t* xdg_surface;
 
     uint32_t pending_move_resize_configure_serial;
+
+    XdgPopupV6& create_popup(wlr::xdg_popup_v6_t& wlr_popup);
 
   protected:
     wl::Listener on_destroy;
@@ -234,8 +235,6 @@ namespace cloth {
     void do_maximize(bool maximized) override;
     void do_set_fullscreen(bool fullscreen) override;
     void do_close() override;
-
-    ViewChild& create_popup(wlr::surface_t& wlr_popup) override;
 
   private:
     wlr::box_t get_size();
@@ -248,6 +247,8 @@ namespace cloth {
 
     uint32_t pending_move_resize_configure_serial;
 
+    XdgPopup& create_popup(wlr::xdg_popup_t& wlr_popup);
+
   protected:
     wl::Listener on_destroy;
     wl::Listener on_new_popup;
@@ -267,8 +268,6 @@ namespace cloth {
     void do_maximize(bool maximized) override;
     void do_set_fullscreen(bool fullscreen) override;
     void do_close() override;
-
-    ViewChild& create_popup(wlr::surface_t& wlr_popup) override;
 
   private:
     wlr::box_t get_size();
@@ -287,7 +286,7 @@ namespace cloth {
     void do_set_fullscreen(bool fullscreen) override;
     void do_close() override;
 
-    ViewChild& create_popup(wlr::surface_t& wlr_popup) override {
+    ViewChild& create_popup(wlr::surface_t& wlr_popup) {
       assert(false);
     }
 

@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include "algorithm.hpp"
+#include <range/v3/range_concepts.hpp>
 
 namespace cloth::util {
 
@@ -21,12 +22,13 @@ namespace cloth::util {
     using self_t = double_iterator<Iter>;
 
     double_iterator(wrapped w) : _iter(std::move(w)) {}
+    double_iterator() : _iter() {}
 
-    reference operator*()
+    reference operator*() const
     {
       return (**_iter);
     }
-    pointer operator->()
+    pointer operator->() const
     {
       return (*_iter).operator->();
     }
@@ -50,40 +52,40 @@ namespace cloth::util {
       return _iter.operator--(i);
     }
 
-    auto operator==(const self_t& rhs)
+    auto operator==(const self_t& rhs) const noexcept
     {
       return _iter == rhs._iter;
     }
-    auto operator!=(const self_t& rhs)
+    auto operator!=(const self_t& rhs) const noexcept
     {
       return _iter != rhs._iter;
     }
-    auto operator<(const self_t& rhs)
+    auto operator<(const self_t& rhs) const noexcept
     {
       return _iter < rhs._iter;
     }
-    auto operator>(const self_t& rhs)
+    auto operator>(const self_t& rhs) const noexcept
     {
       return _iter > rhs._iter;
     }
-    auto operator<=(const self_t& rhs)
+    auto operator<=(const self_t& rhs) const noexcept
     {
       return _iter <= rhs._iter;
     }
-    auto operator>=(const self_t& rhs)
+    auto operator>=(const self_t& rhs) const noexcept
     {
       return _iter >= rhs._iter;
     }
 
-    self_t operator+(difference_type d)
+    self_t operator+(difference_type d) const noexcept
     {
       return _iter + d;
     }
-    self_t operator-(difference_type d)
+    self_t operator-(difference_type d) const noexcept
     {
       return _iter - d;
     }
-    auto operator-(const self_t& rhs)
+    auto operator-(const self_t& rhs) const noexcept
     {
       return _iter - rhs._iter;
     }
@@ -120,6 +122,11 @@ namespace cloth::util {
   private:
     wrapped _iter;
   };
+
+  template<typename Iter>
+  auto operator +(typename double_iterator<Iter>::difference_type diff, double_iterator<Iter> iter) {
+    return iter + diff;
+  }
 
   /// To avoid clients being moved, they are stored in unique_ptrs, which are
   /// moved around in a vector. This class is purely for convenience, to still
@@ -177,11 +184,35 @@ namespace cloth::util {
       return nullptr;
     }
 
+    iterator rotate_to_back(const value_type& v)
+    {
+      auto iter =
+        std::find_if(_order.begin(), _order.end(), [&v](auto&& uptr) { return uptr.get() == &v; });    
+      return rotate_to_back(iter);
+    }
+
     iterator rotate_to_back(iterator iter)
     {
       if (iter != _order.end()) {
         {
           return std::rotate(iter.data(), iter.data() + 1, _order.end());
+        }
+      }
+      return end();
+    }
+
+    iterator rotate_to_front(const value_type& v)
+    {
+      auto iter =
+        std::find_if(_order.begin(), _order.end(), [&v](auto&& uptr) { return uptr.get() == &v; });    
+      return rotate_to_front(iter);
+    }
+
+    iterator rotate_to_front(iterator iter)
+    {
+      if (iter != _order.end()) {
+        {
+          return std::rotate(_order.begin(), iter.data(), iter.data() + 1);
         }
       }
       return end();
@@ -290,3 +321,10 @@ namespace cloth::util {
   }
 
 } // namespace cloth::util
+
+namespace ranges {
+
+  template<typename T>
+  struct enable_view<cloth::util::ptr_vec<T>> : std::false_type {};
+
+}

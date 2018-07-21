@@ -11,16 +11,16 @@
 
 namespace cloth {
 
-  XdgPopupV6::XdgPopupV6(View& p_view, wlr::xdg_popup_v6_t& p_wlr_popup)
-    : ViewChild(p_view, *p_wlr_popup.base->surface), wlr_popup(p_wlr_popup)
+  XdgPopupV6::XdgPopupV6(View& p_view, wlr::xdg_popup_v6_t* p_wlr_popup)
+    : ViewChild(p_view, p_wlr_popup->base->surface), wlr_popup(p_wlr_popup)
   {
-    on_destroy.add_to(wlr_popup.base->events.destroy);
+    on_destroy.add_to(wlr_popup->base->events.destroy);
     on_destroy = [this] { util::erase_this(view.children, this); };
-    on_new_popup.add_to(wlr_popup.base->events.new_popup);
-    on_new_popup = [this](void* data) { view.create_popup(*((wlr::xdg_surface_v6_t*) data)->surface); };
-    on_unmap.add_to(wlr_popup.base->events.unmap);
+    on_new_popup.add_to(wlr_popup->base->events.new_popup);
+    on_new_popup = [this](void* data) { dynamic_cast<XdgSurfaceV6&>(view).create_popup(*((wlr::xdg_popup_v6_t*) data)); };
+    on_unmap.add_to(wlr_popup->base->events.unmap);
     on_unmap = [this] { view.damage_whole(); };
-    on_map.add_to(wlr_popup.base->events.map);
+    on_map.add_to(wlr_popup->base->events.map);
     on_map = [this] { view.damage_whole(); };
 
     // TODO: Desired behaviour?
@@ -39,10 +39,10 @@ namespace cloth {
     }
 
     int anchor_lx, anchor_ly;
-    wlr_xdg_popup_v6_get_anchor_point(&wlr_popup, &anchor_lx, &anchor_ly);
+    wlr_xdg_popup_v6_get_anchor_point(wlr_popup, &anchor_lx, &anchor_ly);
 
     int popup_lx, popup_ly;
-    wlr_xdg_popup_v6_get_toplevel_coords(&wlr_popup, wlr_popup.geometry.x, wlr_popup.geometry.y,
+    wlr_xdg_popup_v6_get_toplevel_coords(wlr_popup, wlr_popup->geometry.x, wlr_popup->geometry.y,
                                       &popup_lx, &popup_ly);
     popup_lx += view.x;
     popup_ly += view.y;
@@ -70,7 +70,7 @@ namespace cloth {
                                          .width = width,
                                          .height = height};
 
-    wlr_xdg_popup_v6_unconstrain_from_box(&wlr_popup, &output_toplevel_sx_box);
+    wlr_xdg_popup_v6_unconstrain_from_box(wlr_popup, &output_toplevel_sx_box);
   }
 
   wlr::box_t XdgSurfaceV6::get_size()
@@ -182,10 +182,10 @@ namespace cloth {
     wlr_xdg_surface_v6_send_close(xdg_surface);
   }
 
-  ViewChild& XdgSurfaceV6::create_popup(wlr::surface_t& wlr_popup) {
-    wlr::xdg_popup_v6_t* xdg_pop = wl_container_of(&wlr_popup, std::declval<wlr::xdg_popup_v6_t*>(), base);
-    auto popup = std::make_unique<XdgPopupV6>(*this, *xdg_pop);
-    return children.push_back(std::move(popup));
+  XdgPopupV6& XdgSurfaceV6::create_popup(wlr::xdg_popup_v6_t& wlr_popup) {
+    auto popup = std::make_unique<XdgPopupV6>(*this, &wlr_popup);
+    children.push_back(std::move(popup));
+    return *popup;
   }
 
   XdgSurfaceV6::XdgSurfaceV6(Desktop& desktop, wlr::xdg_surface_v6_t* xdg_surface)
@@ -260,8 +260,8 @@ namespace cloth {
 
     on_new_popup.add_to(xdg_surface->events.new_popup);
     on_new_popup = [this](void* data) {
-      auto& wlr_xdg_surface = *(wlr::xdg_surface_v6_t*) data;
-      create_popup(*wlr_xdg_surface.surface);
+      auto& wlr_xdg_surface = *(wlr::xdg_popup_v6_t*) data;
+      create_popup(wlr_xdg_surface);
     };
 
     on_map.add_to(xdg_surface->events.map);

@@ -91,6 +91,8 @@ extern "C" {
 #include <dev/evdev/input-event-codes.h>
 #endif
 
+#undef Bool
+
 namespace cloth::wl {
 
   using argument_t = union wl_argument;

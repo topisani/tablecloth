@@ -46,7 +46,7 @@ namespace cloth {
     struct Keyboard {
       std::string name;
       std::string seat;
-      uint32_t meta_key;
+      uint32_t meta_key = 0;
       std::string rules;
       std::string model;
       std::string layout;

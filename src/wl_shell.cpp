@@ -11,16 +11,16 @@
 
 namespace cloth {
 
-  WlShellPopup::WlShellPopup(View& p_view, wlr::wl_shell_surface_t& p_wlr_popup)
-    : ViewChild(p_view, *p_wlr_popup.surface), wlr_popup(p_wlr_popup)
+  WlShellPopup::WlShellPopup(View& p_view, wlr::wl_shell_surface_t* p_wlr_popup)
+    : ViewChild(p_view, p_wlr_popup->surface), wlr_popup(p_wlr_popup)
   {
-    on_destroy.add_to(wlr_popup.events.destroy);
+    on_destroy.add_to(wlr_popup->events.destroy);
     on_destroy = [this] { util::erase_this(view.children, this); };
-    on_set_state.add_to(wlr_popup.events.set_state);
+    on_set_state.add_to(wlr_popup->events.set_state);
     on_set_state = [this] { util::erase_this(view.children, this); };
-    on_new_popup.add_to(wlr_popup.events.new_popup);
+    on_new_popup.add_to(wlr_popup->events.new_popup);
     on_new_popup = [this](void* data) {
-      view.create_popup(*((wlr::wl_shell_surface_t*) data)->surface);
+      dynamic_cast<WlShellSurface&>(view).create_popup(*(wlr::wl_shell_surface_t*) data);
     };
   }
 
@@ -108,18 +108,17 @@ namespace cloth {
 
     on_new_popup.add_to(wl_shell_surface->events.new_popup);
     on_new_popup = [this](void* data) {
-      auto&  wlr_wl_shell_surface = *(wlr::wl_shell_surface_t*) data;
-      create_popup(*wlr_wl_shell_surface.surface);
+      create_popup(*(wlr::wl_shell_surface_t*) data);
     };
 
     on_destroy.add_to(wl_shell_surface->events.destroy);
     on_destroy = [this] { util::erase_this(this->desktop.views, this); };
   }
 
-  ViewChild& WlShellSurface::create_popup(wlr::surface_t& wlr_popup) {
-    wlr::wl_shell_surface_t* xdg_pop = wl_container_of(&wlr_popup, std::declval<wlr::wl_shell_surface_t*>(), surface);
-    auto popup = std::make_unique<WlShellPopup>(*this, *xdg_pop);
-    return children.push_back(std::move(popup));
+  WlShellPopup& WlShellSurface::create_popup(wlr::wl_shell_surface_t& wlr_popup) {
+    auto popup = std::make_unique<WlShellPopup>(*this, &wlr_popup);
+    children.push_back(std::move(popup));
+    return *popup;
   }
 
   void Desktop::handle_wl_shell_surface(void* data)

@@ -32,7 +32,7 @@ namespace cloth {
     float view_rotation = 0;
     uint32_t resize_edges;
 
-    SeatView* pointer_view;
+    SeatView* pointer_view = nullptr;
 
     wl::Listener on_motion;
     wl::Listener on_motion_absolute;

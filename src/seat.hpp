@@ -6,12 +6,12 @@
 #include "keyboard.hpp"
 #include "util/bindings.hpp"
 #include "wlroots.hpp"
+#include "view.hpp"
 
 namespace cloth {
 
   struct Seat;
   struct Input;
-  struct View;
 
   struct DragIcon {
     DragIcon(Seat&, wlr::drag_icon_t&) noexcept;
@@ -118,9 +118,10 @@ namespace cloth {
     wl::client_t* exclusive_client = nullptr;
 
     util::ptr_vec<SeatView> views;
+
     bool has_focus;
 
-    util::ptr_vec<DragIcon> drag_icons; // roots_drag_icon::link
+    util::ptr_vec<DragIcon> drag_icons;
 
     util::ptr_vec<Keyboard> keyboards;
     util::ptr_vec<Pointer> pointers;
@@ -129,7 +130,6 @@ namespace cloth {
 
     wl::Listener on_new_drag_icon;
     wl::Listener on_destroy;
-
 
     void reset_device_mappings(wlr::input_device_t& device) noexcept;
     void set_device_output_mappings(wlr::input_device_t& device, wlr::output_t* output) noexcept;

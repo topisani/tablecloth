@@ -11,6 +11,10 @@
 #include "util/exception.hpp"
 #include "util/logging.hpp"
 
+#include <range/v3/core.hpp>
+#include <range/v3/view.hpp>
+#include <range/v3/view/filter.hpp>
+
 namespace cloth {
 
   Seat::Seat(Input& input, const std::string& name)
@@ -348,10 +352,11 @@ namespace cloth {
 
   View* Seat::get_focus()
   {
+    auto views = input.server.desktop.visible_views();
     if (!has_focus || views.empty()) {
       return nullptr;
     }
-    return &views.front().view;
+    return &views.back();
   }
 
   SeatView::SeatView(Seat& p_seat, View& p_view) noexcept : seat(p_seat), view(p_view)
@@ -374,8 +379,9 @@ namespace cloth {
     }
 
     // Focus first view
-    if (!seat.views.empty()) {
-      seat.set_focus(&seat.views.front().view);
+    auto views = seat.input.server.desktop.visible_views();
+    if (!views.empty()) {
+      seat.set_focus(&views.back());
     }
   }
 
@@ -475,8 +481,7 @@ namespace cloth {
     // Make sure the view will be rendered on top of others, even if it's
     // already focused in this seat
     if (view != nullptr) {
-      // wl_list_remove(&view->link);
-      // wl_list_insert(&seat->input->server->desktop->views, &view->link);
+      view->desktop.views.rotate_to_back(*view);
     }
 
     bool unfullscreen = true;
@@ -532,8 +537,7 @@ namespace cloth {
       return;
     }
 
-    // PREV: wl_list_remove(&seat_view->link);
-    // wl_list_insert(&seat->views, &seat_view->link);
+    seat_view->view.desktop.views.rotate_to_back(seat_view->view);
 
     view->damage_whole();
 
@@ -629,26 +633,25 @@ namespace cloth {
 
   void Seat::cycle_focus()
   {
+    auto views = input.server.desktop.visible_views() | ranges::view::reverse;
     if (views.empty()) {
       return;
     }
 
-    SeatView* first_seat_view = &views.front();
+    auto first_view = views.begin();
     if (!has_focus) {
-      set_focus(&first_seat_view->view);
+      set_focus(&*first_view);
       return;
     }
-    if (views.size() < 2) {
+    auto next_view = ++views.begin();
+    if (next_view == views.end()) {
       return;
     }
-
     // Focus the next view
-    SeatView* next_seat_view = &*(views.begin() + 1);
-    set_focus(&next_seat_view->view);
+    set_focus(&*next_view);
 
-    // Move the first view to the end of the list
-    // PREV: wl_list_remove(&first_seat_view->link);
-    // PREV: wl_list_insert(seat->views.prev, &first_seat_view->link);
+    // Move the first view to the front of the list
+    input.server.desktop.views.rotate_to_front(*first_view);
   }
 
   void Seat::begin_move(View& view)

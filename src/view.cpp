@@ -326,32 +326,32 @@ namespace cloth {
     view.create_subsurface(wlr_subsurface);
   }
 
-  ViewChild::ViewChild(View& view, wlr::surface_t& wlr_surface)
+  ViewChild::ViewChild(View& view, wlr::surface_t* wlr_surface)
     : view(view), wlr_surface(wlr_surface)
   {
     on_commit = [this](void* data) { handle_commit(data); };
-    on_commit.add_to(wlr_surface.events.commit);
+    on_commit.add_to(wlr_surface->events.commit);
 
     on_new_subsurface = [this](void* data) { handle_commit(data); };
-    on_new_subsurface.add_to(wlr_surface.events.new_subsurface);
+    on_new_subsurface.add_to(wlr_surface->events.new_subsurface);
   }
 
   ViewChild& View::create_child(wlr::surface_t& wlr_surface)
   {
-    return children.emplace_back(*this, wlr_surface);
+    return children.emplace_back(*this, &wlr_surface);
   }
 
-  Subsurface::Subsurface(View& view, wlr::subsurface_t& wlr_subsurface)
-    : ViewChild(view, *wlr_subsurface.surface), wlr_subsurface(wlr_subsurface)
+  Subsurface::Subsurface(View& view, wlr::subsurface_t* wlr_subsurface)
+    : ViewChild(view, wlr_subsurface->surface), wlr_subsurface(wlr_subsurface)
   {
     on_destroy = [this](void*) { finish(); };
-    on_destroy.add_to(wlr_subsurface.events.destroy);
+    on_destroy.add_to(wlr_subsurface->events.destroy);
   }
 
   Subsurface& View::create_subsurface(wlr::subsurface_t& wlr_subsurface)
   {
     return static_cast<Subsurface&>(
-      children.push_back(std::make_unique<Subsurface>(*this, wlr_subsurface)));
+      children.push_back(std::make_unique<Subsurface>(*this, &wlr_subsurface)));
   }
 
   void View::map(wlr::surface_t& surface)
@@ -370,7 +370,7 @@ namespace cloth {
     };
     on_new_subsurface.add_to(wlr_surface->events.new_subsurface);
 
-    //PREV: desktop.views.push_back(this);
+    this->mapped = true;
     damage_whole();
   }
 
@@ -381,12 +381,11 @@ namespace cloth {
     events.unmap.emit(this);
     damage_whole();
 
-    // PREV: wl_list_remove(&this->link);
+    this->mapped = false;
     on_new_subsurface.remove();
 
     for (auto& child : children) {
       child.finish();
-      // PREV: child->destroy(child);
     }
 
     if (fullscreen_output != nullptr) {

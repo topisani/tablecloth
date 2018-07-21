@@ -483,7 +483,7 @@ namespace cloth {
 #endif
         } else {
           // Render all views
-          for (auto& view : desktop.views) {
+          for (auto& view : desktop.visible_views()) {
             render_view(view, data);
           }
           // Render top layer above shell views
@@ -533,7 +533,7 @@ namespace cloth {
       }
 #endif
     } else {
-      for (auto& view : desktop.views) {
+      for (auto& view : desktop.visible_views()) {
         view_for_each_surface(view, data.layout, surface_send_frame_done, &data);
       }
 

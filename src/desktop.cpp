@@ -25,7 +25,7 @@ namespace cloth {
       }
     }
 
-    for (auto& view : views) {
+    for (auto& view : visible_views() | ranges::view::reverse) {
       if (view.at(lx, ly, surface, sx, sy)) return &view;
     }
     return nullptr;
@@ -76,9 +76,7 @@ namespace cloth {
 
     View* _view;
     if ((_view = view_at(lx, ly, surface, sx, sy))) {
-      if (view) {
-        view = _view;
-      }
+      view = _view;
       return surface;
     }
 

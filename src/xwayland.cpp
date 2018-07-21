@@ -111,8 +111,11 @@ namespace cloth {
   XwaylandSurface::XwaylandSurface(Desktop& p_desktop, wlr::xwayland_surface_t* p_xwayland_surface)
     : View(p_desktop), xwayland_surface(p_xwayland_surface)
   {
-    width = xwayland_surface->surface->current.width;
-    height = xwayland_surface->surface->current.height;
+    View::wlr_surface = xwayland_surface->surface;
+    x = xwayland_surface->x;
+    y = xwayland_surface->y;
+    width = xwayland_surface->width;
+    height = xwayland_surface->height;
 
     on_request_configure.add_to(xwayland_surface->events.request_configure);
     on_request_configure = [this] (void* data) {
@@ -204,10 +207,11 @@ namespace cloth {
 
   void Desktop::handle_xwayland_surface(void* data)
   {
+    if (data == nullptr) return;
     auto& surface = *(wlr::xwayland_surface_t*) data;
 
-    LOGD("New xwayland surface: title={}, class={}, instance={}", surface.title, surface.class_,
-         surface.instance);
+    LOGD("New xwayland surface: title={}, class={}, instance={}", util::nonull(surface.title), util::nonull(surface.class_),
+         util::nonull(surface.instance));
     wlr_xwayland_surface_ping(&surface);
 
     auto view_ptr = std::make_unique<XwaylandSurface>(*this, &surface);
