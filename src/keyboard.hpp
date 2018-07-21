@@ -24,8 +24,8 @@ namespace cloth {
     wl::Listener on_keyboard_key;
     wl::Listener on_keyboard_modifiers;
 
-    xkb_keysym_t pressed_keysyms_translated[pressed_keysyms_cap];
-    xkb_keysym_t pressed_keysyms_raw[pressed_keysyms_cap];
+    xkb_keysym_t pressed_keysyms_translated[pressed_keysyms_cap] = {0};
+    xkb_keysym_t pressed_keysyms_raw[pressed_keysyms_cap] = {0};
 
   private:
     void execute_user_binding(std::string_view command);

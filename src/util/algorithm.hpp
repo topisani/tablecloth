@@ -23,6 +23,11 @@ namespace cloth::util {
     return result;
   }
 
+  inline const char* nonull(const char* str) {
+    if (str == nullptr) return "";
+    return str;
+  };
+
   inline bool iequals(std::string_view a, std::string_view b)
   {
     return std::equal(a.begin(), a.end(), b.begin(), b.end(),

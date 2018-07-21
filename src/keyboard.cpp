@@ -190,13 +190,13 @@ namespace cloth {
     size_t n = pressed_keysyms_length(pressed_keysyms);
     auto& bindings = seat.input.server.config.bindings;
     for (auto& binding : bindings) {
-      if (modifiers ^ binding.modifiers || n != binding.keysyms_len) {
+      if (modifiers ^ binding.modifiers || n != binding.keysyms.size()) {
         continue;
       }
 
       bool ok = true;
-      for (size_t i = 0; i < binding.keysyms_len; i++) {
-        ssize_t j = pressed_keysyms_index(pressed_keysyms, binding.keysyms[i]);
+      for (auto sym : binding.keysyms) {
+        ssize_t j = pressed_keysyms_index(pressed_keysyms, sym);
         if (j < 0) {
           ok = false;
           break;
@@ -332,17 +332,12 @@ namespace cloth {
     keyboard_config_merge(config, seat.input.config.get_keyboard(&device));
     keyboard_config_merge(config, seat.input.config.get_keyboard(nullptr));
 
-    auto nonull = [] (const char* str) {
-      if (str == nullptr) return "";
-      return str;
-    };
-
     Config::Keyboard env_config = {
-      .rules = nonull(getenv("XKB_DEFAULT_RULES")),
-      .model = nonull(getenv("XKB_DEFAULT_MODEL")),
-      .layout = nonull(getenv("XKB_DEFAULT_LAYOUT")),
-      .variant = nonull(getenv("XKB_DEFAULT_VARIANT")),
-      .options = nonull(getenv("XKB_DEFAULT_OPTIONS")),
+      .rules = util::nonull(getenv("XKB_DEFAULT_RULES")),
+      .model = util::nonull(getenv("XKB_DEFAULT_MODEL")),
+      .layout = util::nonull(getenv("XKB_DEFAULT_LAYOUT")),
+      .variant = util::nonull(getenv("XKB_DEFAULT_VARIANT")),
+      .options = util::nonull(getenv("XKB_DEFAULT_OPTIONS")),
     };
     keyboard_config_merge(config, &env_config);
 

@@ -27,11 +27,11 @@ namespace cloth {
     return NULL;
   }
 
-  Input::Input(Server& server, Config& config) noexcept : server(server), config(config)
+  Input::Input(Server& p_server, Config& p_config) noexcept : server(p_server), config(p_config)
   {
     LOGD("Initializing roots input");
 
-    on_new_input = [&](void* data) {
+    on_new_input = [this](void* data) {
       auto* device = (wlr::input_device_t*) data;
 
       auto seat_name = Config::default_seat_name;

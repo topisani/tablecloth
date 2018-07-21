@@ -33,14 +33,13 @@ namespace cloth {
       std::string name;
       std::string seat;
       std::string mapped_output;
-      bool tap_enabled;
+      bool tap_enabled = true;
       wlr::box_t mapped_box;
     };
 
     struct Binding {
-      uint32_t modifiers;
+      uint32_t modifiers = 0;
       std::vector<xkb_keysym_t> keysyms;
-      size_t keysyms_len = 0;
       std::string command;
     };
 

@@ -12,15 +12,15 @@
 
 namespace cloth {
 
-  LayerPopup::LayerPopup(LayerSurface& parent, wlr::xdg_popup_v6_t& wlr_popup)
-    : parent(parent), wlr_popup(wlr_popup)
+  LayerPopup::LayerPopup(LayerSurface& p_parent, wlr::xdg_popup_v6_t& p_wlr_popup)
+    : parent(p_parent), wlr_popup(p_wlr_popup)
   {
     on_destroy.add_to(wlr_popup.base->events.destroy);
-    on_destroy = [&] { util::erase_this(parent.children, this); };
+    on_destroy = [this] { util::erase_this(parent.children, this); };
     on_new_popup.add_to(wlr_popup.base->events.new_popup);
-    on_new_popup = [&](void* data) { parent.create_popup(*((wlr::xdg_popup_v6_t*) data)); };
+    on_new_popup = [this](void* data) { parent.create_popup(*((wlr::xdg_popup_v6_t*) data)); };
 
-    auto damage_whole = [&] {
+    auto damage_whole = [this] {
       int ox = wlr_popup.geometry.x + parent.geo.x;
       int oy = wlr_popup.geometry.y + parent.geo.y;
       parent.output.damage_whole_local_surface(*wlr_popup.base->surface, ox, oy, 0);
@@ -274,13 +274,13 @@ namespace cloth {
     return children.push_back(std::move(popup));
   }
 
-  LayerSurface::LayerSurface(Output& output, wlr::layer_surface_t& layer_surface)
-    : output(output), layer_surface(layer_surface)
+  LayerSurface::LayerSurface(Output& p_output, wlr::layer_surface_t& p_layer_surface)
+    : output(p_output), layer_surface(p_layer_surface)
   {
     layer_surface.data = this;
 
     on_surface_commit.add_to(layer_surface.surface->events.commit);
-    on_surface_commit = [&] (void* data) {
+    on_surface_commit = [this] (void* data) {
       wlr::box_t old_geo = geo;
       arrange_layers(output);
       if (old_geo == geo) {
@@ -292,14 +292,14 @@ namespace cloth {
     };
 
     on_output_destroy.add_to(layer_surface.output->events.destroy);
-    on_output_destroy = [&] (void* data) {
+    on_output_destroy = [this] (void* data) {
       layer_surface.output = nullptr;
       on_output_destroy.remove();
       wlr_layer_surface_close(&layer_surface);
     };
 
     on_destroy.add_to(layer_surface.events.destroy);
-    on_destroy = [&] (void* data) {
+    on_destroy = [this] (void* data) {
       if (layer_surface.mapped) {
         output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
       }
@@ -307,16 +307,16 @@ namespace cloth {
       arrange_layers(output);
     };
     on_map.add_to(layer_surface.events.map);
-    on_map = [&] (void* data) {
+    on_map = [this] (void* data) {
       output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
       wlr_surface_send_enter(layer_surface.surface, &output.wlr_output);
     };
     on_unmap.add_to(layer_surface.events.unmap);
-    on_unmap = [&] (void* data) {
+    on_unmap = [this] (void* data) {
        output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
     };
     on_new_popup.add_to(layer_surface.events.new_popup);
-    on_new_popup = [&] (void* data) {
+    on_new_popup = [this] (void* data) {
       auto& wlr_popup = *(wlr::xdg_popup_v6_t*) data;
       create_popup(wlr_popup);
     };

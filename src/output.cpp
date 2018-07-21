@@ -746,8 +746,8 @@ namespace cloth {
     }
   }
 
-  Output::Output(Desktop& desktop, wlr::output_t& wlr) noexcept
-    : desktop(desktop),
+  Output::Output(Desktop& p_desktop, wlr::output_t& wlr) noexcept
+    : desktop(p_desktop),
       wlr_output(wlr),
       last_frame(chrono::clock::now()),
       damage(wlr_output_damage_create(&wlr_output))
@@ -764,19 +764,19 @@ namespace cloth {
     }
 
     on_destroy.add_to(wlr_output.events.destroy);
-    on_destroy = [&] { util::erase_this(desktop.outputs, this); };
+    on_destroy = [this] { util::erase_this(desktop.outputs, this); };
 
     on_mode.add_to(wlr_output.events.mode);
-    on_mode = [&] { arrange_layers(*this); };
+    on_mode = [this] { arrange_layers(*this); };
 
     on_transform.add_to(wlr_output.events.transform);
-    on_transform = [&] { arrange_layers(*this); };
+    on_transform = [this] { arrange_layers(*this); };
 
     on_damage_frame.add_to(damage->events.frame);
-    on_damage_frame = [&] { render(); };
+    on_damage_frame = [this] { render(); };
 
     on_damage_destroy.add_to(damage->events.destroy);
-    on_damage_destroy = [&] { util::erase_this(desktop.outputs, this); };
+    on_damage_destroy = [this] { util::erase_this(desktop.outputs, this); };
 
     Config::Output* output_config = desktop.config.get_output(wlr_output);
     if (output_config) {
@@ -801,12 +801,6 @@ namespace cloth {
       }
     } else {
       wlr_output_layout_add_auto(desktop.layout, &wlr_output);
-    }
-
-    for (auto& seat : desktop.server.input.seats)
-    {
-      seat.configure_cursor();
-      seat.configure_xcursor();
     }
 
     arrange_layers(*this);

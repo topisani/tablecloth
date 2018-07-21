@@ -15,14 +15,14 @@
 
 namespace cloth {
 
-  Cursor::Cursor(Seat& seat, wlr::cursor_t* cursor) noexcept : seat(seat), wlr_cursor(cursor)
+  Cursor::Cursor(Seat& p_seat, wlr::cursor_t* p_cursor) noexcept : seat(p_seat), wlr_cursor(p_cursor), default_xcursor(xcursor_default)
   {
     Desktop& desktop = seat.input.server.desktop;
     wlr_cursor_attach_output_layout(wlr_cursor, desktop.layout);
 
     // add input signals
     on_motion.add_to(wlr_cursor->events.motion);
-    on_motion = [&](void* data) {
+    on_motion = [this](void* data) {
       wlr_idle_notify_activity(seat.input.server.desktop.idle, seat.wlr_seat);
       auto* event = (wlr::event_pointer_motion_t*) data;
       wlr_cursor_move(wlr_cursor, event->device, event->delta_x, event->delta_y);
@@ -30,7 +30,7 @@ namespace cloth {
     };
 
     on_motion_absolute.add_to(wlr_cursor->events.motion_absolute);
-    on_motion_absolute = [&](void* data) {
+    on_motion_absolute = [this](void* data) {
       wlr_idle_notify_activity(seat.input.server.desktop.idle, seat.wlr_seat);
       auto* event = (wlr::event_pointer_motion_absolute_t*) data;
       wlr_cursor_warp_absolute(wlr_cursor, event->device, event->x, event->y);
@@ -38,7 +38,7 @@ namespace cloth {
     };
 
     on_button.add_to(wlr_cursor->events.button);
-    on_button = [&](void* data) {
+    on_button = [this](void* data) {
       wlr_idle_notify_activity(seat.input.server.desktop.idle, seat.wlr_seat);
       auto* event = (wlr::event_pointer_button_t*) data;
       press_button(*event->device, event->time_msec, wlr::Button(event->button), event->state,
@@ -46,7 +46,7 @@ namespace cloth {
     };
 
     on_axis.add_to(wlr_cursor->events.axis);
-    on_axis = [&](void* data) {
+    on_axis = [this](void* data) {
       wlr_idle_notify_activity(seat.input.server.desktop.idle, seat.wlr_seat);
       auto* event = (wlr::event_pointer_axis_t*) data;
       wlr_seat_pointer_notify_axis(this->seat.wlr_seat, event->time_msec, event->orientation,
@@ -54,7 +54,7 @@ namespace cloth {
     };
 
     on_touch_down.add_to(wlr_cursor->events.touch_down);
-    on_touch_down = [&](void* data) {
+    on_touch_down = [this](void* data) {
       wlr_idle_notify_activity(seat.input.server.desktop.idle, seat.wlr_seat);
       auto* event = (wlr::event_touch_down_t*) data;
       Desktop& desktop = seat.input.server.desktop;
@@ -81,7 +81,7 @@ namespace cloth {
     };
 
     on_touch_up.add_to(wlr_cursor->events.touch_up);
-    on_touch_up = [&](void* data) {
+    on_touch_up = [this](void* data) {
       wlr_idle_notify_activity(seat.input.server.desktop.idle, seat.wlr_seat);
       auto* event = (wlr::event_touch_up_t*) data;
       wlr::touch_point_t* point = wlr_seat_touch_get_point(this->seat.wlr_seat, event->touch_id);
@@ -98,7 +98,7 @@ namespace cloth {
     };
 
     on_touch_motion.add_to(wlr_cursor->events.touch_motion);
-    on_touch_motion = [&](void* data) {
+    on_touch_motion = [this](void* data) {
       wlr_idle_notify_activity(seat.input.server.desktop.idle, seat.wlr_seat);
       auto* event = (wlr::event_touch_motion_t*) data;
       auto& desktop = seat.input.server.desktop;
@@ -130,7 +130,7 @@ namespace cloth {
     };
 
     on_tool_axis.add_to(wlr_cursor->events.tablet_tool_axis);
-    on_tool_axis = [&](void* data) {
+    on_tool_axis = [this](void* data) {
       wlr_idle_notify_activity(seat.input.server.desktop.idle, seat.wlr_seat);
       auto* event = (wlr::event_tablet_tool_axis_t*) data;
       if ((event->updated_axes & WLR_TABLET_TOOL_AXIS_X) &&
@@ -147,7 +147,7 @@ namespace cloth {
     };
 
     on_tool_tip.add_to(wlr_cursor->events.tablet_tool_tip);
-    on_tool_tip = [&](void* data) {
+    on_tool_tip = [this](void* data) {
       wlr_idle_notify_activity(seat.input.server.desktop.idle, seat.wlr_seat);
       auto* event = (wlr::event_tablet_tool_tip_t*) data;
       press_button(*event->device, event->time_msec, wlr::Button::left,
@@ -155,7 +155,7 @@ namespace cloth {
     };
 
     on_request_set_cursor.add_to(seat.wlr_seat->events.request_set_cursor);
-    on_request_set_cursor = [&](void* data) {
+    on_request_set_cursor = [this](void* data) {
       wlr_idle_notify_activity(seat.input.server.desktop.idle, seat.wlr_seat);
       auto* event = (wlr::seat_pointer_request_set_cursor_event_t*) data;
       wlr::surface_t* focused_surface = event->seat_client->seat->pointer_state.focused_surface;

@@ -4,10 +4,14 @@
 #include "config.hpp"
 #include "server.hpp"
 #include "seat.hpp"
+extern "C" {
+#include <wlr/util/log.h>
+}
 
 using namespace cloth;
 
 extern "C" int main(int argc, char **argv) {
+	wlr_log_init(WLR_DEBUG, NULL);
 
   auto server = Server(argc, argv);
 	const char *socket = wl_display_add_socket_auto(server.wl_display);

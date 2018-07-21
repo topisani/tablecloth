@@ -57,9 +57,7 @@ namespace cloth {
     wlr::surface_t* surface = nullptr;
     wlr::output_t* wlr_output = wlr_output_layout_output_at(layout, lx, ly);
     double ox = lx, oy = ly;
-    if (view) {
-      view = nullptr;
-    }
+    view = nullptr;
 
     Output* output = nullptr;
     if (wlr_output) {
@@ -97,13 +95,19 @@ namespace cloth {
     return nullptr;
   }
 
-  Desktop::Desktop(Server& server, Config& config) noexcept : server(server), config(config)
+  Desktop::Desktop(Server& p_server, Config& p_config) noexcept : server(p_server), config(p_config)
   {
     LOGD("Initializing tablecloth desktop");
 
-    on_new_output = [&](void* data) {
+    on_new_output = [this](void* data) {
       LOGD("New output");
       outputs.emplace_back(*this, *(wlr::output_t*) data);
+
+      for (auto& seat : server.input.seats)
+      {
+        seat.configure_cursor();
+        seat.configure_xcursor();
+      }
     };
     on_new_output.add_to(server.backend->events.new_output);
 

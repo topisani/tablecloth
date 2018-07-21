@@ -108,20 +108,20 @@ namespace cloth {
     return nullptr;
   }
 
-  XwaylandSurface::XwaylandSurface(Desktop& desktop, wlr::xwayland_surface_t* xwayland_surface)
-    : View(desktop), xwayland_surface(xwayland_surface)
+  XwaylandSurface::XwaylandSurface(Desktop& p_desktop, wlr::xwayland_surface_t* p_xwayland_surface)
+    : View(p_desktop), xwayland_surface(p_xwayland_surface)
   {
     width = xwayland_surface->surface->current.width;
     height = xwayland_surface->surface->current.height;
 
     on_request_configure.add_to(xwayland_surface->events.request_configure);
-    on_request_configure = [&](void* data) {
+    on_request_configure = [this] (void* data) {
       auto& e = *(wlr::xwayland_surface_configure_event_t*) data;
       update_position(e.x, e.y);
     };
 
     on_request_move.add_to(xwayland_surface->events.request_move);
-    on_request_move = [&](void* data) {
+    on_request_move = [this] (void* data) {
       Seat* seat = guess_seat_for_view(*this);
       if (!seat || seat->cursor.mode != Cursor::Mode::Passthrough) {
         return;
@@ -130,7 +130,7 @@ namespace cloth {
     };
 
     on_request_resize.add_to(xwayland_surface->events.request_resize);
-    on_request_resize = [&](void* data) {
+    on_request_resize = [this] (void* data) {
       Seat* seat = guess_seat_for_view(*this);
       auto& e = *(wlr::xwayland_resize_event_t*) data;
       if (!seat || seat->cursor.mode != Cursor::Mode::Passthrough) {
@@ -140,15 +140,15 @@ namespace cloth {
     };
 
     on_request_maximize.add_to(xwayland_surface->events.request_maximize);
-    on_request_maximize = [&](void* data) {
+    on_request_maximize = [this] (void* data) {
       maximize(xwayland_surface->maximized_vert && xwayland_surface->maximized_horz);
     };
 
     on_request_fullscreen.add_to(xwayland_surface->events.request_fullscreen);
-    on_request_fullscreen = [&](void* data) { set_fullscreen(xwayland_surface->fullscreen, nullptr); };
+    on_request_fullscreen = [this] (void* data) { set_fullscreen(xwayland_surface->fullscreen, nullptr); };
 
     // Added/removed on map/unmap
-    on_surface_commit = [&](void* data) {
+    on_surface_commit = [this] (void* data) {
       apply_damage();
 
       int width = xwayland_surface->surface->current.width;
@@ -169,7 +169,7 @@ namespace cloth {
     };
 
     on_map.add_to(xwayland_surface->events.map);
-    on_map = [&](void* data) {
+    on_map = [this] (void* data) {
       auto& surface = *(wlr::xwayland_surface_t*) data;
       x = surface.x;
       y = surface.y;
@@ -193,13 +193,13 @@ namespace cloth {
     };
 
     on_unmap.add_to(xwayland_surface->events.unmap);
-    on_unmap = [&](void* data) {
+    on_unmap = [this] (void* data) {
       on_surface_commit.remove();
       unmap();
     };
 
     on_destroy.add_to(xwayland_surface->events.destroy);
-    on_destroy = [&] { util::erase_this(desktop.views, this); };
+    on_destroy = [this] { util::erase_this(desktop.views, this); };
   }
 
   void Desktop::handle_xwayland_surface(void* data)

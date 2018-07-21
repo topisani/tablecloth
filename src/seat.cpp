@@ -120,10 +120,10 @@ namespace cloth {
   DragIcon::DragIcon(Seat& seat, wlr::drag_icon_t& wlr_icon) noexcept
    : seat(seat), wlr_drag_icon(wlr_icon)
   {
-    on_surface_commit = [&] { update_position(); };
+    on_surface_commit = [this] { update_position(); };
     on_surface_commit.add_to(wlr_drag_icon.surface->events.commit);
 
-    auto handle_damage_whole = [&] { damage_whole(); };
+    auto handle_damage_whole = [this] { damage_whole(); };
 
     on_unmap = handle_damage_whole;
     on_unmap.add_to(wlr_drag_icon.events.unmap);
@@ -354,11 +354,11 @@ namespace cloth {
     return &views.front().view;
   }
 
-  SeatView::SeatView(Seat& seat, View& view) noexcept : seat(seat), view(view)
+  SeatView::SeatView(Seat& p_seat, View& p_view) noexcept : seat(p_seat), view(p_view)
   {
-    on_view_unmap = [&] { util::erase_this(seat.views, this); };
+    on_view_unmap = [this] { util::erase_this(seat.views, this); };
     on_view_unmap.add_to(view.events.unmap);
-    on_view_destroy = [&] { util::erase_this(seat.views, this); };
+    on_view_destroy = [this] { util::erase_this(seat.views, this); };
     on_view_destroy.add_to(view.events.destroy);
   }
 

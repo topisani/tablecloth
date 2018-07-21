@@ -29,7 +29,7 @@ namespace cloth {
 
     int offs_x, offs_y;
     int view_x, view_y, view_width, view_height;
-    float view_rotation;
+    float view_rotation = 0;
     uint32_t resize_edges;
 
     SeatView* pointer_view;

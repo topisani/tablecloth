@@ -11,15 +11,15 @@
 
 namespace cloth {
 
-  WlShellPopup::WlShellPopup(View& view, wlr::wl_shell_surface_t& wlr_popup)
-    : ViewChild(view, *wlr_popup.surface), wlr_popup(wlr_popup)
+  WlShellPopup::WlShellPopup(View& p_view, wlr::wl_shell_surface_t& p_wlr_popup)
+    : ViewChild(p_view, *p_wlr_popup.surface), wlr_popup(p_wlr_popup)
   {
     on_destroy.add_to(wlr_popup.events.destroy);
-    on_destroy = [&] { util::erase_this(view.children, this); };
+    on_destroy = [this] { util::erase_this(view.children, this); };
     on_set_state.add_to(wlr_popup.events.set_state);
-    on_set_state = [&] { util::erase_this(view.children, this); };
+    on_set_state = [this] { util::erase_this(view.children, this); };
     on_new_popup.add_to(wlr_popup.events.new_popup);
-    on_new_popup = [&](void* data) {
+    on_new_popup = [this](void* data) {
       view.create_popup(*((wlr::wl_shell_surface_t*) data)->surface);
     };
   }
@@ -34,14 +34,14 @@ namespace cloth {
     wl_client_destroy(wl_shell_surface->client);
   }
 
-  WlShellSurface::WlShellSurface(Desktop& desktop, wlr::wl_shell_surface_t* wl_shell_surface)
-   : View(desktop), wl_shell_surface(wl_shell_surface) 
+  WlShellSurface::WlShellSurface(Desktop& desktop, wlr::wl_shell_surface_t* p_wl_shell_surface)
+   : View(desktop), wl_shell_surface(p_wl_shell_surface) 
   {
     View::wlr_surface = wl_shell_surface->surface;
     width = wl_shell_surface->surface->current.width;
     height = wl_shell_surface->surface->current.height;
     on_request_move.add_to(wl_shell_surface->events.request_move);
-    on_request_move = [&](void* data) {
+    on_request_move = [this](void* data) {
       Input& input = this->desktop.server.input;
       auto&  e = *(wlr::wl_shell_surface_move_event_t*) data;
       Seat* seat = input.seat_from_wlr_seat(*e.seat->seat);
@@ -52,7 +52,7 @@ namespace cloth {
     };
 
     on_request_resize.add_to(wl_shell_surface->events.request_resize);
-    on_request_resize = [&](void* data) {
+    on_request_resize = [this](void* data) {
       Input& input = this->desktop.server.input;
       auto&  e = *(wlr::wl_shell_surface_resize_event_t*) data;
       Seat* seat = input.seat_from_wlr_seat(*e.seat->seat);
@@ -63,19 +63,19 @@ namespace cloth {
     };
 
     on_request_maximize.add_to(wl_shell_surface->events.request_maximize);
-    on_request_maximize = [&](void* data) {
+    on_request_maximize = [this](void* data) {
       // auto& e = *(wlr::wl_shell_surface_maximize_event_t *) data;
       maximize(true);
     };
 
     on_request_fullscreen.add_to(wl_shell_surface->events.request_fullscreen);
-    on_request_fullscreen = [&](void* data) {
+    on_request_fullscreen = [this](void* data) {
       auto&  e = *(wlr::wl_shell_surface_set_fullscreen_event_t*) data;
       set_fullscreen(true, e.output);
     };
 
     on_set_state.add_to(wl_shell_surface->events.set_state);
-    on_set_state = [&](void* data) {
+    on_set_state = [this](void* data) {
       if (maximized && wl_shell_surface->state != WLR_WL_SHELL_SURFACE_STATE_MAXIMIZED) {
         maximize(false);
       }
@@ -86,7 +86,7 @@ namespace cloth {
     };
 
     on_surface_commit.add_to(wl_shell_surface->surface->events.commit);
-    on_surface_commit = [&](void* data) {
+    on_surface_commit = [this](void* data) {
       apply_damage();
 
       int width = wl_shell_surface->surface->current.width;
@@ -107,13 +107,13 @@ namespace cloth {
     };
 
     on_new_popup.add_to(wl_shell_surface->events.new_popup);
-    on_new_popup = [&](void* data) {
+    on_new_popup = [this](void* data) {
       auto&  wlr_wl_shell_surface = *(wlr::wl_shell_surface_t*) data;
       create_popup(*wlr_wl_shell_surface.surface);
     };
 
     on_destroy.add_to(wl_shell_surface->events.destroy);
-    on_destroy = [&] { util::erase_this(desktop.views, this); };
+    on_destroy = [this] { util::erase_this(this->desktop.views, this); };
   }
 
   ViewChild& WlShellSurface::create_popup(wlr::surface_t& wlr_popup) {

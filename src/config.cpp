@@ -156,7 +156,6 @@ namespace cloth {
     {
       Config::Binding bc;
 
-      xkb_keysym_t keysyms[Keyboard::pressed_keysyms_cap];
       auto symnames = std::string(combination);
       char* symname = strtok(symnames.data(), "+");
       while (symname) {
@@ -169,14 +168,12 @@ namespace cloth {
             LOGE("got unknown key binding symbol: {}", symname);
             return;
           }
-          keysyms[bc.keysyms_len] = sym;
-          bc.keysyms_len++;
+          bc.keysyms.push_back(sym);
         }
         symname = strtok(nullptr, "+");
       }
 
       bc.command = command;
-      bc.keysyms = {keysyms, keysyms + Keyboard::pressed_keysyms_cap};
       config.bindings.push_back(std::move(bc));
     }
 

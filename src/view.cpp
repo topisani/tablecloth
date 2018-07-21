@@ -19,7 +19,7 @@ namespace cloth {
   View::~View() noexcept
   {
     events.destroy.emit();
-    if (!wlr_surface) unmap();
+    if (wlr_surface) unmap();
   }
 
   ViewType View::type() noexcept {

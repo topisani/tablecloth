@@ -11,17 +11,17 @@
 
 namespace cloth {
 
-  XdgPopupV6::XdgPopupV6(View& view, wlr::xdg_popup_v6_t& wlr_popup)
-    : ViewChild(view, *wlr_popup.base->surface), wlr_popup(wlr_popup)
+  XdgPopupV6::XdgPopupV6(View& p_view, wlr::xdg_popup_v6_t& p_wlr_popup)
+    : ViewChild(p_view, *p_wlr_popup.base->surface), wlr_popup(p_wlr_popup)
   {
     on_destroy.add_to(wlr_popup.base->events.destroy);
-    on_destroy = [&] { util::erase_this(view.children, this); };
+    on_destroy = [this] { util::erase_this(view.children, this); };
     on_new_popup.add_to(wlr_popup.base->events.new_popup);
-    on_new_popup = [&](void* data) { view.create_popup(*((wlr::xdg_surface_v6_t*) data)->surface); };
+    on_new_popup = [this](void* data) { view.create_popup(*((wlr::xdg_surface_v6_t*) data)->surface); };
     on_unmap.add_to(wlr_popup.base->events.unmap);
-    on_unmap = [&] { view.damage_whole(); };
+    on_unmap = [this] { view.damage_whole(); };
     on_map.add_to(wlr_popup.base->events.map);
-    on_map = [&] { view.damage_whole(); };
+    on_map = [this] { view.damage_whole(); };
 
     // TODO: Desired behaviour?
     unconstrain();
@@ -195,7 +195,7 @@ namespace cloth {
     width = xdg_surface->surface->current.width;
     height = xdg_surface->surface->current.height;
     on_request_move.add_to(xdg_surface->toplevel->events.request_move);
-    on_request_move = [&](void* data) {
+    on_request_move = [this](void* data) {
       Input& input = this->desktop.server.input;
       auto& e = *(wlr::xdg_toplevel_v6_move_event_t*) data;
       Seat* seat = input.seat_from_wlr_seat(*e.seat->seat);
@@ -206,7 +206,7 @@ namespace cloth {
     };
 
     on_request_resize.add_to(xdg_surface->toplevel->events.request_resize);
-    on_request_resize = [&](void* data) {
+    on_request_resize = [this](void* data) {
       Input& input = this->desktop.server.input;
       auto& e = *(wlr::xdg_toplevel_v6_resize_event_t*) data;
       Seat* seat = input.seat_from_wlr_seat(*e.seat->seat);
@@ -217,21 +217,21 @@ namespace cloth {
     };
 
     on_request_maximize.add_to(xdg_surface->toplevel->events.request_maximize);
-    on_request_maximize = [&](void* data) {
-      if (xdg_surface->role != WLR_XDG_SURFACE_V6_ROLE_TOPLEVEL) return;
-      maximize(xdg_surface->toplevel->client_pending.maximized);
+    on_request_maximize = [this](void* data) {
+      if (this->xdg_surface->role != WLR_XDG_SURFACE_V6_ROLE_TOPLEVEL) return;
+      maximize(this->xdg_surface->toplevel->client_pending.maximized);
     };
 
     on_request_fullscreen.add_to(xdg_surface->toplevel->events.request_fullscreen);
-    on_request_fullscreen = [&](void* data) {
-      if (xdg_surface->role != WLR_XDG_SURFACE_V6_ROLE_TOPLEVEL) return;
+    on_request_fullscreen = [this](void* data) {
+      if (this->xdg_surface->role != WLR_XDG_SURFACE_V6_ROLE_TOPLEVEL) return;
       auto& e = *(wlr::xdg_toplevel_v6_set_fullscreen_event_t*) data;
       set_fullscreen(e.fullscreen, e.output);
     };
 
     on_surface_commit.add_to(xdg_surface->surface->events.commit);
-    on_surface_commit = [&](void* data) {
-      if (!xdg_surface->mapped) return;
+    on_surface_commit = [this](void* data) {
+      if (!this->xdg_surface || !this->xdg_surface->mapped) return;
 
       apply_damage();
 
@@ -239,7 +239,7 @@ namespace cloth {
       update_size(size.width, size.height);
 
     	uint32_t pending_serial = pending_move_resize_configure_serial;
-    	if (pending_serial > 0 && pending_serial >= xdg_surface->configure_serial) {
+    	if (pending_serial > 0 && pending_serial >= this->xdg_surface->configure_serial) {
     		double x = this->x;
     		double y = this->y;
     		if (pending_move_resize.update_x) {
@@ -252,35 +252,35 @@ namespace cloth {
     		}
     		update_position(x, y);
 
-    		if (pending_serial == xdg_surface->configure_serial) {
+    		if (pending_serial == this->xdg_surface->configure_serial) {
     			pending_move_resize_configure_serial = 0;
     		}
     	}
     };
 
     on_new_popup.add_to(xdg_surface->events.new_popup);
-    on_new_popup = [&](void* data) {
+    on_new_popup = [this](void* data) {
       auto& wlr_xdg_surface = *(wlr::xdg_surface_v6_t*) data;
       create_popup(*wlr_xdg_surface.surface);
     };
 
     on_map.add_to(xdg_surface->events.map);
-    on_map = [&](void* data) {
+    on_map = [this](void* data) {
       auto box = get_size();
       width = box.width;
       height = box.height;
 
-      map(*xdg_surface->surface);
+      map(*this->xdg_surface->surface);
       setup();
     };
 
     on_unmap.add_to(xdg_surface->events.unmap);
-    on_unmap = [&](void* data) {
+    on_unmap = [this](void* data) {
       unmap();
     };
 
     on_destroy.add_to(xdg_surface->events.destroy);
-    on_destroy = [&] { util::erase_this(desktop.views, this); };
+    on_destroy = [this] { util::erase_this(this->desktop.views, this); };
   }
 
   void Desktop::handle_xdg_shell_v6_surface(void* data)
@@ -292,7 +292,7 @@ namespace cloth {
       return;
     }
 
-    LOGD("new xdg toplevel: title={}, class={}", surface.toplevel->title, surface.toplevel->app_id);
+    LOGD("new xdg toplevel: title={}, class={}", util::nonull(surface.toplevel->title), util::nonull(surface.toplevel->app_id));
     wlr_xdg_surface_v6_ping(&surface);
 
     auto view_ptr = std::make_unique<XdgSurfaceV6>(*this, &surface);

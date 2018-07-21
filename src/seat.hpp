@@ -103,7 +103,7 @@ namespace cloth {
 
     SeatView& seat_view_from_view(View& view);
 
-    wlr::seat_t* wlr_seat;
+    wlr::seat_t* wlr_seat = nullptr;
     Input& input;
     Cursor cursor;
 
@@ -112,10 +112,10 @@ namespace cloth {
     double touch_x, touch_y;
 
     // If the focused layer is set, views cannot receive keyboard focus
-    wlr::layer_surface_t* focused_layer;
+    wlr::layer_surface_t* focused_layer = nullptr;
 
     // If non-null, only this client can receive input events
-    wl::client_t* exclusive_client;
+    wl::client_t* exclusive_client = nullptr;
 
     util::ptr_vec<SeatView> views;
     bool has_focus;
