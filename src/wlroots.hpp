@@ -92,6 +92,9 @@ extern "C" {
 #endif
 
 #undef Bool
+#undef True
+#undef False
+#undef Status
 
 namespace cloth::wl {
 

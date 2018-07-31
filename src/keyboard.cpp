@@ -112,7 +112,7 @@ namespace cloth {
         focus->set_fullscreen(!is_fullscreen, nullptr);
       }
     } else if (command == "next_window") {
-      seat.cycle_focus();
+      input.server.desktop.current_workspace().cycle_focus();
     } else if (command == "alpha") {
       View* focus = seat.get_focus();
       if (focus != nullptr) {

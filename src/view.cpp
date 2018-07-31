@@ -9,12 +9,13 @@
 #include "server.hpp"
 #include "wlroots.hpp"
 #include "xcursor.hpp"
+#include "workspace.hpp"
 
 #include "wlr-layer-shell-unstable-v1-protocol.h"
 
 namespace cloth {
 
-  View::View(Desktop& desktop) : desktop(desktop) {}
+  View::View(Workspace& workspace) : workspace(&workspace), desktop(workspace.desktop) {}
 
   View::~View() noexcept
   {
@@ -30,6 +31,10 @@ namespace cloth {
     if (util::dynamic_is<XwaylandSurface>(this)) return ViewType::xwayland;
     #endif
     assert(false);
+  }
+
+  bool View::is_focused() {
+    return workspace->focused_view() == this;
   }
 
   wlr::box_t View::get_box() const
@@ -236,7 +241,7 @@ namespace cloth {
       move_resize(output_box);
       rotate(0);
 
-      output.fullscreen_view = this;
+      output.workspace->fullscreen_view = this;
       fullscreen_output = &output;
       output.damage_whole();
     }
@@ -246,7 +251,7 @@ namespace cloth {
       rotate(saved.rotation);
       fullscreen_output->damage_whole();
 
-      fullscreen_output->fullscreen_view = nullptr;
+      fullscreen_output->workspace->fullscreen_view = nullptr;
       fullscreen_output = nullptr;
     }
   }
@@ -390,7 +395,7 @@ namespace cloth {
 
     if (fullscreen_output != nullptr) {
       fullscreen_output->damage_whole();
-      fullscreen_output->fullscreen_view = nullptr;
+      fullscreen_output->workspace->fullscreen_view = nullptr;
       fullscreen_output = nullptr;
     }
 
@@ -401,9 +406,7 @@ namespace cloth {
   void View::initial_focus()
   {
     // TODO what seat gets focus? the one with the last input event?
-    for (auto& seat : desktop.server.input.seats) {
-      seat.set_focus(this);
-    }
+    workspace->set_focused_view(this);
   }
 
   void View::setup()

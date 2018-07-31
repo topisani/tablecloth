@@ -5,8 +5,8 @@
 #include "cursor.hpp"
 #include "keyboard.hpp"
 #include "util/bindings.hpp"
-#include "wlroots.hpp"
 #include "view.hpp"
+#include "wlroots.hpp"
 
 namespace cloth {
 
@@ -92,7 +92,6 @@ namespace cloth {
     View* get_focus();
     void set_focus(View* view);
     void set_focus_layer(wlr::layer_surface_t* layer);
-    void cycle_focus();
     void begin_move(View& view);
     void begin_resize(View& view, wlr::edges_t edges);
     void begin_rotate(View& view);
@@ -144,6 +143,10 @@ namespace cloth {
     void add_tablet_pad(wlr::input_device_t& device);
     void add_tablet_tool(wlr::input_device_t& device);
     SeatView& add_view(View& view);
+
+  private:
+    friend SeatView;
+    View* _focused_view = nullptr;
   };
 
 } // namespace cloth

@@ -1,10 +1,10 @@
 #pragma once
 
+#include <cassert>
+#include <memory>
 #include <type_traits>
 #include <vector>
-#include <memory>
 #include "algorithm.hpp"
-#include <range/v3/range_concepts.hpp>
 
 namespace cloth::util {
 
@@ -30,7 +30,7 @@ namespace cloth::util {
     }
     pointer operator->() const
     {
-      return (*_iter).operator->();
+      return &(**_iter);
     }
 
     self_t& operator++()
@@ -124,7 +124,8 @@ namespace cloth::util {
   };
 
   template<typename Iter>
-  auto operator +(typename double_iterator<Iter>::difference_type diff, double_iterator<Iter> iter) {
+  auto operator+(typename double_iterator<Iter>::difference_type diff, double_iterator<Iter> iter)
+  {
     return iter + diff;
   }
 
@@ -168,7 +169,8 @@ namespace cloth::util {
     }
 
     template<typename... Args>
-    value_type& emplace_back(Args&&... args) {
+    value_type& emplace_back(Args&&... args)
+    {
       return push_back(std::make_unique<value_type>(std::forward<Args>(args)...));
     }
 
@@ -187,7 +189,7 @@ namespace cloth::util {
     iterator rotate_to_back(const value_type& v)
     {
       auto iter =
-        std::find_if(_order.begin(), _order.end(), [&v](auto&& uptr) { return uptr.get() == &v; });    
+        std::find_if(_order.begin(), _order.end(), [&v](auto&& uptr) { return uptr.get() == &v; });
       return rotate_to_back(iter);
     }
 
@@ -204,7 +206,7 @@ namespace cloth::util {
     iterator rotate_to_front(const value_type& v)
     {
       auto iter =
-        std::find_if(_order.begin(), _order.end(), [&v](auto&& uptr) { return uptr.get() == &v; });    
+        std::find_if(_order.begin(), _order.end(), [&v](auto&& uptr) { return uptr.get() == &v; });
       return rotate_to_front(iter);
     }
 
@@ -231,6 +233,21 @@ namespace cloth::util {
     std::size_t capacity() const noexcept
     {
       return _order.capacity();
+    }
+
+    std::size_t max_size() const noexcept
+    {
+      return _order.max_size();
+    }
+
+    void reserve(std::size_t new_cap) 
+    {
+      _order.reserve(new_cap);
+    }
+
+    void shrink_to_fit()
+    {
+      _order.shrink_to_fit();
     }
 
     value_type& operator[](std::size_t n)
@@ -287,15 +304,15 @@ namespace cloth::util {
       return _order.rend();
     }
 
-    value_type& front() 
+    value_type& front()
     {
       return *_order.front();
     }
 
-    value_type& back() 
+    value_type& back()
     {
       return *_order.back();
-    }  
+    }
 
     const value_type& front() const
     {
@@ -305,7 +322,11 @@ namespace cloth::util {
     const value_type& back() const
     {
       return *_order.back();
-    }  
+    }
+
+    std::vector<std::unique_ptr<value_type>>& underlying() {
+      return _order;
+    }
   };
 
   template<typename T, typename T2>
@@ -320,11 +341,251 @@ namespace cloth::util {
     return vec.erase(el);
   }
 
-} // namespace cloth::util
+  template<typename T>
+  struct non_null_ptr {
+    non_null_ptr() = delete;
+    constexpr non_null_ptr(T* ptr) : _ptr(ptr)
+    {
+      assert(ptr != nullptr);
+    }
+    non_null_ptr(std::nullptr_t) = delete;
 
-namespace ranges {
+    constexpr non_null_ptr(const non_null_ptr&) = default;
+    constexpr non_null_ptr(non_null_ptr&&) = default;
+    constexpr non_null_ptr& operator=(const non_null_ptr&) = default;
+    constexpr non_null_ptr& operator=(non_null_ptr&&) = default;
+
+    constexpr T& operator*() const noexcept
+    {
+      return *_ptr;
+    }
+
+    constexpr T* operator->() const noexcept
+    {
+      return _ptr;
+    }
+
+    constexpr operator T*() noexcept
+    {
+      return _ptr;
+    }
+
+    constexpr operator T* const() const noexcept
+    {
+      return _ptr;
+    }
+
+  private:
+    T* _ptr;
+  };
 
   template<typename T>
-  struct enable_view<cloth::util::ptr_vec<T>> : std::false_type {};
+  struct ref_vec {
+    using value_type = T;
 
-}
+    std::vector<value_type*> _order;
+
+    using iterator = double_iterator<typename decltype(_order)::iterator>;
+    using const_iterator = double_iterator<typename decltype(_order)::const_iterator>;
+
+    using reverse_iterator = double_iterator<typename decltype(_order)::reverse_iterator>;
+    using const_reverse_iterator =
+      double_iterator<typename decltype(_order)::const_reverse_iterator>;
+
+    ref_vec() = default;
+
+    ref_vec(std::initializer_list<value_type*> lst) : _order {lst} { };
+
+    template<typename InputIter, typename = std::enable_if_t<std::is_same_v<decltype(*std::declval<InputIter>()), value_type&>>>
+    ref_vec(InputIter iter1, InputIter iter2) {
+      _order.reserve(std::distance(iter1, iter2));
+      std::transform(iter1, iter2, std::back_inserter(_order), [] (auto& v) {return &v; });      
+    }
+
+    template<typename Range, typename  = std::enable_if_t<std::is_same_v<decltype(*std::declval<Range>().begin()), value_type&>>>
+    ref_vec(Range&& rng) : ref_vec (std::begin(rng), std::end(rng)) { }
+
+    value_type& push_back(value_type& v)
+    {
+      _order.push_back(&v);
+      return v;
+    }
+
+    value_type& push_back(non_null_ptr<value_type> ptr)
+    {
+      _order.push_back(ptr);
+      return *ptr;
+    }
+
+    value_type& emplace_back(value_type& v)
+    {
+      return push_back(v);
+    }
+
+    std::unique_ptr<value_type> erase(const value_type& v)
+    {
+      auto iter =
+        std::find_if(_order.begin(), _order.end(), [&v](auto&& ptr) { return ptr == &v; });
+      if (iter != _order.end()) {
+        auto uptr = std::move(*iter);
+        _order.erase(iter);
+        return uptr;
+      }
+      return nullptr;
+    }
+
+    iterator rotate_to_back(const value_type& v)
+    {
+      auto iter =
+        std::find_if(_order.begin(), _order.end(), [&v](auto&& ptr) { return ptr == &v; });
+      return rotate_to_back(iter);
+    }
+
+    iterator rotate_to_back(iterator iter)
+    {
+      if (iter != _order.end()) {
+        {
+          return std::rotate(iter.data(), iter.data() + 1, _order.end());
+        }
+      }
+      return end();
+    }
+
+    iterator rotate_to_front(const value_type& v)
+    {
+      auto iter =
+        std::find_if(_order.begin(), _order.end(), [&v](auto&& ptr) { return ptr == &v; });
+      return rotate_to_front(iter);
+    }
+
+    iterator rotate_to_front(iterator iter)
+    {
+      if (iter != _order.end()) {
+        {
+          return std::rotate(_order.begin(), iter.data(), iter.data() + 1);
+        }
+      }
+      return end();
+    }
+
+    std::size_t size() const noexcept
+    {
+      return _order.size();
+    }
+
+    bool empty() const noexcept
+    {
+      return _order.empty();
+    }
+
+    std::size_t capacity() const noexcept
+    {
+      return _order.capacity();
+    }
+
+    std::size_t max_size() const noexcept
+    {
+      return _order.max_size();
+    }
+
+    void reserve(std::size_t new_cap) 
+    {
+      _order.reserve(new_cap);
+    }
+
+    void shrink_to_fit()
+    {
+      _order.shrink_to_fit();
+    }
+
+    value_type& operator[](std::size_t n)
+    {
+      return *_order[n];
+    }
+
+    const value_type& operator[](std::size_t n) const
+    {
+      return *_order[n];
+    }
+
+    value_type& at(std::size_t n)
+    {
+      return *_order.at(n);
+    }
+
+    const value_type& at(std::size_t n) const
+    {
+      return *_order.at(n);
+    }
+
+    iterator begin()
+    {
+      return _order.begin();
+    }
+    iterator end()
+    {
+      return _order.end();
+    }
+    const_iterator begin() const
+    {
+      return _order.begin();
+    }
+    const_iterator end() const
+    {
+      return _order.end();
+    }
+
+    reverse_iterator rbegin()
+    {
+      return _order.rbegin();
+    }
+    reverse_iterator rend()
+    {
+      return _order.rend();
+    }
+    const_reverse_iterator rbegin() const
+    {
+      return _order.rbegin();
+    }
+    const_reverse_iterator rend() const
+    {
+      return _order.rend();
+    }
+
+    value_type& front()
+    {
+      return *_order.front();
+    }
+
+    value_type& back()
+    {
+      return *_order.back();
+    }
+
+    const value_type& front() const
+    {
+      return *_order.front();
+    }
+
+    const value_type& back() const
+    {
+      return *_order.back();
+    }
+
+    std::vector<value_type*>& underlying() {
+      return _order;
+    }
+  };
+
+
+} // namespace cloth::util
+
+// namespace ranges {
+// 
+//   template<typename T>
+//   struct enable_view<cloth::util::ptr_vec<T>> : std::false_type {};
+// 
+//   template<typename T>
+//   struct enable_view<cloth::util::ref_vec<T>> : std::false_type {};
+// 
+// } // namespace ranges

@@ -44,6 +44,14 @@ namespace cloth::util {
     return a.compare(a.size() - prefix.size(), prefix.size(), prefix) == 0;
   }
 
+  /// Return a closure which compares the adress any reference to T to the address of t
+  template<typename T>
+  constexpr auto addr_eq(T&& t) {
+    return [&t] (auto&& t2) {
+      return &t == &t2;
+    };
+  }
+
   template<typename T>
   bool erase_this(std::vector<T>& cont, T* el)
   {
@@ -76,10 +84,15 @@ namespace cloth::util {
 
   namespace view {
 
+    namespace detail {
+      template<typename T>
+      using store_or_ref_t = std::conditional_t<std::is_rvalue_reference_v<T>, std::decay_t<T>, T&>;
+    }
+
     template<typename Cont>
     struct reverse {
 
-      reverse(Cont& cont) noexcept : _container(cont) {}
+      reverse(Cont&& cont) noexcept : _container(std::forward<Cont>(cont)) {}
 
       auto begin()
       {
@@ -111,12 +124,15 @@ namespace cloth::util {
         return std::crend(_container);
       }
 
-      Cont& _container;
+      detail::store_or_ref_t<Cont&&> _container;
     };
+
+    template<typename ContRef>
+    reverse(ContRef&& cont) -> reverse<ContRef&&>;
 
     template<typename Cont>
     struct constant {
-      constant(Cont& cont) noexcept : _container(cont){};
+      constant(Cont&& cont) noexcept : _container(std::forward<Cont>(cont)){};
 
       auto begin() const
       {
@@ -138,8 +154,12 @@ namespace cloth::util {
         return std::cend(_container);
       }
 
-      Cont& _container;
+      detail::store_or_ref_t<Cont&&> _container;
     };
+
+    template<typename ContRef>
+    constant(ContRef&& cont) -> constant<ContRef&&>;
+
   } // namespace view
 
 

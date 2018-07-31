@@ -10,7 +10,7 @@ wayland_wall = dependency('wayland-wall')
 wlroots = dependency('wlroots', fallback: ['wlroots', 'wlroots'])
 wlr_protos = dependency('wlr_protos', fallback: ['wlroots', 'wlr_protos'])
 fmt = dependency('fmt', fallback: ['fmtlib', 'fmt_dep'])
-ranges = dependency('range-v3', fallback: ['range-v3', 'range_dep'])
+#ranges = dependency('range-v3', fallback: ['range-v3', 'range_dep'])
 gtk = dependency('gtk+-3.0')
 gtkmm = dependency('gtkmm-3.0')
 wp_protocol_dir = wayland_protocols.get_pkgconfig_variable('pkgdatadir')
@@ -28,4 +28,4 @@ sources += [
     wayland_scanner_code.process('protocol/workspaces.xml'),
 ]
 
-executable('tablecloth', sources, dependencies : [thread_dep, fmt, ranges, xkbcommon_dep, wlroots, wlr_protos, libinput, gtk, gtkmm])
+executable('tablecloth', sources, dependencies : [thread_dep, fmt, xkbcommon_dep, wlroots, wlr_protos, libinput, gtk, gtkmm])

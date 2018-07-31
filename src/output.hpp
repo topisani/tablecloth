@@ -13,9 +13,10 @@ namespace cloth {
   struct Desktop;
   struct View;
   struct DragIcon;
+  struct Workspace;
 
   struct Output {
-    Output(Desktop& desktop, wlr::output_t& wlr) noexcept;
+    Output(Desktop& desktop, Workspace& ws, wlr::output_t& wlr) noexcept;
 
     Output(const Output&) = delete;
     Output& operator=(const Output&) noexcept = delete;
@@ -38,11 +39,8 @@ namespace cloth {
     // Member variables
 
     Desktop& desktop;
+    util::non_null_ptr<Workspace> workspace;
     wlr::output_t& wlr_output;
-
-    View* fullscreen_view = nullptr;
-
-    std::array<util::ptr_vec<LayerSurface>, 4> layers;
 
     chrono::time_point last_frame;
 

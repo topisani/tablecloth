@@ -59,7 +59,7 @@ public:
 
 #define CLOTH_ENABLE_BITMASK_OPS(Enum)                                                             \
   template<>                                                                                       \
-  struct ::cloth::enable_bitmask_ops<Enum> : std::true_type {};
+  struct enable_bitmask_ops<Enum> : std::true_type {};
 
 namespace cloth {
 

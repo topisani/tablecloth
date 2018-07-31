@@ -34,8 +34,8 @@ namespace cloth {
     wl_client_destroy(wl_shell_surface->client);
   }
 
-  WlShellSurface::WlShellSurface(Desktop& desktop, wlr::wl_shell_surface_t* p_wl_shell_surface)
-   : View(desktop), wl_shell_surface(p_wl_shell_surface) 
+  WlShellSurface::WlShellSurface(Workspace& p_workspace, wlr::wl_shell_surface_t* p_wl_shell_surface)
+   : View(p_workspace), wl_shell_surface(p_wl_shell_surface) 
   {
     View::wlr_surface = wl_shell_surface->surface;
     width = wl_shell_surface->surface->current.width;
@@ -112,7 +112,7 @@ namespace cloth {
     };
 
     on_destroy.add_to(wl_shell_surface->events.destroy);
-    on_destroy = [this] { util::erase_this(this->desktop.views, this); };
+    on_destroy = [this] { workspace->erase_view(*this); };
   }
 
   WlShellPopup& WlShellSurface::create_popup(wlr::wl_shell_surface_t& wlr_popup) {
@@ -133,20 +133,21 @@ namespace cloth {
     LOGD("new wl shell surface: title={}, class={}", surface.title, surface.class_);
     wlr_wl_shell_surface_ping(&surface);
 
-    auto view_ptr = std::make_unique<WlShellSurface>(*this, &surface);
+    auto& workspace = *outputs.front().workspace;
+    auto view_ptr = std::make_unique<WlShellSurface>(workspace, &surface);
     auto& view = *view_ptr;
-    views.push_back(std::move(view_ptr));
+    workspace.add_view(std::move(view_ptr));
 
     view.map(*surface.surface);
     view.setup();
 
     if (surface.state == WLR_WL_SHELL_SURFACE_STATE_TRANSIENT) {
       // We need to map it relative to the parent
-      auto parent = util::find_if(views, [&] (auto& parent) { 
+      auto parent = util::find_if(view.workspace->views(), [&] (auto& parent) { 
         auto* ptr = dynamic_cast<WlShellSurface*>(&parent);
         return ptr && ptr->wl_shell_surface == surface.parent;
       });
-      if (parent != views.end()) {
+      if (parent != view.workspace->views().end()) {
         view.move(parent->x + surface.transient_state->x,
                   parent->y + surface.transient_state->y);
       }

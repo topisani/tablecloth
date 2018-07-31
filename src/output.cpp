@@ -375,7 +375,7 @@ namespace cloth {
   static void layers_send_done(Output& output, chrono::time_point when)
   {
     auto when_ts = chrono::to_timespec(when);
-    for (auto& layer : output.layers) {
+    for (auto& layer : output.workspace->layers) {
       for (auto& surface : layer) {
         wlr::layer_surface_t& layer = surface.layer_surface;
         wlr_surface_send_frame_done(layer.surface, &when_ts);
@@ -404,8 +404,8 @@ namespace cloth {
     wlr::box_t* output_box = wlr_output_layout_get_box(desktop.layout, &wlr_output);
 
     // Check if we can delegate the fullscreen surface to the output
-    if (fullscreen_view != nullptr && fullscreen_view->wlr_surface != nullptr) {
-      View& view = *fullscreen_view;
+    if (workspace->fullscreen_view != nullptr && workspace->fullscreen_view->wlr_surface != nullptr) {
+      View& view = *workspace->fullscreen_view;
 
       // Make sure the view is centered on screen
       wlr::box_t view_box = view.get_box();
@@ -456,12 +456,12 @@ namespace cloth {
           wlr_renderer_clear(renderer, clear_color);
         }
 
-        render_layer(this, output_box, data, layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND]);
-        render_layer(this, output_box, data, layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM]);
+        render_layer(this, output_box, data, workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND]);
+        render_layer(this, output_box, data, workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM]);
 
         // If a view is fullscreen on this output, render it
-        if (fullscreen_view != nullptr) {
-          View& view = *fullscreen_view;
+        if (workspace->fullscreen_view != nullptr) {
+          View& view = *workspace->fullscreen_view;
 
           if (wlr_output.fullscreen_surface == view.wlr_surface) {
             // The output will render the fullscreen view
@@ -483,18 +483,18 @@ namespace cloth {
 #endif
         } else {
           // Render all views
-          for (auto& view : desktop.visible_views()) {
+          for (auto& view : workspace->visible_views()) {
             render_view(view, data);
           }
           // Render top layer above shell views
-          render_layer(this, output_box, data, layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP]);
+          render_layer(this, output_box, data, workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP]);
         }
 
         // Render drag icons
         data.alpha = 1.0;
         drag_icons_for_each_surface(desktop.server.input, render_surface, data.layout, &data);
 
-        render_layer(this, output_box, data, layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY]);
+        render_layer(this, output_box, data, workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY]);
       }
 
     renderer_end:
@@ -510,15 +510,18 @@ namespace cloth {
       // PREV: update now?
       struct timespec now_ts = chrono::to_timespec(now);
       if (wlr_output_damage_swap_buffers(this->damage, &now_ts, &damage)) {
+        now = chrono::to_time_point(now_ts);
         last_frame = desktop.last_frame = now;
       }
     }
 
+    // Damage finish
+
     pixman_region32_fini(&damage);
 
     // Send frame done events to all surfaces
-    if (fullscreen_view != nullptr) {
-      View& view = *fullscreen_view;
+    if (workspace->fullscreen_view != nullptr) {
+      View& view = *workspace->fullscreen_view;
       if (wlr_output.fullscreen_surface == view.wlr_surface) {
         // The surface is managed by the wlr_output
         return;
@@ -533,7 +536,7 @@ namespace cloth {
       }
 #endif
     } else {
-      for (auto& view : desktop.visible_views()) {
+      for (auto& view : workspace->visible_views()) {
         view_for_each_surface(view, data.layout, surface_send_frame_done, &data);
       }
 
@@ -553,15 +556,15 @@ namespace cloth {
     if (view.wlr_surface == nullptr) {
       return false;
     }
-    if (output.fullscreen_view == nullptr) {
+    if (output.workspace->fullscreen_view == nullptr) {
       return true;
     }
-    if (output.fullscreen_view == &view) {
+    if (output.workspace->fullscreen_view == &view) {
       return true;
     }
 #ifdef WLR_HAS_XWAYLAND
     {
-      auto* xfv = dynamic_cast<XwaylandSurface*>(output.fullscreen_view);
+      auto* xfv = dynamic_cast<XwaylandSurface*>(output.workspace->fullscreen_view);
       auto* xv = dynamic_cast<XwaylandSurface*>(&view);
       if (xfv && xv) {
         // Special case: accept damage from children
@@ -746,8 +749,9 @@ namespace cloth {
     }
   }
 
-  Output::Output(Desktop& p_desktop, wlr::output_t& wlr) noexcept
+  Output::Output(Desktop& p_desktop, Workspace& ws, wlr::output_t& wlr) noexcept
     : desktop(p_desktop),
+      workspace(&ws),
       wlr_output(wlr),
       last_frame(chrono::clock::now()),
       damage(wlr_output_damage_create(&wlr_output))

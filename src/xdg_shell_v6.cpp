@@ -188,8 +188,8 @@ namespace cloth {
     return *popup;
   }
 
-  XdgSurfaceV6::XdgSurfaceV6(Desktop& desktop, wlr::xdg_surface_v6_t* xdg_surface)
-    : View(desktop), xdg_surface(xdg_surface)
+  XdgSurfaceV6::XdgSurfaceV6(Workspace& p_workspace, wlr::xdg_surface_v6_t* xdg_surface)
+    : View(p_workspace), xdg_surface(xdg_surface)
   {
     View::wlr_surface = xdg_surface->surface;
     width = xdg_surface->surface->current.width;
@@ -280,7 +280,7 @@ namespace cloth {
     };
 
     on_destroy.add_to(xdg_surface->events.destroy);
-    on_destroy = [this] { util::erase_this(this->desktop.views, this); };
+    on_destroy = [this] { workspace->erase_view(*this); };
   }
 
   void Desktop::handle_xdg_shell_v6_surface(void* data)
@@ -295,9 +295,11 @@ namespace cloth {
     LOGD("new xdg toplevel: title={}, class={}", util::nonull(surface.toplevel->title), util::nonull(surface.toplevel->app_id));
     wlr_xdg_surface_v6_ping(&surface);
 
-    auto view_ptr = std::make_unique<XdgSurfaceV6>(*this, &surface);
+    // TODO: get the correct output instead
+    auto& workspace = outputs.front().workspace;
+    auto view_ptr = std::make_unique<XdgSurfaceV6>(*workspace, &surface);
     auto& view = *view_ptr;
-    views.push_back(std::move(view_ptr));
+    workspace->add_view(std::move(view_ptr));
 
   	if (surface.toplevel->client_pending.maximized) {
   		view.maximize(true);

@@ -108,8 +108,8 @@ namespace cloth {
     return nullptr;
   }
 
-  XwaylandSurface::XwaylandSurface(Desktop& p_desktop, wlr::xwayland_surface_t* p_xwayland_surface)
-    : View(p_desktop), xwayland_surface(p_xwayland_surface)
+  XwaylandSurface::XwaylandSurface(Workspace& p_workspace, wlr::xwayland_surface_t* p_xwayland_surface)
+    : View(p_workspace), xwayland_surface(p_xwayland_surface)
   {
     View::wlr_surface = xwayland_surface->surface;
     x = xwayland_surface->x;
@@ -202,7 +202,7 @@ namespace cloth {
     };
 
     on_destroy.add_to(xwayland_surface->events.destroy);
-    on_destroy = [this] { util::erase_this(desktop.views, this); };
+    on_destroy = [this] { workspace->erase_view(*this); };
   }
 
   void Desktop::handle_xwayland_surface(void* data)
@@ -214,7 +214,8 @@ namespace cloth {
          util::nonull(surface.instance));
     wlr_xwayland_surface_ping(&surface);
 
-    auto view_ptr = std::make_unique<XwaylandSurface>(*this, &surface);
-    views.push_back(std::move(view_ptr));
+    auto& output = outputs.front();
+    auto view_ptr = std::make_unique<XwaylandSurface>(*output.workspace, &surface);
+    output.workspace->add_view(std::move(view_ptr));
   }
 } // namespace cloth

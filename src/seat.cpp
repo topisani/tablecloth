@@ -11,10 +11,6 @@
 #include "util/exception.hpp"
 #include "util/logging.hpp"
 
-#include <range/v3/core.hpp>
-#include <range/v3/view.hpp>
-#include <range/v3/view/filter.hpp>
-
 namespace cloth {
 
   Seat::Seat(Input& input, const std::string& name)
@@ -352,11 +348,7 @@ namespace cloth {
 
   View* Seat::get_focus()
   {
-    auto views = input.server.desktop.visible_views();
-    if (!has_focus || views.empty()) {
-      return nullptr;
-    }
-    return &views.back();
+    return _focused_view;
   }
 
   SeatView::SeatView(Seat& p_seat, View& p_view) noexcept : seat(p_seat), view(p_view)
@@ -370,6 +362,7 @@ namespace cloth {
   SeatView::~SeatView() noexcept
   {
     if (&view == seat.get_focus()) {
+      seat._focused_view = nullptr;
       seat.has_focus = false;
       seat.cursor.mode = Cursor::Mode::Passthrough;
     }
@@ -478,44 +471,6 @@ namespace cloth {
       return;
     }
 
-    // Make sure the view will be rendered on top of others, even if it's
-    // already focused in this seat
-    if (view != nullptr) {
-      view->desktop.views.rotate_to_back(*view);
-    }
-
-    bool unfullscreen = true;
-
-#ifdef WLR_HAS_XWAYLAND
-    if (auto* xwl_view = dynamic_cast<XwaylandSurface*>(view);
-        xwl_view && xwl_view->xwayland_surface->override_redirect) {
-      unfullscreen = false;
-    }
-#endif
-
-    if (view && unfullscreen) {
-      Desktop& desktop = view->desktop;
-      wlr::box_t box = view->get_box();
-      for (auto& output : desktop.outputs) {
-        if (output.fullscreen_view && output.fullscreen_view != view &&
-            wlr_output_layout_intersects(desktop.layout, &output.wlr_output, &box)) {
-          output.fullscreen_view->set_fullscreen(false, nullptr);
-        }
-      }
-    }
-
-    View* prev_focus = get_focus();
-    if (view == prev_focus) {
-      return;
-    }
-
-#ifdef WLR_HAS_XWAYLAND
-    if (auto* xwl_view = dynamic_cast<XwaylandSurface*>(view);
-        xwl_view && wlr_xwayland_surface_is_unmanaged(xwl_view->xwayland_surface)) {
-      return;
-    }
-#endif
-
     SeatView* seat_view = nullptr;
     if (view != nullptr) {
       seat_view = &seat_view_from_view(*view);
@@ -525,6 +480,9 @@ namespace cloth {
     }
 
     has_focus = false;
+
+    auto* prev_focus = get_focus();
+    _focused_view = view;
 
     // Deactivate the old view if it is not focused by some other seat
     if (prev_focus != nullptr && !input.view_has_focus(*prev_focus)) {
@@ -536,8 +494,6 @@ namespace cloth {
       wlr_seat_keyboard_clear_focus(wlr_seat);
       return;
     }
-
-    seat_view->view.desktop.views.rotate_to_back(seat_view->view);
 
     view->damage_whole();
 
@@ -629,29 +585,6 @@ namespace cloth {
       }
     }
     exclusive_client = client;
-  }
-
-  void Seat::cycle_focus()
-  {
-    auto views = input.server.desktop.visible_views() | ranges::view::reverse;
-    if (views.empty()) {
-      return;
-    }
-
-    auto first_view = views.begin();
-    if (!has_focus) {
-      set_focus(&*first_view);
-      return;
-    }
-    auto next_view = ++views.begin();
-    if (next_view == views.end()) {
-      return;
-    }
-    // Focus the next view
-    set_focus(&*next_view);
-
-    // Move the first view to the front of the list
-    input.server.desktop.views.rotate_to_front(*first_view);
   }
 
   void Seat::begin_move(View& view)

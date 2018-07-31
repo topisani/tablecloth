@@ -13,6 +13,7 @@ namespace cloth {
   struct Output;
   struct Desktop;
   struct View;
+  struct Workspace;
 
   struct ViewChild {
     ViewChild(View& view, wlr::surface_t* wlr_surface);
@@ -96,7 +97,7 @@ namespace cloth {
 
 
   struct View {
-    View(Desktop& desktop);
+    View(Workspace& workspace);
     virtual ~View() noexcept;
 
     wlr::box_t get_box() const;
@@ -123,6 +124,9 @@ namespace cloth {
     void unmap();
     void arrange_maximized();
 
+    /// Is this view the currently focused view in its workspace
+    bool is_focused();
+
     wlr::box_t get_deco_box() const;
     DecoPart get_deco_part(double sx, double sy);
 
@@ -133,6 +137,7 @@ namespace cloth {
 
     ViewType type() noexcept;
 
+    util::non_null_ptr<Workspace> workspace;
     Desktop& desktop;
 
     bool mapped = false;
@@ -188,7 +193,7 @@ namespace cloth {
   };
 
   struct WlShellSurface : View {
-    WlShellSurface(Desktop& desktop, wlr::wl_shell_surface_t* wlr_surface);
+    WlShellSurface(Workspace& workspace, wlr::wl_shell_surface_t* wlr_surface);
     wlr::wl_shell_surface_t* wl_shell_surface;
 
     WlShellPopup& create_popup(wlr::wl_shell_surface_t& wlr_popup);
@@ -209,7 +214,7 @@ namespace cloth {
   };
 
   struct XdgSurfaceV6 : View {
-    XdgSurfaceV6(Desktop& desktop, wlr::xdg_surface_v6_t* wlr_surface);
+    XdgSurfaceV6(Workspace& workspace, wlr::xdg_surface_v6_t* wlr_surface);
     wlr::xdg_surface_v6_t* xdg_surface;
 
     uint32_t pending_move_resize_configure_serial;
@@ -242,7 +247,7 @@ namespace cloth {
   };
 
   struct XdgSurface : View {
-    XdgSurface(Desktop& desktop, wlr::xdg_surface_t* wlr_surface);
+    XdgSurface(Workspace& workspace, wlr::xdg_surface_t* wlr_surface);
     wlr::xdg_surface_t* xdg_surface;
 
     uint32_t pending_move_resize_configure_serial;
@@ -275,7 +280,7 @@ namespace cloth {
   };
 
   struct XwaylandSurface : View {
-    XwaylandSurface(Desktop& desktop, wlr::xwayland_surface_t* wlr_surface);
+    XwaylandSurface(Workspace& workspace, wlr::xwayland_surface_t* wlr_surface);
     wlr::xwayland_surface_t* xwayland_surface;
 
     void do_activate(bool active) override;

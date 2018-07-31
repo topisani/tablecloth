@@ -9,9 +9,7 @@
 #include "config.hpp"
 #include "output.hpp"
 #include "view.hpp"
-#include <range/v3/core.hpp>
-#include <range/v3/view.hpp>
-#include <range/v3/view/filter.hpp>
+#include "workspace.hpp"
 
 namespace cloth {
 
@@ -24,11 +22,10 @@ namespace cloth {
 
     Output* output_from_wlr_output(struct wlr_output* output);
 
-    wlr::surface_t* surface_at(double lx,
-                               double ly,
-                               double& sx,
-                               double& sy,
-                               View*& view);
+    wlr::surface_t* surface_at(double lx, double ly, double& sx, double& sy, View*& view);
+
+    util::ref_vec<View> visible_views();
+    Workspace& current_workspace();
 
   private:
     View* view_at(double lx, double ly, wlr::surface_t*& surface, double& sx, double& sy);
@@ -41,14 +38,11 @@ namespace cloth {
     void handle_xwayland_surface(void* data);
 
   public:
-
     // DATA //
 
-    util::ptr_vec<View> views; // roots_view::link
+    std::array<Workspace, 10> workspaces;
 
-    auto visible_views();
-
-    util::ptr_vec<Output> outputs; // roots_output::link
+    util::ptr_vec<Output> outputs;
     chrono::time_point last_frame;
 
     Server& server;
@@ -91,13 +85,10 @@ namespace cloth {
 #ifdef WLR_HAS_XWAYLAND
   public:
     wlr::xwayland_t* xwayland = nullptr;
+
   protected:
     wl::Listener on_xwayland_surface;
 #endif
   };
-
-  inline auto Desktop::visible_views() {
-    return views | ranges::view::filter([] (const View& v) { return v.mapped; });
-  }
 
 } // namespace cloth

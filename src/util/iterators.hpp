@@ -5,6 +5,7 @@
 #include <functional>
 #include <type_traits>
 #include <tuple>
+#include <memory>
 
 #include <type_traits>
 
@@ -917,6 +918,131 @@ namespace cloth::util {
   template<typename BIter, typename EIter>
   auto adjacent_pairs(BIter f, EIter l) {
     return AdjacentRange{util::sequence(f, l)};
+  }
+
+  ///
+  /// Transform iterator
+  ///
+  template<typename WrappedIter, typename Callable>
+  class TransformIteratorImpl{
+  public:
+    using reference = std::invoke_result_t<Callable, typename WrappedIter::reference>;
+    using value_type = std::decay_t<reference>;
+    using iterator_category = typename WrappedIter::iterator_category;
+
+    TransformIteratorImpl(WrappedIter iter, Callable callable)
+      : iter (std::move(iter)), callable {std::make_shared<Callable>(std::move(callable))}
+    {}
+
+    TransformIteratorImpl(WrappedIter iter, TransformIteratorImpl other)
+      : iter (std::move(iter)), callable {other.callable}
+    {}
+
+    void advance(int n)
+    {
+      std::advance(iter);
+    }
+
+    value_type& dereference()
+    {
+      return std::invoke(*callable, *iter);
+    }
+
+    bool equal(const TransformIteratorImpl& o) const
+    {
+      return iter == o.iter;
+    }
+
+    auto difference(const TransformIteratorImpl& o) const
+    {
+      return iter - o.iter;
+    }
+
+    WrappedIter iter;
+    std::shared_ptr<Callable> callable;
+  };
+
+  ///
+  /// Transforming Iterator
+  ///
+  template<typename WrappedIter, typename Callable>
+  using transform_iterator = iterator_adaptor<TransformIteratorImpl<WrappedIter, Callable>>;
+
+  namespace view {
+
+    template<typename Range, typename Callable>
+    auto transform(Range&& r, Callable&& c) {
+      using std::begin, std::end;
+      using transformiter = transform_iterator<decltype(begin(r)), std::decay_t<Callable>>;
+      auto first = transformiter(begin(r), std::forward<Callable>(c));
+      auto last = transformiter(end(r), first);
+      return sequence(first, last);
+    };
+  }
+
+  ///
+  /// Filter iterator
+  ///
+  template<typename WrappedIter, typename Predicate>
+  class FilterIterImpl{
+  public:
+
+    using value_type = typename WrappedIter::value_type;
+    using iterator_category = typename WrappedIter::iterator_category;
+
+    static_assert(std::is_same_v<std::decay_t<decltype(*std::declval<WrappedIter>())>, value_type>);
+
+    FilterIterImpl(WrappedIter iter, WrappedIter last, Predicate callable)
+      : iter (std::move(iter)), last(last), callable {std::make_shared<Predicate>(std::move(callable))}
+    {}
+
+    FilterIterImpl(WrappedIter iter, WrappedIter last, FilterIterImpl other)
+      : iter (std::move(iter)), last(last), callable {other.callable}
+    {}
+
+    void advance(int n)
+    {
+      for (int i = 0; i < n; i++) {
+        while (++iter != last && !std::invoke(*callable, *iter) );
+      }
+    }
+
+    value_type& dereference()
+    {
+      return *iter;
+    }
+
+    bool equal(const FilterIterImpl& o) const
+    {
+      return iter == o.iter;
+    }
+
+    auto difference(const FilterIterImpl& o) const
+    {
+      return iter - o.iter;
+    }
+
+    WrappedIter iter;
+    WrappedIter last;
+    std::shared_ptr<Predicate> callable;
+  };
+
+  ///
+  /// Filter Iterator
+  ///
+  template<typename WrappedIter, typename Predicate>
+  using filter_iterator = iterator_adaptor<FilterIterImpl<WrappedIter, Predicate>>;
+
+  namespace view {
+
+    template<typename Range, typename Predicate>
+    auto filter(Range&& r, Predicate&& c) {
+      using std::begin, std::end;
+      using filteriter = filter_iterator<decltype(begin(r)), std::decay_t<Predicate>>;
+      auto first = filteriter(begin(r), end(r), std::forward<Predicate>(c));
+      auto last = filteriter(end(r), end(r), first);
+      return sequence(first, last);
+    };
   }
 
 }

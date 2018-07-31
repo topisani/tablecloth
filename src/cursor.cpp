@@ -296,7 +296,7 @@ namespace cloth {
     wlr::surface_t* surface = desktop.surface_at(lx, ly, sx, sy, view);
 
     if (state == WLR_BUTTON_PRESSED && view && seat.has_meta_pressed()) {
-      seat.set_focus(view);
+      view->workspace->set_focused_view(view);
 
       wlr::edges_t edges;
       switch (button) {
@@ -335,7 +335,7 @@ namespace cloth {
         break;
       case WLR_BUTTON_PRESSED:
         if (view) {
-          seat.set_focus(view);
+          view->workspace->set_focused_view(view);
         }
         if (surface && wlr_surface_is_layer_surface(surface)) {
           auto* layer = wlr_layer_surface_from_wlr_surface(surface);

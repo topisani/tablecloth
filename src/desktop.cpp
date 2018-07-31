@@ -7,6 +7,8 @@
 #include "wlroots.hpp"
 #include "xcursor.hpp"
 
+#include "util/iterators.hpp"
+
 #include "wlr-layer-shell-unstable-v1-protocol.h"
 
 namespace cloth {
@@ -16,17 +18,18 @@ namespace cloth {
     wlr::output_t* wlr_output = wlr_output_layout_output_at(layout, lx, ly);
     if (wlr_output != nullptr) {
       Output* output = output_from_wlr_output(wlr_output);
-      if (output != nullptr && output->fullscreen_view != nullptr) {
-        if (output->fullscreen_view->at(lx, ly, surface, sx, sy)) {
-          return output->fullscreen_view;
+      if (output != nullptr && output->workspace->fullscreen_view != nullptr) {
+        if (output->workspace->fullscreen_view->at(lx, ly, surface, sx, sy)) {
+          return output->workspace->fullscreen_view;
         } else {
           return nullptr;
         }
       }
-    }
 
-    for (auto& view : visible_views() | ranges::view::reverse) {
-      if (view.at(lx, ly, surface, sx, sy)) return &view;
+      auto visviews = output->workspace->visible_views();
+      for (auto& view : util::view::reverse(visviews)) {
+        if (view.at(lx, ly, surface, sx, sy)) return &view;
+      }
     }
     return nullptr;
   }
@@ -64,12 +67,13 @@ namespace cloth {
       output = (Output*) wlr_output->data;
       wlr_output_layout_output_coords(layout, wlr_output, &ox, &oy);
 
-      if ((surface = layer_surface_at(*output, output->layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY],
-                                      ox, oy, sx, sy))) {
+      if ((surface =
+             layer_surface_at(*output, output->workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY],
+                              ox, oy, sx, sy))) {
         return surface;
       }
-      if ((surface = layer_surface_at(*output, output->layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], ox,
-                                      oy, sx, sy))) {
+      if ((surface = layer_surface_at(
+             *output, output->workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], ox, oy, sx, sy))) {
         return surface;
       }
     }
@@ -81,28 +85,32 @@ namespace cloth {
     }
 
     if (wlr_output) {
-      if ((surface = layer_surface_at(*output, output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], ox,
-                                      oy, sx, sy))) {
+      if ((surface =
+             layer_surface_at(*output, output->workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM],
+                              ox, oy, sx, sy))) {
         return surface;
       }
-      if ((surface = layer_surface_at(*output, output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND],
-                                      ox, oy, sx, sy))) {
+      if ((surface = layer_surface_at(
+             *output, output->workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], ox, oy, sx,
+             sy))) {
         return surface;
       }
     }
     return nullptr;
   }
 
-  Desktop::Desktop(Server& p_server, Config& p_config) noexcept : server(p_server), config(p_config)
+  Desktop::Desktop(Server& p_server, Config& p_config) noexcept
+    : workspaces(util::generate_array<10>([this](int n) { return Workspace(*this, n); })),
+      server(p_server),
+      config(p_config)
   {
     LOGD("Initializing tablecloth desktop");
 
     on_new_output = [this](void* data) {
       LOGD("New output");
-      outputs.emplace_back(*this, *(wlr::output_t*) data);
+      outputs.emplace_back(*this, workspaces[0], *(wlr::output_t*) data);
 
-      for (auto& seat : server.input.seats)
-      {
+      for (auto& seat : server.input.seats) {
         seat.configure_cursor();
         seat.configure_xcursor();
       }
@@ -121,10 +129,12 @@ namespace cloth {
       double center_x = center_output_box->x + center_output_box->width / 2;
       double center_y = center_output_box->y + center_output_box->height / 2;
 
-      for (auto& view : this->views) {
-        auto box = view.get_box();
-        if (wlr_output_layout_intersects(this->layout, nullptr, &box)) continue;
-        view.move(center_x - box.width / 2, center_y - box.height / 2);
+      for (auto& output : outputs) {
+        for (auto& view : output.workspace->views()) {
+          auto box = view.get_box();
+          if (wlr_output_layout_intersects(this->layout, nullptr, &box)) continue;
+          view.move(center_x - box.width / 2, center_y - box.height / 2);
+        }
       }
     };
 
@@ -237,5 +247,21 @@ namespace cloth {
     }
     return nullptr;
   }
+
+  util::ref_vec<View> Desktop::visible_views()
+  {
+    util::ref_vec<View> res;
+    for (auto& ws : workspaces) {
+      auto views = ws.visible_views();
+      res.reserve(res.size() + views.size());
+      util::copy(views.underlying(), res.underlying().end());
+    }
+    return res;
+  }
+
+  auto Desktop::current_workspace() -> Workspace&
+  {
+    return *outputs.front().workspace;
+  };
 
 } // namespace cloth
