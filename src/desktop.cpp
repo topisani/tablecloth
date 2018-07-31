@@ -26,8 +26,7 @@ namespace cloth {
         }
       }
 
-      auto visviews = output->workspace->visible_views();
-      for (auto& view : util::view::reverse(visviews)) {
+      for (auto& view : util::view::reverse(output->workspace->visible_views())) {
         if (view.at(lx, ly, surface, sx, sy)) return &view;
       }
     }
@@ -252,9 +251,10 @@ namespace cloth {
   {
     util::ref_vec<View> res;
     for (auto& ws : workspaces) {
+      if (!ws.is_visible()) continue;
       auto views = ws.visible_views();
       res.reserve(res.size() + views.size());
-      util::copy(views.underlying(), res.underlying().end());
+      util::copy(views.underlying(), std::back_inserter(res.underlying()));
     }
     return res;
   }

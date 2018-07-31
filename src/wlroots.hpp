@@ -252,7 +252,7 @@ namespace cloth::wl {
 
     void remove() noexcept
     {
-      wl_list_remove(&_listener.link);
+      if (_listener.link.next != nullptr) wl_list_remove(&_listener.link);
       _listener.link = {nullptr, nullptr};
     }
 

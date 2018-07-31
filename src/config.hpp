@@ -18,10 +18,10 @@ namespace cloth {
 
     struct Output {
       std::string name;
-      bool enable;
-      wl::output_transform_t transform;
-      int x, y;
-      float scale;
+      bool enable = true;
+      wl::output_transform_t transform = WL_OUTPUT_TRANSFORM_NORMAL;
+      int x = 0, y = 0;
+      float scale = 1;
       struct {
         int width, height;
         float refresh_rate;
@@ -52,7 +52,7 @@ namespace cloth {
       std::string layout;
       std::string variant;
       std::string options;
-      int repeat_rate, repeat_delay;
+      int repeat_rate = 0, repeat_delay = 0;
     };
 
     struct Cursor {
@@ -63,7 +63,7 @@ namespace cloth {
       std::string default_image;
     };
 
-    Config() noexcept = default;
+    Config() noexcept {};
 
     /// Create a roots config from the given command line arguments. Command line
     /// arguments can specify the location of the config file. If it is not
@@ -89,8 +89,8 @@ namespace cloth {
     /// NULL. A NULL seat_name returns the default config for cursors.
     Config::Cursor* get_cursor(std::string_view seat_name = default_seat_name) noexcept;
 
-    bool xwayland;
-    bool xwayland_lazy;
+    bool xwayland = true;
+    bool xwayland_lazy = false;
 
     std::vector<Output> outputs;
     std::vector<Device> devices;
@@ -100,7 +100,7 @@ namespace cloth {
 
     std::string config_path;
     std::string startup_cmd;
-    bool debug_damage_tracking;
+    bool debug_damage_tracking = false;
   };
 
 } // namespace cloth

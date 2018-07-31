@@ -439,6 +439,8 @@ namespace cloth {
       .alpha = 1.0,
     };
 
+    auto visible_views = workspace->visible_views();
+
     // otherwise Output doesn't need swap and isn't damaged, skip rendering completely
     if (needs_swap) {
       wlr_renderer_begin(renderer, wlr_output.width, wlr_output.height);
@@ -483,7 +485,7 @@ namespace cloth {
 #endif
         } else {
           // Render all views
-          for (auto& view : workspace->visible_views()) {
+          for (auto& view : visible_views) {
             render_view(view, data);
           }
           // Render top layer above shell views
@@ -536,7 +538,7 @@ namespace cloth {
       }
 #endif
     } else {
-      for (auto& view : workspace->visible_views()) {
+      for (auto& view : visible_views) {
         view_for_each_surface(view, data.layout, surface_send_frame_done, &data);
       }
 

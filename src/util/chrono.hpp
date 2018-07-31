@@ -14,13 +14,13 @@ namespace cloth::chrono {
     inline struct timespec to_timespec(time_point t) noexcept
     {
       long secs = duration_cast<seconds>(t.time_since_epoch()).count();
-      long nsc = nanoseconds(t.time_since_epoch()).count() % 1000000000;
+      long nsc = duration_cast<nanoseconds>(t.time_since_epoch() % seconds(1)).count();
       return {secs, nsc};
     }
 
     inline time_point to_time_point(struct timespec t) noexcept
     {
-      return time_point() + seconds(t.tv_sec) + nanoseconds(t.tv_nsec);
+      return time_point(duration_cast<duration>(seconds(t.tv_sec) + nanoseconds(t.tv_nsec)));
     }
 
 }
