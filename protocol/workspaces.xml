@@ -13,6 +13,12 @@
       <arg name="workspace" type="uint"/>
     </request>
 
+    <request name="switch_to">
+      <description summary="Select a workspace by ID">
+      </description>
+      <arg name="workspace" type="uint"/>
+    </request>
+
     <event name="state">
       <description summary="workspace state">
 	The current workspace state, such as current workspace and workspace

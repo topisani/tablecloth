@@ -26,6 +26,7 @@ namespace cloth {
 
     util::ref_vec<View> visible_views();
     Workspace& current_workspace();
+    Workspace& switch_to_workspace(int idx);
 
   private:
     View* view_at(double lx, double ly, wlr::surface_t*& surface, double& sx, double& sy);
@@ -40,7 +41,9 @@ namespace cloth {
   public:
     // DATA //
 
-    std::array<Workspace, 10> workspaces;
+    static constexpr std::size_t workspace_count = 10;
+
+    std::array<Workspace, workspace_count> workspaces;
 
     util::ptr_vec<Output> outputs;
     chrono::time_point last_frame;

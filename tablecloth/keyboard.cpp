@@ -2,6 +2,7 @@
 
 #include <unistd.h>
 #include <xkbcommon/xkbcommon.h>
+#include <charconv>
 
 #include "util/logging.hpp"
 #include "util/exception.hpp"
@@ -92,6 +93,7 @@ namespace cloth {
   }
 
   static std::string exec_prefix = "exec ";
+  static std::string switch_ws_prefix = "switch_workspace ";
 
   static bool outputs_enabled = true;
 
@@ -138,6 +140,13 @@ namespace cloth {
       outputs_enabled = !outputs_enabled;
       for (auto& output : seat.input.server.desktop.outputs) {
         wlr_output_enable(&output.wlr_output, outputs_enabled);
+      }
+    } else if (util::starts_with(switch_ws_prefix, command)) {
+      int workspace = -1;
+      auto ws_str = command.substr(switch_ws_prefix.size());
+      std::from_chars(&*ws_str.begin(), &*ws_str.end(), workspace);
+      if (workspace >= 0 && workspace < 10) {
+        input.server.desktop.switch_to_workspace(workspace);
       }
     } else {
       LOGE("unknown binding command: %s", command);

@@ -16,7 +16,8 @@ namespace cloth {
       backend(wlr_backend_autocreate(wl_display, nullptr)),
       renderer(wlr_backend_get_renderer(backend)),
       data_device_manager(wlr_data_device_manager_create(wl_display)),
-      config(argc, argv), desktop(*this, config), input(*this, config)
+      config(argc, argv), desktop(*this, config), input(*this, config),
+      workspace_manager(*this)
   {
     assert(wl_display && wl_event_loop);
 

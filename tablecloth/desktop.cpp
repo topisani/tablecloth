@@ -10,6 +10,7 @@
 #include "util/iterators.hpp"
 
 #include "wlr-layer-shell-unstable-v1-protocol.h"
+#include "workspaces-server-protocol.h"
 
 namespace cloth {
 
@@ -262,6 +263,18 @@ namespace cloth {
   auto Desktop::current_workspace() -> Workspace&
   {
     return *outputs.front().workspace;
-  };
+  }
+
+  auto Desktop::switch_to_workspace(int idx) -> Workspace&
+  {
+    assert(idx >= 0 && idx < workspace_count);
+    for (auto& seat : server.input.seats) {
+      seat.set_focus(workspaces[idx].focused_view());
+    }
+    outputs.front().workspace = &workspaces[idx];
+    outputs.front().damage_whole();
+    server.workspace_manager.send_state();
+    return workspaces[idx];
+  }
 
 } // namespace cloth

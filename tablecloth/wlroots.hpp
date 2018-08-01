@@ -96,6 +96,7 @@ extern "C" {
 #undef False
 #undef Status
 
+
 namespace cloth::wl {
 
   using argument_t = union wl_argument;

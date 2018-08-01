@@ -11,6 +11,7 @@
 #include "config.hpp"
 #include "desktop.hpp"
 #include "input.hpp"
+#include "protocol/workspace_manager.hpp"
 
 namespace cloth {
 
@@ -28,6 +29,8 @@ namespace cloth {
     Config config;
     Desktop desktop;
     Input input;
+
+    WorkspaceManager workspace_manager;
 
     Server(int argc, char* argv[]) noexcept;
   };
