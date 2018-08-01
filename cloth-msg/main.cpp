@@ -1,7 +1,7 @@
 #include <clara.hpp>
 
 #include <wayland-client.hpp>
-#include <workspaces-protocol.hpp>
+#include <tablecloth-shell-protocol.hpp>
 
 #include "util/logging.hpp"
 
@@ -14,11 +14,13 @@ namespace cloth::msg {
   struct Client {
     int workspace = 0;
     bool show_help = false;
-    bool listen;
+    bool listen = false;
+    bool cycle_focus = false;
 
     wl::display_t display;
     wl::registry_t registry;
     wl::workspace_manager_t workspaces;
+    wl::cloth_window_manager_t cloth_windows;
 
     auto bind_interfaces()
     {
@@ -27,7 +29,12 @@ namespace cloth::msg {
         if (interface == workspaces.interface_name) {
           registry.bind(name, workspaces, version);
           if (listen) workspaces.on_state() = [&] (uint32_t current, uint32_t count) {
-            std::cout << fmt::format("workspace {}/{}", current, count) << std::endl;
+            std::cout << fmt::format("workspace {}:{}", current + 1, count) << std::endl;
+          };
+        } else if (interface == cloth_windows.interface_name) {
+          registry.bind(name, cloth_windows, version);
+          if (listen) cloth_windows.on_focused_window_name() = [&] (const std::string& name, uint32_t ws) {
+            std::cout << fmt::format("focused {}:{}", ws + 1, name) << std::endl;
           };
         }
       };
@@ -41,6 +48,9 @@ namespace cloth::msg {
       auto cli = Opt(workspace, "workspace") 
                ["-s"]["--switch-ws"]
                ("Switch to a workspace")  
+             | Opt(cycle_focus)
+               ["--cycle-focus"]
+               ("Cycle Focus")
              | Opt(listen)
                ["-l"]["--listen"]
                ("Listen for events")
@@ -55,6 +65,7 @@ namespace cloth::msg {
       if (workspace > 0) {
         workspaces.switch_to(workspace - 1);
       }
+      if (cycle_focus) cloth_windows.cycle_focus();
     }
 
     int main(int argc, char* argv[])

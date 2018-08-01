@@ -76,6 +76,8 @@ namespace cloth {
       }
     }
 
+    desktop.server.window_manager.send_focused_window_name(*this);
+
     if (view == prev_focus) {
       return view;
     }

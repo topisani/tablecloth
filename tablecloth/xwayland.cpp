@@ -108,6 +108,12 @@ namespace cloth {
     return nullptr;
   }
 
+  auto XwaylandSurface::get_name() -> std::string
+  {
+    if (xwayland_surface) return xwayland_surface->title;
+    return "";
+  }
+
   XwaylandSurface::XwaylandSurface(Workspace& p_workspace, wlr::xwayland_surface_t* p_xwayland_surface)
     : View(p_workspace), xwayland_surface(p_xwayland_surface)
   {

@@ -188,6 +188,16 @@ namespace cloth {
     return *popup;
   }
 
+  auto XdgSurfaceV6::get_name() -> std::string
+  {
+    if (xdg_surface == nullptr) return "";
+    if (xdg_surface->role == WLR_XDG_SURFACE_V6_ROLE_TOPLEVEL) {
+      return xdg_surface->toplevel->title;
+    } else {
+      return "";
+    }
+  }
+
   XdgSurfaceV6::XdgSurfaceV6(Workspace& p_workspace, wlr::xdg_surface_v6_t* xdg_surface)
     : View(p_workspace), xdg_surface(xdg_surface)
   {

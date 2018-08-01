@@ -4,6 +4,8 @@
 
 #include "server.hpp"
 
+#include <tablecloth-shell-server-protocol.h>
+
 namespace cloth {
 
   static const struct workspace_manager_interface workspace_manager_impl = {

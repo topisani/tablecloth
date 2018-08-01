@@ -172,6 +172,8 @@ namespace cloth {
       wl::Signal destroy;
     } events;
 
+    virtual auto get_name() -> std::string = 0;
+
   protected:
     wl::Listener on_new_subsurface;
 
@@ -198,6 +200,8 @@ namespace cloth {
 
     WlShellPopup& create_popup(wlr::wl_shell_surface_t& wlr_popup);
 
+    auto get_name() -> std::string override;
+
   protected:
     wl::Listener on_destroy;
     wl::Listener on_new_popup;
@@ -221,6 +225,7 @@ namespace cloth {
 
     XdgPopupV6& create_popup(wlr::xdg_popup_v6_t& wlr_popup);
 
+    auto get_name() -> std::string override;
   protected:
     wl::Listener on_destroy;
     wl::Listener on_new_popup;
@@ -253,6 +258,7 @@ namespace cloth {
     uint32_t pending_move_resize_configure_serial;
 
     XdgPopup& create_popup(wlr::xdg_popup_t& wlr_popup);
+    auto get_name() -> std::string override;
 
   protected:
     wl::Listener on_destroy;
@@ -294,6 +300,8 @@ namespace cloth {
     ViewChild& create_popup(wlr::surface_t& wlr_popup) {
       assert(false);
     }
+
+    auto get_name() -> std::string override;
 
   protected:
     wl::Listener on_destroy;

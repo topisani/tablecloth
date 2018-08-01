@@ -12,6 +12,7 @@
 #include "desktop.hpp"
 #include "input.hpp"
 #include "protocol/workspace_manager.hpp"
+#include "protocol/window_manager.hpp"
 
 namespace cloth {
 
@@ -31,6 +32,7 @@ namespace cloth {
     Input input;
 
     WorkspaceManager workspace_manager;
+    WindowManager window_manager;
 
     Server(int argc, char* argv[]) noexcept;
   };

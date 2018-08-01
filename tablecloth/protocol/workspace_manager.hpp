@@ -1,7 +1,6 @@
 #pragma once
 
 #include <wayland-server.h>
-#include <workspaces-server-protocol.h>
 
 #include "wlroots.hpp"
 

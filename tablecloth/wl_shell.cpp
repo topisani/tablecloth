@@ -121,6 +121,11 @@ namespace cloth {
     return *popup;
   }
 
+  auto WlShellSurface::get_name() -> std::string {
+    if (wl_shell_surface == nullptr) return "";
+    return wl_shell_surface->title;
+  }
+
   void Desktop::handle_wl_shell_surface(void* data)
   {
     auto& surface = *(wlr::wl_shell_surface_t*) data;
