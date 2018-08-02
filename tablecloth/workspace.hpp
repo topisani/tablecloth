@@ -18,8 +18,6 @@ namespace cloth {
     Desktop& desktop;
     View* fullscreen_view = nullptr;
 
-    std::array<util::ptr_vec<LayerSurface>, 4> layers;
-
     auto views() const noexcept -> const util::ptr_vec<View>&;
     auto visible_views() -> util::ref_vec<View>;
 

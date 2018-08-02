@@ -1,8 +1,9 @@
 #include <clara.hpp>
 
 #include <gtkmm.h>
-#include <tablecloth-shell-protocol.hpp>
 #include <wayland-client.hpp>
+
+#include <protocols.hpp>
 
 #include "gdkwayland.hpp"
 #include "util/logging.hpp"
@@ -23,7 +24,8 @@ namespace cloth::bar {
     wl::display_t display;
     wl::registry_t registry;
     wl::workspace_manager_t workspaces;
-    wl::cloth_window_manager_t cloth_windows;
+    wl::cloth_window_manager_t window_manager;
+    wl::zwlr_layer_shell_v1_t layer_shell;
 
     std::unique_ptr<Panel> panel;
 
@@ -37,16 +39,16 @@ namespace cloth::bar {
     {
       registry = display.get_registry();
       registry.on_global() = [&](uint32_t name, std::string interface, uint32_t version) {
+        LOGD("Global: {}", interface);
         if (interface == workspaces.interface_name) {
           registry.bind(name, workspaces, version);
           workspaces.on_state() = [&](uint32_t current, uint32_t count) {
             std::cout << fmt::format("workspace {}:{}", current + 1, count) << std::endl;
           };
-        } else if (interface == cloth_windows.interface_name) {
-          registry.bind(name, cloth_windows, version);
-          cloth_windows.on_focused_window_name() = [&](const std::string& name, uint32_t ws) {
-            std::cout << fmt::format("focused {}:{}", ws + 1, name) << std::endl;
-          };
+        } else if (interface == window_manager.interface_name) {
+          registry.bind(name, window_manager, version);
+        } else if (interface == layer_shell.interface_name) {
+          registry.bind(name, layer_shell, version);
         }
       };
       display.roundtrip();
@@ -68,6 +70,7 @@ namespace cloth::bar {
 
     Gtk::Window window;
     wl::surface_t surface;
+    wl::zwlr_layer_surface_v1_t layer_surface;
     wl::output_t output;
 
     Panel(Client& client) : client(client), window{Gtk::WindowType::WINDOW_TOPLEVEL}
@@ -75,23 +78,37 @@ namespace cloth::bar {
       window.set_title("tablecloth panel");
       window.set_decorated(false);
 
+      gtk_widget_realize(GTK_WIDGET(window.gobj()));
+      Gdk::wayland::window::set_use_custom_surface(window);
+      surface = Gdk::wayland::window::get_wl_surface(window);
+      layer_surface = client.layer_shell.get_layer_surface(surface, nullptr, wl::zwlr_layer_shell_v1_layer::overlay, "cloth.panel");
+      layer_surface.set_anchor(wl::zwlr_layer_surface_v1_anchor::top | wl::zwlr_layer_surface_v1_anchor::left);
+      layer_surface.set_size(16, 16);
+      layer_surface.set_exclusive_zone(0);
+      layer_surface.set_keyboard_interactivity(0);
+      layer_surface.on_configure() = [&] (uint32_t serial, uint32_t width, uint32_t height) {
+        window.resize(width, height);
+        layer_surface.ack_configure(serial);
+        window.show_all();
+      };
+      layer_surface.on_closed() = [&] {
+        window.close();
+      };
+
+      surface.commit();
+
       auto& box1 = *Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 0));
       window.add(box1);
 
       auto& button = *Gtk::manage(new Gtk::Button("TERM"));
       button.signal_clicked().connect(
-        [&]() { client.cloth_windows.run_command("exec weston-terminal"); });
+        [&]() { client.window_manager.run_command("exec weston-terminal"); });
       box1.pack_start(button, true, false, 0);
       button.show();
       box1.show();
 
-      window.show_all();
-
       window.set_size_request(16, 16);
-
-      // Gdk::wayland::window::set_use_custom_surface(window);
-      // surface = Gdk::wayland::window::get_wl_surface(window);
-      // client.cloth_windows.set_panel_surface(output, surface);
+      window.show_all();
     }
   };
 
@@ -112,7 +129,7 @@ namespace cloth::bar {
 
     panel = std::make_unique<Panel>(*this);
 
-    gtk_main.run(panel->window);
+    gtk_main.run();
     return 0;
   }
 } // namespace cloth::bar

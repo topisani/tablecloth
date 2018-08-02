@@ -39,6 +39,9 @@ namespace cloth {
     // Member variables
 
     Desktop& desktop;
+
+    std::array<util::ptr_vec<LayerSurface>, 4> layers;
+
     util::non_null_ptr<Workspace> workspace;
     wlr::output_t& wlr_output;
 

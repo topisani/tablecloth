@@ -177,13 +177,13 @@ namespace cloth {
     wlr_output_effective_resolution(&output.wlr_output, &usable_area.width, &usable_area.height);
 
     // Arrange exclusive surfaces from top->bottom
-    arrange_layer(output.wlr_output, output.workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], usable_area,
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], usable_area,
                   true);
-    arrange_layer(output.wlr_output, output.workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], usable_area,
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], usable_area,
                   true);
-    arrange_layer(output.wlr_output, output.workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], usable_area,
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], usable_area,
                   true);
-    arrange_layer(output.wlr_output, output.workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND],
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND],
                   usable_area, true);
     memcpy(&output.usable_area, &usable_area, sizeof(wlr::box_t));
 
@@ -192,13 +192,13 @@ namespace cloth {
     }
 
     // Arrange non-exlusive surfaces from top->bottom
-    arrange_layer(output.wlr_output, output.workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], usable_area,
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], usable_area,
                   false);
-    arrange_layer(output.wlr_output, output.workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], usable_area,
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], usable_area,
                   false);
-    arrange_layer(output.wlr_output, output.workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], usable_area,
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], usable_area,
                   false);
-    arrange_layer(output.wlr_output, output.workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND],
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND],
                   usable_area, false);
 
     // Find topmost keyboard interactive layer, if such a layer exists
@@ -209,7 +209,7 @@ namespace cloth {
     size_t nlayers = sizeof(layers_above_shell) / sizeof(layers_above_shell[0]);
     LayerSurface* topmost = nullptr;
     for (size_t i = 0; i < nlayers; ++i) {
-      for (auto& layer : util::view::reverse(output.workspace->layers[layers_above_shell[i]])) {
+      for (auto& layer : util::view::reverse(output.layers[layers_above_shell[i]])) {
         if (layer.layer_surface.current.keyboard_interactive) {
           topmost = &layer;
           break;
@@ -254,10 +254,10 @@ namespace cloth {
     }
 
     auto* output = (Output*) layer_surface.data;
-    if (!output)  throw util::exception("layer_surface.data not set");
+    if (!output) output = &outputs.front();
 
     [[maybe_unused]]
-    auto& layer = output->workspace->layers[layer_surface.layer].emplace_back(*output, layer_surface);
+    auto& layer = output->layers[layer_surface.layer].emplace_back(*output, layer_surface);
 
     // Temporarily set the layer's current state to client_pending
     // So that we can easily arrange it
@@ -303,7 +303,7 @@ namespace cloth {
       if (layer_surface.mapped) {
         output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
       }
-      util::erase_this(output.workspace->layers[layer_surface.layer], this);
+      auto keep_alive = util::erase_this(output.layers[layer_surface.layer], this);
       arrange_layers(output);
     };
     on_map.add_to(layer_surface.events.map);

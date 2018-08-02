@@ -68,12 +68,12 @@ namespace cloth {
       wlr_output_layout_output_coords(layout, wlr_output, &ox, &oy);
 
       if ((surface =
-             layer_surface_at(*output, output->workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY],
+             layer_surface_at(*output, output->layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY],
                               ox, oy, sx, sy))) {
         return surface;
       }
       if ((surface = layer_surface_at(
-             *output, output->workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], ox, oy, sx, sy))) {
+             *output, output->layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], ox, oy, sx, sy))) {
         return surface;
       }
     }
@@ -86,12 +86,12 @@ namespace cloth {
 
     if (wlr_output) {
       if ((surface =
-             layer_surface_at(*output, output->workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM],
+             layer_surface_at(*output, output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM],
                               ox, oy, sx, sy))) {
         return surface;
       }
       if ((surface = layer_surface_at(
-             *output, output->workspace->layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], ox, oy, sx,
+             *output, output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], ox, oy, sx,
              sy))) {
         return surface;
       }
