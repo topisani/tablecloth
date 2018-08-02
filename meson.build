@@ -31,4 +31,4 @@ wayland_scannerpp = generator(find_program('wayland-scanner++'), output: [
 subdir('common')
 subdir('tablecloth')
 subdir('cloth-msg')
-
+subdir('cloth-bar')

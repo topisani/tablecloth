@@ -3,6 +3,8 @@
 #include "util/logging.hpp"
 
 #include "server.hpp"
+#include "seat.hpp"
+#include "layers.hpp"
 
 #include <tablecloth-shell-server-protocol.h>
 
@@ -11,7 +13,13 @@ namespace cloth {
   static const struct cloth_window_manager_interface cloth_window_manager_impl = {
     .cycle_focus = [] (wl::client_t*, wl::resource_t* resource) {
       static_cast<WindowManager*>(resource->data)->cycle_focus();
-    }
+    },
+    .run_command = [] (wl::client_t*, wl::resource_t* resource, const char* commands) {
+      static_cast<WindowManager*>(resource->data)->run_command(commands);
+    },
+    .set_panel_surface = [] (wl::client_t*, wl::resource_t* resource, wl::resource_t* output, wl::resource_t* surface) {
+      static_cast<WindowManager*>(resource->data)->set_panel_surface((wl::output_t*) output->data, (wl::surface_t*) surface->data);
+    },
   };
 
   static void bind_cloth_window_manager(wl::client_t* client, void* data, uint32_t version, uint32_t id)
@@ -43,6 +51,21 @@ namespace cloth {
 
   auto WindowManager::cycle_focus() -> void {
     server.desktop.current_workspace().cycle_focus();
+  }
+
+  auto WindowManager::run_command(const char* command) -> void {
+    for (auto& seat : server.input.seats) {
+      for (auto& keyboard : seat.keyboards) {
+        keyboard.execute_user_binding(command);
+        return;
+      }
+    }
+  }
+
+  auto WindowManager::set_panel_surface(wl::output_t* wl_output, wl::surface_t* surface) -> void
+  {
+    // TODO: Actually select the output
+    auto& output = server.desktop.outputs.front();
   }
 
   auto WindowManager::send_focused_window_name(Workspace& ws) -> void {

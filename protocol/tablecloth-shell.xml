@@ -40,6 +40,18 @@
     </event>
 
     <request name="cycle_focus">
+      <description summary="Cycle Focus"/>
+    </request>
+
+    <request name="run_command">
+      <description summary="Run a command string"/>
+      <arg name="command" type="string" summary="the command and arguments"/>
+    </request>
+
+    <request name="set_panel_surface">
+      <description summary="Set the panel surface"/>
+      <arg name="Output" type="object" interface="wl_output" summary="The output to assign the panel to"/>
+      <arg name="surface" type="object" interface="wl_surface" summary="The panel surface"/>
     </request>
 
   </interface>

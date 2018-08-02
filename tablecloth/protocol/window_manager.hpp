@@ -11,6 +11,8 @@ namespace cloth {
 
   struct WindowManager {
     auto cycle_focus() -> void;
+    auto run_command(const char*) -> void;
+    auto set_panel_surface(wl::output_t* output, wl::surface_t* surface) -> void;
 
     auto send_focused_window_name(Workspace& ws) -> void;
 

@@ -27,8 +27,9 @@ namespace cloth {
     xkb_keysym_t pressed_keysyms_translated[pressed_keysyms_cap] = {0};
     xkb_keysym_t pressed_keysyms_raw[pressed_keysyms_cap] = {0};
 
-  private:
     void execute_user_binding(std::string_view command);
+
+  private:
     bool execute_compositor_binding(xkb_keysym_t keysym);
 
     bool execute_binding(xkb_keysym_t* pressed_keysyms,
