@@ -3,6 +3,8 @@ project('tablecloth', 'cpp', 'c', default_options : ['cpp_std=c++17'])
 thread_dep = dependency('threads')
 xkbcommon_dep = dependency('xkbcommon ')
 wayland_server_dep = dependency('wayland-server')
+wayland_client_dep = dependency('wayland-client')
+wayland_cursor_dep = dependency('wayland-cursor')
 libinput = dependency('libinput')
 
 wayland_protocols = dependency('wayland-protocols')
