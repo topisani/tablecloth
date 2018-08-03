@@ -1,19 +1,16 @@
 #pragma once
 
-#include <pixman.h>
+#include <tweeny/tweeny.h>
 
 #include "util/chrono.hpp"
+#include "util/macros.hpp"
 #include "util/ptr_vec.hpp"
 
-#include "wlroots.hpp"
 #include "layers.hpp"
+#include "render.hpp"
+#include "wlroots.hpp"
 
 namespace cloth {
-
-  struct Desktop;
-  struct View;
-  struct DragIcon;
-  struct Workspace;
 
   struct Output {
     Output(Desktop& desktop, Workspace& ws, wlr::output_t& wlr) noexcept;
@@ -22,32 +19,32 @@ namespace cloth {
     Output& operator=(const Output&) noexcept = delete;
 
     Output(Output&& rhs) noexcept = default;
-    Output& operator=(Output&&) noexcept = default;
+    Output& operator=(Output&&) = default;
 
-    void damage_whole();
-    void damage_whole_view(View& view);
-    void damage_from_view(View& view);
-    void damage_whole_drag_icon(DragIcon& icon);
-    void damage_from_local_surface(wlr::surface_t& surface,
-                                          double ox,
-                                          double oy,
-                                          float rotation = 0);
-    void damage_whole_local_surface(wlr::surface_t& surface,
-                                           double ox,
-                                           double oy,
-                                           float rotation = 0);
+    auto damage_whole() -> void;
+    auto damage_whole_view(View& view) -> void;
+    auto damage_whole_decoration(View& view) -> void;
+    auto damage_from_view(View& view) -> void;
+    auto damage_whole_drag_icon(DragIcon& icon) -> void;
+    auto damage_from_local_surface(wlr::surface_t& surface,
+                                   double ox,
+                                   double oy,
+                                   float rotation = 0) -> void;
+    auto damage_whole_local_surface(wlr::surface_t& surface,
+                                    double ox,
+                                    double oy,
+                                    float rotation = 0) -> void;
     // Member variables
 
     Desktop& desktop;
 
-    std::array<util::ptr_vec<LayerSurface>, 4> layers;
+    std::array<Layer, 4> layers;
 
     util::non_null_ptr<Workspace> workspace;
     wlr::output_t& wlr_output;
 
     chrono::time_point last_frame;
 
-    wlr::output_damage_t* damage;
     wlr::box_t usable_area;
 
   protected:
@@ -58,9 +55,13 @@ namespace cloth {
     wl::Listener on_damage_destroy;
 
   private:
-    void render();
+    auto render() -> void;
+
+    RenderContext context = {*this};
+
+    Workspace* prev_workspace = nullptr;
+
+    float ws_alpha = 0.f;
   };
-
-
 
 } // namespace cloth

@@ -207,6 +207,11 @@ namespace cloth {
       unmap();
     };
 
+    on_set_title.add_to(xwayland_surface->events.set_title);
+    on_set_title = [this] (void* data) {
+      workspace->desktop.server.window_manager.send_focused_window_name(*workspace);
+    };
+
     on_destroy.add_to(xwayland_surface->events.destroy);
     on_destroy = [this] { workspace->erase_view(*this); };
   }

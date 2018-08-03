@@ -274,6 +274,7 @@ namespace cloth {
     outputs.front().workspace = &workspaces[idx];
     outputs.front().damage_whole();
     server.workspace_manager.send_state();
+    server.window_manager.send_focused_window_name(*outputs.front().workspace);
     return workspaces[idx];
   }
 

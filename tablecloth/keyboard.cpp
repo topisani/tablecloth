@@ -127,6 +127,7 @@ namespace cloth {
         LOGE("cannot execute binding command: fork() failed");
         return;
       } else if (pid == 0) {
+        LOGD("Executing command: {}", shell_cmd);
         execl("/bin/sh", "/bin/sh", "-c", shell_cmd.c_str(), (void*) nullptr);
       }
     } else if (command == "maximize") {

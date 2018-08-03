@@ -312,6 +312,7 @@ namespace cloth {
     wl::Listener on_request_fullscreen;
     wl::Listener on_map;
     wl::Listener on_unmap;
+    wl::Listener on_set_title;
 
     wl::Listener on_surface_commit;
 

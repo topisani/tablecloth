@@ -302,7 +302,7 @@ namespace cloth {
       return;
     }
 
-    LOGD("new xdg toplevel: title={}, class={}", util::nonull(surface.toplevel->title), util::nonull(surface.toplevel->app_id));
+    LOGD("new xdg V6 toplevel: title={}, class={}", util::nonull(surface.toplevel->title), util::nonull(surface.toplevel->app_id));
     wlr_xdg_surface_v6_ping(&surface);
 
     // TODO: get the correct output instead

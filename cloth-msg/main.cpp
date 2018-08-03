@@ -17,6 +17,8 @@ namespace cloth::msg {
     bool listen = false;
     bool cycle_focus = false;
 
+    std::string commands;
+
     wl::display_t display;
     wl::registry_t registry;
     wl::workspace_manager_t workspaces;
@@ -51,6 +53,9 @@ namespace cloth::msg {
              | Opt(cycle_focus)
                ["--cycle-focus"]
                ("Cycle Focus")
+             | Opt(commands, "commands")
+               ["-r"]["--run-commands"]
+               ("Run cloth commands")
              | Opt(listen)
                ["-l"]["--listen"]
                ("Listen for events")
@@ -66,6 +71,7 @@ namespace cloth::msg {
         workspaces.switch_to(workspace - 1);
       }
       if (cycle_focus) cloth_windows.cycle_focus();
+      if (!commands.empty()) cloth_windows.run_command(commands);
     }
 
     int main(int argc, char* argv[])

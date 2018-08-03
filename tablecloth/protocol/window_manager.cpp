@@ -54,12 +54,14 @@ namespace cloth {
   }
 
   auto WindowManager::run_command(const char* command) -> void {
+    LOGD("Running command {}", command);
     for (auto& seat : server.input.seats) {
       for (auto& keyboard : seat.keyboards) {
         keyboard.execute_user_binding(command);
         return;
       }
     }
+    LOGE("No keyboard found");
   }
 
   auto WindowManager::set_panel_surface(wl::output_t* wl_output, wl::surface_t* surface) -> void
