@@ -17,9 +17,6 @@ namespace cloth {
     .run_command = [] (wl::client_t*, wl::resource_t* resource, const char* commands) {
       static_cast<WindowManager*>(resource->data)->run_command(commands);
     },
-    .set_panel_surface = [] (wl::client_t*, wl::resource_t* resource, wl::resource_t* output, wl::resource_t* surface) {
-      static_cast<WindowManager*>(resource->data)->set_panel_surface((wl::output_t*) output->data, (wl::surface_t*) surface->data);
-    },
   };
 
   static void bind_cloth_window_manager(wl::client_t* client, void* data, uint32_t version, uint32_t id)
@@ -32,7 +29,9 @@ namespace cloth {
       auto& bound_clients = static_cast<WindowManager*>(res->data)->bound_clients;
       bound_clients.erase(util::remove(bound_clients, res), bound_clients.end());
     };
-    static_cast<WindowManager*>(data)->bound_clients.push_back(resource);
+    auto& wm = *static_cast<WindowManager*>(data);
+    wm.bound_clients.push_back(resource);
+    wm.send_focused_window_name(wm.server.desktop.current_workspace());
   }
 
   WindowManager::WindowManager(Server& server) 
@@ -62,12 +61,6 @@ namespace cloth {
       }
     }
     LOGE("No keyboard found");
-  }
-
-  auto WindowManager::set_panel_surface(wl::output_t* wl_output, wl::surface_t* surface) -> void
-  {
-    // TODO: Actually select the output
-    auto& output = server.desktop.outputs.front();
   }
 
   auto WindowManager::send_focused_window_name(Workspace& ws) -> void {

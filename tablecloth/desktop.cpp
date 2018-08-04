@@ -271,10 +271,14 @@ namespace cloth {
     for (auto& seat : server.input.seats) {
       seat.set_focus(workspaces[idx].focused_view());
     }
-    outputs.front().workspace = &workspaces[idx];
-    outputs.front().damage_whole();
+    // TODO: Properly support multiple outputs
+    // with separate workspaces
+    for (auto& output : outputs) {
+      output.workspace = &workspaces[idx];
+      output.damage_whole();
+    }
     server.workspace_manager.send_state();
-    server.window_manager.send_focused_window_name(*outputs.front().workspace);
+    server.window_manager.send_focused_window_name(workspaces[idx]);
     return workspaces[idx];
   }
 

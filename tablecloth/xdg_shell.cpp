@@ -192,7 +192,7 @@ namespace cloth {
   {
     if (!xdg_surface) return "";
     if (xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
-      return xdg_surface->toplevel->title;
+      return util::nonull(xdg_surface->toplevel->title);
     } else {
       return "";
     }

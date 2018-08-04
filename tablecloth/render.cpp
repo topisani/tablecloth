@@ -310,7 +310,8 @@ namespace cloth {
                          }};
       for_each_surface(*layer_surface.layer_surface.surface, render_surface, data);
 
-      wlr_layer_surface_for_each_surface(&layer_surface.layer_surface, render_surface, &data);
+      ContextAndData cd = {*this, data};
+      wlr_layer_surface_for_each_surface(&layer_surface.layer_surface, render_surface, &cd);
     }
   } // namespace cloth
 
@@ -566,7 +567,8 @@ namespace cloth {
 
     damage_whole_decoration(view);
 
-    for_each_surface(view, damage_whole_surface, {});
+    RenderData data{.layout = {.x = view.x, .y = view.y}};
+    for_each_surface(view, damage_whole_surface, data);
   }
 
   auto RenderContext::damage_whole_drag_icon(DragIcon& icon) -> void
@@ -634,7 +636,8 @@ namespace cloth {
       return;
     }
 
-    for_each_surface(view, damage_from_surface, {});
+    RenderData data = {.layout = {.x = view.x, .y = view.y}};
+    for_each_surface(view, damage_from_surface, data);
   }
 
 

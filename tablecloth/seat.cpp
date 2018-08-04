@@ -40,7 +40,7 @@ namespace cloth {
     wlr_cursor_map_input_to_output(cursor, &device, nullptr);
     Config::Device* dconfig;
     if ((dconfig = config.get_device(device))) {
-      wlr_cursor_map_input_to_region(cursor, &device, &dconfig->mapped_box);
+      // TODO wlr_cursor_map_input_to_region(cursor, &device, &dconfig->mapped_box);
     }
   }
 
@@ -59,7 +59,7 @@ namespace cloth {
     }
 
     if (mapped_output == device.output_name) {
-      wlr_cursor_map_input_to_output(cursor, &device, output);
+      // TODO wlr_cursor_map_input_to_output(cursor, &device, output);
     }
   }
 

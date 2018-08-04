@@ -27,7 +27,9 @@ namespace cloth {
       auto& bound_clients = static_cast<WorkspaceManager*>(res->data)->bound_clients;
       bound_clients.erase(util::remove(bound_clients, res), bound_clients.end());
     };
-    static_cast<WorkspaceManager*>(data)->bound_clients.push_back(resource);
+    auto& wm = *static_cast<WorkspaceManager*>(data);
+    wm.bound_clients.push_back(resource);
+    wm.send_state();
   }
 
   WorkspaceManager::WorkspaceManager(Server& server) 

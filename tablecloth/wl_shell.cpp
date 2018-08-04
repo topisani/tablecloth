@@ -123,7 +123,7 @@ namespace cloth {
 
   auto WlShellSurface::get_name() -> std::string {
     if (wl_shell_surface == nullptr) return "";
-    return wl_shell_surface->title;
+    return util::nonull(wl_shell_surface->title);
   }
 
   void Desktop::handle_wl_shell_surface(void* data)

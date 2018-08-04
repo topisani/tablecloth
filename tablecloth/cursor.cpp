@@ -167,7 +167,7 @@ namespace cloth {
       if (event->seat_client->client != focused_client ||
           mode != Mode::Passthrough) {
         LOGD("Denying request to set cursor from unfocused client");
-        return;
+        //return;
       }
 
       wlr_cursor_set_surface(wlr_cursor, event->surface, event->hotspot_x, event->hotspot_y);

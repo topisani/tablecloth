@@ -110,7 +110,7 @@ namespace cloth {
 
   auto XwaylandSurface::get_name() -> std::string
   {
-    if (xwayland_surface) return xwayland_surface->title;
+    if (xwayland_surface) return util::nonull(xwayland_surface->title);
     return "";
   }
 

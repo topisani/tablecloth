@@ -253,7 +253,7 @@ namespace cloth {
       }
     }
 
-    auto* output = (Output*) layer_surface.data;
+    auto* output = output_from_wlr_output(layer_surface.output);
     if (!output) output = &outputs.front();
 
     [[maybe_unused]]
