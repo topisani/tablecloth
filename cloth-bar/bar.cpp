@@ -98,14 +98,25 @@ namespace cloth::bar {
 
   auto Bar::setup_widgets() -> void
   {
+
+    auto& left = *Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 0));
+    auto& center = *Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 0));
+    auto& right = *Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 0));
+
     auto& box1 = *Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 0));
     window.add(box1);
+    box1.set_homogeneous(true);
+    box1.pack_start(left, true, true);
+    box1.pack_start(center, false, false);
+    box1.pack_end(right, true, true);
 
     auto& focused_window = *Gtk::manage(new Gtk::Label());
     focused_window.get_style_context()->add_class("focused-window-title");
     client.signals.focused_window_name.connect([&focused_window](std::string focused_window_name) {
       focused_window.set_text(focused_window_name);
     });
+
+    focused_window.set_hexpand(false);
 
     auto& button = *Gtk::manage(new Gtk::Button("TERM"));
     button.signal_clicked().connect(
@@ -114,9 +125,9 @@ namespace cloth::bar {
     auto& workspace_selector = *new WorkspaceSelectorWidget(*this);
     workspace_selector.update(1, 10);
 
-    box1.pack_start(focused_window, false, false, 0);
-    box1.pack_start(workspace_selector, true, false, 10);
-    box1.pack_end(button, false, false, 0);
+    left.pack_start(focused_window, false, true, 0);
+    center.pack_start(workspace_selector, true, false, 10);
+    right.pack_end(button, false, false, 0);
   }
 
 } // namespace cloth::bar
