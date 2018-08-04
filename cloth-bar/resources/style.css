@@ -1,0 +1,34 @@
+* {
+    border: none;
+    border-radius: 0;
+    font-family: curie;
+    font-size: 12px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+    margin-top: 0px;
+    margin-bottom: 0px;
+}
+
+window {
+    background: black;
+    opacity: 0.5;
+    border: none;
+    color: white;
+}
+
+.focused-window-title {
+    padding: 0px 10px;
+}
+
+.workspace-selector {
+}
+
+.workspace-selector button {
+    padding: 0px 0px;
+    background: black;
+    color: white;
+}
+
+.workspace-selector button.current {
+    background: blue;
+}

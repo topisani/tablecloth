@@ -13,6 +13,8 @@ namespace cloth::bar {
   struct Bar {
     Bar(Client& client, std::unique_ptr<wl::output_t>&& output);
 
+    Bar(const Bar&) = delete;
+
     Client& client;
 
     Gtk::Window window;
@@ -23,9 +25,12 @@ namespace cloth::bar {
     auto set_width(int) -> void;
 
   private:
-    int width = 10;
-
     auto setup_widgets() -> void;
+    auto setup_css() -> void;
+
+    int width = 10;
+    Glib::RefPtr<Gtk::StyleContext> style_context;
+    Glib::RefPtr<Gtk::CssProvider> css_provider;
   };
 
 }

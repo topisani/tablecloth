@@ -7,6 +7,8 @@
 
 #include <protocols.hpp>
 
+#include "util/ptr_vec.hpp"
+
 #include "gdkwayland.hpp"
 
 #include "bar.hpp"
@@ -18,6 +20,7 @@ namespace cloth::bar {
   struct Client {
     int height = 16;
     bool show_help = false;
+    std::string css_file = "./cloth-bar/resources/style.css";
 
     Gtk::Main gtk_main;
 
@@ -27,7 +30,12 @@ namespace cloth::bar {
     wl::workspace_manager_t workspaces;
     wl::cloth_window_manager_t window_manager;
     wl::zwlr_layer_shell_v1_t layer_shell;
-    std::vector<Bar> bars;
+    util::ptr_vec<Bar> bars;
+
+    struct {
+      sigc::signal<void(int, int)> workspace_state;
+      sigc::signal<void(std::string)> focused_window_name;
+    } signals;
 
     Client(int argc, char* argv[])
       : gtk_main(argc, argv),
@@ -37,6 +45,8 @@ namespace cloth::bar {
 
     auto bind_interfaces();
 
+    auto setup_css();
+
     auto make_cli() 
     {
       using namespace clara;
@@ -44,7 +54,10 @@ namespace cloth::bar {
       auto cli = Parser{} | Help(show_help)
                  | Opt(height, "height")
                    ["--height"]
-                   ("Bar Height");
+                   ("Bar Height")
+                 | Opt(css_file, "css_file")
+                   ["--css"]
+                   ("Path to css file");
       // clang-format on
       return cli;
     }

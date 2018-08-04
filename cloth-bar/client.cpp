@@ -11,20 +11,20 @@ namespace cloth::bar {
       LOGD("Global: {}", interface);
       if (interface == workspaces.interface_name) {
         registry.bind(name, workspaces, version);
-        workspaces.on_state() = [&](uint32_t current, uint32_t count) {
-          std::cout << fmt::format("workspace {}:{}", current + 1, count) << std::endl;
+        workspaces.on_state() = [&] (unsigned current, unsigned count) {
+          signals.workspace_state.emit(current, count);
         };
       } else if (interface == window_manager.interface_name) {
         registry.bind(name, window_manager, version);
+        window_manager.on_focused_window_name() = [&] (const std::string& name, unsigned ws) {
+          signals.focused_window_name.emit(name);
+        };
       } else if (interface == layer_shell.interface_name) {
         registry.bind(name, layer_shell, version);
       } else if (interface == wl::output_t::interface_name) {
         auto output = std::make_unique<wl::output_t>();
         registry.bind(name, *output, version);
-        auto& bar = bars.emplace_back(*this, std::move(output));
-        bar.output->on_mode() = [&bar](wl::output_mode, int32_t w, int32_t h, int32_t refresh) { 
-                                         LOGI("Bar width configured: {}", w);
-                                         bar.set_width(w); };
+        bars.emplace_back(*this, std::move(output));
       }
     };
     display.roundtrip();
