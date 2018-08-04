@@ -44,8 +44,8 @@ namespace cloth {
     int constrained_width, constrained_height;
     apply_size_constraints(width, height, constrained_width, constrained_height);
 
-    wlr_xwayland_surface_configure(xwayland_surface, xwayland_surface->x, xwayland_surface->y, constrained_width,
-                                   constrained_height);
+    wlr_xwayland_surface_configure(xwayland_surface, xwayland_surface->x, xwayland_surface->y,
+                                   constrained_width, constrained_height);
   }
 
   void XwaylandSurface::do_move_resize(double x, double y, int width, int height)
@@ -114,7 +114,8 @@ namespace cloth {
     return "";
   }
 
-  XwaylandSurface::XwaylandSurface(Workspace& p_workspace, wlr::xwayland_surface_t* p_xwayland_surface)
+  XwaylandSurface::XwaylandSurface(Workspace& p_workspace,
+                                   wlr::xwayland_surface_t* p_xwayland_surface)
     : View(p_workspace), xwayland_surface(p_xwayland_surface)
   {
     View::wlr_surface = xwayland_surface->surface;
@@ -124,13 +125,13 @@ namespace cloth {
     height = xwayland_surface->height;
 
     on_request_configure.add_to(xwayland_surface->events.request_configure);
-    on_request_configure = [this] (void* data) {
+    on_request_configure = [this](void* data) {
       auto& e = *(wlr::xwayland_surface_configure_event_t*) data;
       update_position(e.x, e.y);
     };
 
     on_request_move.add_to(xwayland_surface->events.request_move);
-    on_request_move = [this] (void* data) {
+    on_request_move = [this](void* data) {
       Seat* seat = guess_seat_for_view(*this);
       if (!seat || seat->cursor.mode != Cursor::Mode::Passthrough) {
         return;
@@ -139,7 +140,7 @@ namespace cloth {
     };
 
     on_request_resize.add_to(xwayland_surface->events.request_resize);
-    on_request_resize = [this] (void* data) {
+    on_request_resize = [this](void* data) {
       Seat* seat = guess_seat_for_view(*this);
       auto& e = *(wlr::xwayland_resize_event_t*) data;
       if (!seat || seat->cursor.mode != Cursor::Mode::Passthrough) {
@@ -149,15 +150,17 @@ namespace cloth {
     };
 
     on_request_maximize.add_to(xwayland_surface->events.request_maximize);
-    on_request_maximize = [this] (void* data) {
+    on_request_maximize = [this](void* data) {
       maximize(xwayland_surface->maximized_vert && xwayland_surface->maximized_horz);
     };
 
     on_request_fullscreen.add_to(xwayland_surface->events.request_fullscreen);
-    on_request_fullscreen = [this] (void* data) { set_fullscreen(xwayland_surface->fullscreen, nullptr); };
+    on_request_fullscreen = [this](void* data) {
+      set_fullscreen(xwayland_surface->fullscreen, nullptr);
+    };
 
     // Added/removed on map/unmap
-    on_surface_commit = [this] (void* data) {
+    on_surface_commit = [this](void* data) {
       apply_damage();
 
       int width = xwayland_surface->surface->current.width;
@@ -178,7 +181,7 @@ namespace cloth {
     };
 
     on_map.add_to(xwayland_surface->events.map);
-    on_map = [this] (void* data) {
+    on_map = [this](void* data) {
       auto& surface = *(wlr::xwayland_surface_t*) data;
       x = surface.x;
       y = surface.y;
@@ -188,7 +191,16 @@ namespace cloth {
       on_surface_commit.add_to(surface.surface->events.commit);
 
       map(*xwayland_surface->surface);
-      if (!surface.override_redirect) {
+      if (surface.override_redirect) {
+        // Usually set on popup windows (like menus, dropdowns etc) to make sure the
+        // compositor stays out of it
+        //
+        // rootston sets focus here, but that makes chrome's popup menus instantly unmap
+        // and so far it seems to work without it
+        //
+        // I could be worried that a popup that needs keyboard input would not work like this,
+        // and we may need to find a new solution
+      } else {
         if (surface.decorations == WLR_XWAYLAND_SURFACE_DECORATIONS_ALL) {
           // TODO: Desired behaviour?
           decorated = true;
@@ -196,24 +208,26 @@ namespace cloth {
           titlebar_height = 12;
         }
         setup();
-      } else {
-        initial_focus();
       }
     };
 
     on_unmap.add_to(xwayland_surface->events.unmap);
-    on_unmap = [this] (void* data) {
-      on_surface_commit.remove();
+    on_unmap = [this](void* data) {
+      LOGD("Unmapped");
       unmap();
+      on_surface_commit.remove();
     };
 
     on_set_title.add_to(xwayland_surface->events.set_title);
-    on_set_title = [this] (void* data) {
+    on_set_title = [this](void* data) {
       workspace->desktop.server.window_manager.send_focused_window_name(*workspace);
     };
 
     on_destroy.add_to(xwayland_surface->events.destroy);
-    on_destroy = [this] { workspace->erase_view(*this); };
+    on_destroy = [this] {
+      LOGD("Destroyed");
+      workspace->erase_view(*this);
+    };
   }
 
   void Desktop::handle_xwayland_surface(void* data)
@@ -221,8 +235,8 @@ namespace cloth {
     if (data == nullptr) return;
     auto& surface = *(wlr::xwayland_surface_t*) data;
 
-    LOGD("New xwayland surface: title={}, class={}, instance={}", util::nonull(surface.title), util::nonull(surface.class_),
-         util::nonull(surface.instance));
+    LOGD("New xwayland surface: title={}, class={}, instance={}", util::nonull(surface.title),
+         util::nonull(surface.class_), util::nonull(surface.instance));
     wlr_xwayland_surface_ping(&surface);
 
     auto& output = outputs.front();

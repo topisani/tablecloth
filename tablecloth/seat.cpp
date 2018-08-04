@@ -211,7 +211,7 @@ namespace cloth {
 
     on_device_destroy.add_to(device.events.destroy);
     on_device_destroy = [this] {
-      util::erase_this(this->seat.touch, this);
+      auto keep_around = util::erase_this(this->seat.touch, this);
       this->seat.update_capabilities();
     };
 
@@ -228,7 +228,7 @@ namespace cloth {
 
     on_device_destroy.add_to(device.events.destroy);
     on_device_destroy = [this] {
-      util::erase_this(this->seat.tablet_tools, this);
+      auto keep_alive = util::erase_this(this->seat.tablet_tools, this);
       this->seat.update_capabilities();
     };
 
@@ -467,7 +467,7 @@ namespace cloth {
 
   void Seat::set_focus(View* view)
   {
-    if (view && !allow_input(*view->wlr_surface->resource)) {
+    if (view && view->wlr_surface && !allow_input(*view->wlr_surface->resource)) {
       return;
     }
 

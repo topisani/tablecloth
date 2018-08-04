@@ -238,6 +238,11 @@ namespace cloth {
 
   auto RenderContext::render_surface(wlr::surface_t* surface, int sx, int sy, void* _data) -> void
   {
+    if (!surface) {
+      //LOGE("null surface in render_surface");
+      return;
+    }
+
     auto& cvd = *(ContextAndData*) _data;
 
     Output& output = cvd.context.output;
@@ -659,6 +664,10 @@ namespace cloth {
                                        wlr_surface_iterator_func_t iterator,
                                        const RenderData& data) -> void
   {
+    if (!view.wlr_surface) {
+      //LOGE("Null surface for view title='{}', type='{}'", view.get_name(), (int) view.type());
+      return;
+    }
     ContextAndData cd = {*this, data};
     if (auto* xdg_surface_v6 = dynamic_cast<XdgSurfaceV6*>(&view); xdg_surface_v6) {
       wlr_xdg_surface_v6_for_each_surface(xdg_surface_v6->xdg_surface, iterator, &cd);
@@ -666,12 +675,11 @@ namespace cloth {
       wlr_xdg_surface_for_each_surface(xdg_surface->xdg_surface, iterator, &cd);
     } else if (auto* wl_shell_surface = dynamic_cast<WlShellSurface*>(&view); wl_shell_surface) {
       wlr_wl_shell_surface_for_each_surface(wl_shell_surface->wl_shell_surface, iterator, &cd);
-    } else
 #ifdef WLR_HAS_XWAYLAND
-      if (auto* wlr_surface = dynamic_cast<XwaylandSurface*>(&view); wlr_surface) {
+    } else if (auto* wlr_surface = dynamic_cast<XwaylandSurface*>(&view); wlr_surface) {
       wlr_surface_for_each_surface(wlr_surface->xwayland_surface->surface, iterator, &cd);
-    }
 #endif
+    }
   }
 
 #ifdef WLR_HAS_XWAYLAND

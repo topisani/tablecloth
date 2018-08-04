@@ -316,8 +316,8 @@ namespace cloth {
 
   void ViewChild::finish()
   {
+    auto keep_alive = util::erase_this(view.children, this);
     view.damage_whole();
-    util::erase_this(view.children, this);
   }
 
   void ViewChild::handle_commit(void* data)
@@ -355,6 +355,7 @@ namespace cloth {
 
   Subsurface& View::create_subsurface(wlr::subsurface_t& wlr_subsurface)
   {
+    LOGD("New subsurface");
     return static_cast<Subsurface&>(
       children.push_back(std::make_unique<Subsurface>(*this, &wlr_subsurface)));
   }
@@ -382,11 +383,10 @@ namespace cloth {
   void View::unmap()
   {
     assert(this->wlr_surface != nullptr);
-
+    this->mapped = false;
     events.unmap.emit(this);
     damage_whole();
 
-    this->mapped = false;
     on_new_subsurface.remove();
 
     for (auto& child : children) {
@@ -459,6 +459,7 @@ namespace cloth {
 
   bool View::at(double lx, double ly, wlr::surface_t*& wlr_surface, double& sx, double& sy)
   {
+    if (!this->wlr_surface || !this->mapped) return false;
     if (util::dynamic_is<WlShellSurface>(this) &&
         dynamic_cast<WlShellSurface*>(this)->wl_shell_surface->state == WLR_WL_SHELL_SURFACE_STATE_POPUP) {
       return false;
