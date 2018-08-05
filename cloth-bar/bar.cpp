@@ -1,10 +1,16 @@
 #include "bar.hpp"
 
+#include <condition_variable>
+#include <thread>
+
 #include "client.hpp"
 
+#include "util/chrono.hpp"
 #include "util/logging.hpp"
 
 #include "gdkwayland.hpp"
+
+#include "widgets/battery.hpp"
 
 namespace cloth::bar {
 
@@ -18,26 +24,32 @@ namespace cloth::bar {
     window.set_title("tablecloth panel");
     window.set_decorated(false);
 
+    setup_css();
+    setup_widgets();
+
     gtk_widget_realize(GTK_WIDGET(window.gobj()));
     Gdk::wayland::window::set_use_custom_surface(window);
     surface = Gdk::wayland::window::get_wl_surface(window);
     layer_surface = client.layer_shell.get_layer_surface(
       surface, *output, wl::zwlr_layer_shell_v1_layer::top, "cloth.panel");
-    layer_surface.set_anchor(wl::zwlr_layer_surface_v1_anchor::top |
-                             wl::zwlr_layer_surface_v1_anchor::left);
-    layer_surface.set_size(client.height, 16);
-    layer_surface.set_exclusive_zone(0);
-    layer_surface.set_keyboard_interactivity(0);
+    layer_surface.set_anchor(wl::zwlr_layer_surface_v1_anchor::left |
+                             wl::zwlr_layer_surface_v1_anchor::top |
+                             wl::zwlr_layer_surface_v1_anchor::right);
+    layer_surface.set_size(width, client.height);
     layer_surface.on_configure() = [&](uint32_t serial, uint32_t width, uint32_t height) {
-      layer_surface.ack_configure(serial);
       window.show_all();
+      layer_surface.ack_configure(serial);
+      if (client.height != height) {
+        height = client.height;
+        LOGD("New Height: {}", height);
+        layer_surface.set_size(width, height);
+        layer_surface.set_exclusive_zone(visible ? height : 0);
+        surface.commit();
+      }
     };
     layer_surface.on_closed() = [&] { window.close(); };
 
     surface.commit();
-
-    setup_css();
-    setup_widgets();
   }
 
   auto Bar::setup_css() -> void
@@ -58,7 +70,16 @@ namespace cloth::bar {
     this->width = width;
     window.set_size_request(width);
     window.resize(width, client.height);
-    layer_surface.set_size(width, client.height);
+    layer_surface.set_size(width, 40);
+    surface.commit();
+  }
+
+  auto Bar::toggle() -> void
+  {
+    visible = !visible;
+    auto zone = visible ? client.height : 0;
+    layer_surface.set_exclusive_zone(zone);
+    surface.commit();
   }
 
   struct WorkspaceSelectorWidget {
@@ -96,9 +117,31 @@ namespace cloth::bar {
     std::vector<Gtk::Button> buttons;
   };
 
+  struct ClockWidget {
+    ClockWidget()
+    {
+      label.get_style_context()->add_class("clock-widget");
+      thread = [this] {
+        using namespace chrono;
+        auto now = clock::now();
+        label.set_text(fmt::format("{:02}:{:02}",
+                                   duration_cast<hours>(now.time_since_epoch()).count() % 24,
+                                   duration_cast<minutes>(now.time_since_epoch()).count() % 60));
+        thread.sleep_until(floor<minutes>(now + minutes(1)));
+      };
+    };
+
+    operator Gtk::Widget&()
+    {
+      return label;
+    }
+
+    Gtk::Label label;
+    util::SleeperThread thread;
+  };
+
   auto Bar::setup_widgets() -> void
   {
-
     auto& left = *Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 0));
     auto& center = *Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 0));
     auto& right = *Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 0));
@@ -113,6 +156,10 @@ namespace cloth::bar {
     auto& focused_window = *Gtk::manage(new Gtk::Label());
     focused_window.get_style_context()->add_class("focused-window-title");
     client.signals.focused_window_name.connect([&focused_window](std::string focused_window_name) {
+      if (focused_window_name.size() > 70) {
+        focused_window_name.erase(67);
+        focused_window_name += "...";
+      }
       focused_window.set_text(focused_window_name);
     });
 
@@ -122,12 +169,18 @@ namespace cloth::bar {
     button.signal_clicked().connect(
       [&]() { client.window_manager.run_command("exec weston-terminal"); });
 
+    auto& clock = *new ClockWidget();
+
     auto& workspace_selector = *new WorkspaceSelectorWidget(*this);
     workspace_selector.update(1, 10);
+
+    auto& battery = *new widgets::Battery();
 
     left.pack_start(focused_window, false, true, 0);
     center.pack_start(workspace_selector, true, false, 10);
     right.pack_end(button, false, false, 0);
+    right.pack_end(clock, false, false, 0);
+    right.pack_end(battery, false, false, 0);
   }
 
 } // namespace cloth::bar

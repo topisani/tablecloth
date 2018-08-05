@@ -3,6 +3,10 @@
 #include <chrono>
 #include <ctime>
 
+#include <functional>
+#include <condition_variable>
+#include <thread>
+
 namespace cloth::chrono {
 
     using namespace std::chrono;
@@ -22,5 +26,62 @@ namespace cloth::chrono {
     {
       return time_point(duration_cast<duration>(seconds(t.tv_sec) + nanoseconds(t.tv_nsec)));
     }
+
+}
+
+namespace cloth::util {
+
+  struct SleeperThread {
+    SleeperThread() = default;
+
+    SleeperThread(std::function<void()> func)
+      : thread{[this, func] {
+          do {
+            func();
+          } while (do_run);
+        }}
+    {}
+
+    SleeperThread& operator=(std::function<void()> func)
+    {
+      thread = std::thread([this, func] {
+        do {
+          func();
+        } while (do_run);
+      });
+      return *this;
+    }
+
+
+    auto sleep_for(chrono::duration dur)
+    {
+      auto lock = std::unique_lock(mutex);
+      return condvar.wait_for(lock, dur);
+    }
+
+    auto sleep_until(chrono::time_point time)
+    {
+      auto lock = std::unique_lock(mutex);
+      return condvar.wait_until(lock, time);
+    }
+
+    auto wake_up()
+    {
+      condvar.notify_all();
+    }
+
+    ~SleeperThread()
+    {
+      do_run = false;
+      condvar.notify_all();
+      thread.join();
+    }
+
+  private:
+    std::thread thread;
+    std::condition_variable condvar;
+    std::mutex mutex;
+    bool do_run = true;
+  };
 
 }

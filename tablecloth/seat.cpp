@@ -4,8 +4,8 @@
 #include "input.hpp"
 #include "keyboard.hpp"
 #include "seat.hpp"
-#include "xcursor.hpp"
 #include "server.hpp"
+#include "xcursor.hpp"
 
 #include "util/algorithm.hpp"
 #include "util/exception.hpp"
@@ -14,7 +14,9 @@
 namespace cloth {
 
   Seat::Seat(Input& input, const std::string& name)
-    : wlr_seat(wlr_seat_create(input.server.wl_display, name.c_str())), input(input), cursor(*this, wlr_cursor_create())
+    : wlr_seat(wlr_seat_create(input.server.wl_display, name.c_str())),
+      input(input),
+      cursor(*this, wlr_cursor_create())
   {
     if (!wlr_seat) throw util::exception("Could not create wlr_seat from name {}", name);
 
@@ -118,7 +120,7 @@ namespace cloth {
   }
 
   DragIcon::DragIcon(Seat& seat, wlr::drag_icon_t& wlr_icon) noexcept
-   : seat(seat), wlr_drag_icon(wlr_icon)
+    : seat(seat), wlr_drag_icon(wlr_icon)
   {
     on_surface_commit = [this] { update_position(); };
     on_surface_commit.add_to(wlr_drag_icon.surface->events.commit);
@@ -486,7 +488,14 @@ namespace cloth {
 
     // Deactivate the old view if it is not focused by some other seat
     if (prev_focus != nullptr && !input.view_has_focus(*prev_focus)) {
-      prev_focus->activate(false);
+      if (auto* xwl = dynamic_cast<XwaylandSurface*>(view);
+          xwl && xwl->xwayland_surface->override_redirect) {
+        // NOTE: 
+        // This may not be the correct thing to do, but popup menus in chrome instantly disappear if
+        // the parent window gets deactivated
+      } else {
+        prev_focus->activate(false);
+      }
     }
 
     if (view == nullptr) {

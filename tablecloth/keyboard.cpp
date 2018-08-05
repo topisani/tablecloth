@@ -4,13 +4,13 @@
 #include <xkbcommon/xkbcommon.h>
 #include <charconv>
 
-#include "util/logging.hpp"
 #include "util/exception.hpp"
+#include "util/logging.hpp"
 
 #include "input.hpp"
 #include "keyboard.hpp"
-#include "server.hpp"
 #include "seat.hpp"
+#include "server.hpp"
 
 namespace cloth {
 
@@ -60,7 +60,7 @@ namespace cloth {
     case XKB_KEY_Shift_L:
     case XKB_KEY_Shift_R:
     case XKB_KEY_Control_L:
-   case XKB_KEY_Control_R:
+    case XKB_KEY_Control_R:
     case XKB_KEY_Caps_Lock:
     case XKB_KEY_Shift_Lock:
     case XKB_KEY_Meta_L:
@@ -94,6 +94,7 @@ namespace cloth {
 
   static std::string exec_prefix = "exec ";
   static std::string switch_ws_prefix = "switch_workspace ";
+  static std::string move_ws_prefix = "move_workspace ";
 
   static bool outputs_enabled = true;
 
@@ -106,6 +107,11 @@ namespace cloth {
       View* focus = seat.get_focus();
       if (focus != nullptr) {
         focus->close();
+      }
+    } else if (command == "center") {
+      View* focus = seat.get_focus();
+      if (focus != nullptr) {
+        focus->center();
       }
     } else if (command == "fullscreen") {
       View* focus = seat.get_focus();
@@ -149,6 +155,16 @@ namespace cloth {
       if (workspace >= 0 && workspace < 10) {
         input.server.desktop.switch_to_workspace(workspace);
       }
+    } else if (util::starts_with(move_ws_prefix, command)) {
+      View* focus = seat.get_focus();
+      if (focus != nullptr) {
+        int workspace = -1;
+        auto ws_str = command.substr(move_ws_prefix.size());
+        std::from_chars(&*ws_str.begin(), &*ws_str.end(), workspace);
+        if (workspace >= 0 && workspace < 10) {
+          input.server.desktop.workspaces.at(workspace).add_view(focus->workspace->erase_view(*focus));
+        }
+      }
     } else {
       LOGE("unknown binding command: %s", command);
     }
@@ -156,7 +172,7 @@ namespace cloth {
 
   /// Execute a built-in, hardcoded compositor binding. These are triggered from a
   /// single keysym.
-  /// 
+  ///
   /// Returns true if the keysym was handled by a binding and false if the event
   /// should be propagated to clients.
   bool Keyboard::execute_compositor_binding(xkb_keysym_t keysym)
@@ -184,7 +200,7 @@ namespace cloth {
 
   /// Execute keyboard bindings. These include compositor bindings and user-defined
   /// bindings.
-  /// 
+  ///
   /// Returns true if the keysym was handled by a binding and false if the event
   /// should be propagated to clients.
   bool Keyboard::execute_binding(xkb_keysym_t* pressed_keysyms,
@@ -230,12 +246,12 @@ namespace cloth {
   ///
   /// On US layout, pressing Alt+Shift+2 will trigger Alt+@.
   std::size_t Keyboard::keysyms_translated(xkb_keycode_t keycode,
-                                            const xkb_keysym_t** keysyms,
-                                            uint32_t* modifiers)
+                                           const xkb_keysym_t** keysyms,
+                                           uint32_t* modifiers)
   {
     *modifiers = wlr_keyboard_get_modifiers(device.keyboard);
-    xkb_mod_mask_t consumed = xkb_state_key_get_consumed_mods2(
-      device.keyboard->xkb_state, keycode, XKB_CONSUMED_MODE_XKB);
+    xkb_mod_mask_t consumed =
+      xkb_state_key_get_consumed_mods2(device.keyboard->xkb_state, keycode, XKB_CONSUMED_MODE_XKB);
     *modifiers = *modifiers & ~consumed;
 
     return xkb_state_key_get_syms(device.keyboard->xkb_state, keycode, keysyms);
@@ -249,15 +265,14 @@ namespace cloth {
   ///
   /// This will trigger keybinds such as Alt+Shift+2.
   std::size_t Keyboard::keysyms_raw(xkb_keycode_t keycode,
-                                     const xkb_keysym_t** keysyms,
-                                     uint32_t* modifiers)
+                                    const xkb_keysym_t** keysyms,
+                                    uint32_t* modifiers)
   {
     *modifiers = wlr_keyboard_get_modifiers(device.keyboard);
 
-    xkb_layout_index_t layout_index =
-      xkb_state_key_get_layout(device.keyboard->xkb_state, keycode);
-    return xkb_keymap_key_get_syms_by_level(device.keyboard->keymap, keycode,
-                                            layout_index, 0, keysyms);
+    xkb_layout_index_t layout_index = xkb_state_key_get_layout(device.keyboard->xkb_state, keycode);
+    return xkb_keymap_key_get_syms_by_level(device.keyboard->keymap, keycode, layout_index, 0,
+                                            keysyms);
   }
 
   void Keyboard::handle_key(wlr::event_keyboard_key_t& event)
@@ -271,25 +286,21 @@ namespace cloth {
     // Handle translated keysyms
 
     std::size_t keysyms_len = keysyms_translated(keycode, &keysyms, &modifiers);
-    pressed_keysyms_update(pressed_keysyms_translated, keysyms, keysyms_len,
-                           event.state);
+    pressed_keysyms_update(pressed_keysyms_translated, keysyms, keysyms_len, event.state);
     if (event.state == WLR_KEY_RELEASED) {
-      handled = execute_binding(pressed_keysyms_translated, modifiers,
-                                         keysyms, keysyms_len);
+      handled = execute_binding(pressed_keysyms_translated, modifiers, keysyms, keysyms_len);
     }
 
     // Handle raw keysyms
     keysyms_len = keysyms_raw(keycode, &keysyms, &modifiers);
     pressed_keysyms_update(pressed_keysyms_raw, keysyms, keysyms_len, event.state);
     if (event.state == WLR_KEY_PRESSED && !handled) {
-      handled = execute_binding(pressed_keysyms_raw, modifiers,
-                                         keysyms, keysyms_len);
+      handled = execute_binding(pressed_keysyms_raw, modifiers, keysyms, keysyms_len);
     }
 
     if (!handled) {
       wlr_seat_set_keyboard(seat.wlr_seat, &device);
-      wlr_seat_keyboard_notify_key(seat.wlr_seat, event.time_msec, event.keycode,
-                                   event.state);
+      wlr_seat_keyboard_notify_key(seat.wlr_seat, event.time_msec, event.keycode, event.state);
     }
   }
 
@@ -299,8 +310,7 @@ namespace cloth {
     wlr_seat_keyboard_notify_modifiers(seat.wlr_seat, &device.keyboard->modifiers);
   }
 
-  static void keyboard_config_merge(Config::Keyboard& config,
-                                    Config::Keyboard* fallback)
+  static void keyboard_config_merge(Config::Keyboard& config, Config::Keyboard* fallback)
   {
     if (fallback == nullptr) return;
     if (config.rules.empty()) {
@@ -332,8 +342,7 @@ namespace cloth {
     }
   }
 
-  Keyboard::Keyboard(Seat& seat, wlr::input_device_t& device)
-   : seat (seat), device (device)
+  Keyboard::Keyboard(Seat& seat, wlr::input_device_t& device) : seat(seat), device(device)
   {
     assert(device.type == WLR_INPUT_DEVICE_KEYBOARD);
 
@@ -379,7 +388,7 @@ namespace cloth {
     wlr_keyboard_set_repeat_info(device.keyboard, repeat_rate, repeat_delay);
 
     on_keyboard_key.add_to(device.keyboard->events.key);
-    on_keyboard_key = [this] (void* data) {
+    on_keyboard_key = [this](void* data) {
       Desktop& desktop = this->seat.input.server.desktop;
       wlr_idle_notify_activity(desktop.idle, this->seat.wlr_seat);
       auto& event = *(wlr::event_keyboard_key_t*) data;

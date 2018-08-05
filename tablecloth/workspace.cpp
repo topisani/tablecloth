@@ -120,11 +120,13 @@ namespace cloth {
   auto Workspace::add_view(std::unique_ptr<View>&& view_ptr) -> View&
   {
     view_ptr->workspace = this;
+    view_ptr->damage_whole();
     return _views.push_back(std::move(view_ptr));
   }
 
   auto Workspace::erase_view(View& v) -> std::unique_ptr<View>
   {
+    v.damage_whole();
     return _views.erase(v);
   }
 

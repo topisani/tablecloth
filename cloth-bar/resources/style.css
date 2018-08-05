@@ -7,6 +7,7 @@
     padding-bottom: 0px;
     margin-top: 0px;
     margin-bottom: 0px;
+    min-height: 0px;
 }
 
 window {
@@ -18,12 +19,14 @@ window {
 
 .focused-window-title {
     padding: 0px 10px;
+    min-height: 0px;
 }
 
 .workspace-selector {
 }
 
 .workspace-selector button {
+    min-height: 0px;
     padding: 0px 0px;
     background: black;
     color: white;
@@ -31,4 +34,9 @@ window {
 
 .workspace-selector button.current {
     background: blue;
+}
+
+.clock-widget {
+    padding: 0px 10px;
+    min-height: 0px;
 }

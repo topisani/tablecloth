@@ -13,7 +13,8 @@ namespace cloth {
 
   void XwaylandSurface::do_activate(bool active)
   {
-    wlr_xwayland_surface_activate(xwayland_surface, active);
+    if (!xwayland_surface->override_redirect)
+      wlr_xwayland_surface_activate(xwayland_surface, active);
   }
 
   void XwaylandSurface::apply_size_constraints(int width,
@@ -195,11 +196,10 @@ namespace cloth {
         // Usually set on popup windows (like menus, dropdowns etc) to make sure the
         // compositor stays out of it
         //
-        // rootston sets focus here, but that makes chrome's popup menus instantly unmap
-        // and so far it seems to work without it
-        //
-        // I could be worried that a popup that needs keyboard input would not work like this,
-        // and we may need to find a new solution
+        // Seat::set_focus() checks this variable, and does not deactivate the previously focused
+        // window if it is set That code should probably check if the previously focused window is
+        // indeed the parent
+        initial_focus();
       } else {
         if (surface.decorations == WLR_XWAYLAND_SURFACE_DECORATIONS_ALL) {
           // TODO: Desired behaviour?

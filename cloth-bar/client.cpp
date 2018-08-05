@@ -34,6 +34,7 @@ namespace cloth::bar {
   {
     auto cli = make_cli();
     auto result = cli.parse(clara::Args(argc, argv));
+
     if (!result) {
       LOGE("Error in command line: {}", result.errorMessage());
       return 1;

@@ -18,7 +18,7 @@ namespace cloth::bar {
   namespace wl = wayland;
 
   struct Client {
-    int height = 16;
+    int height = 26;
     bool show_help = false;
     std::string css_file = "./cloth-bar/resources/style.css";
 
