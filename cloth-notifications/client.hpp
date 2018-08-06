@@ -29,19 +29,12 @@ namespace cloth::notifications {
     Glib::RefPtr<Gdk::Display> gdk_display;
     wl::display_t display;
     wl::registry_t registry;
-    wl::workspace_manager_t workspaces;
-    wl::cloth_window_manager_t window_manager;
     wl::zwlr_layer_shell_v1_t layer_shell;
     DBus::BusDispatcher dispatcher;
     std::thread dbus_thread;
 
     Glib::RefPtr<Gtk::StyleContext> style_context;
     Glib::RefPtr<Gtk::CssProvider> css_provider;
-
-    struct {
-      sigc::signal<void(int, int)> workspace_state;
-      sigc::signal<void(std::string)> focused_window_name;
-    } signals;
 
     Client(int argc, char* argv[])
       : gtk_main(argc, argv),

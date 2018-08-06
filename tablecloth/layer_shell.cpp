@@ -283,7 +283,7 @@ namespace cloth {
     on_surface_commit = [this] (void* data) {
       wlr::box_t old_geo = geo;
       arrange_layers(output);
-      if (old_geo == geo) {
+      if (old_geo != geo) {
         output.damage_whole_local_surface(*layer_surface.surface, old_geo.x, old_geo.y);
         output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
       } else {

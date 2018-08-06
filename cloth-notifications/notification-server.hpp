@@ -21,19 +21,29 @@ namespace cloth::notifications {
   struct Client;
   struct NotificationServer;
 
+  enum struct Urgency {
+    Low = 0, Normal = 1, Critical = 2
+  };
+
   struct Notification {
+
+    static constexpr unsigned max_image_width = 100;
+    static constexpr unsigned max_image_height = 100;
+
     Notification(NotificationServer& server,
                  unsigned id,
                  const std::string& title,
                  const std::string& body,
                  const std::vector<std::string>& actions,
-                 const std::string& app_icon);
+                 Urgency urgency,
+                 Glib::RefPtr<Gdk::Pixbuf> image = {});
 
     ~Notification();
 
     NotificationServer& server;
     const unsigned id;
 
+    Glib::RefPtr<Gdk::Pixbuf> pixbuf;
     Gtk::Window window;
     Gtk::Image image;
     Gtk::Label title;
@@ -50,11 +60,12 @@ namespace cloth::notifications {
     static inline const std::string server_path = "/org/freedesktop/Notifications";
     static inline const std::string server_name = "org.freedesktop.Notifications";
 
+
     NotificationServer(Client& client, DBus::Connection& connection)
       : DBus::ObjectAdaptor(connection, server_path), client(client)
     {}
 
-    auto GetCapabilities() -> std::vector<std::string> override;
+    auto GetCapabilities(DBus::Error& e) -> std::vector<std::string> override;
     auto Notify(const std::string&,
                 const uint32_t&,
                 const std::string&,
@@ -62,9 +73,9 @@ namespace cloth::notifications {
                 const std::string&,
                 const std::vector<std::string>&,
                 const std::map<std::string, ::DBus::Variant>&,
-                const int32_t&) -> uint32_t override;
-    auto CloseNotification(const uint32_t&) -> void override;
-    auto GetServerInformation(std::string&, std::string&, std::string&, std::string&)
+                const int32_t&, DBus::Error& e) -> uint32_t override;
+    auto CloseNotification(const uint32_t&, DBus::Error& e) -> void override;
+    auto GetServerInformation(std::string&, std::string&, std::string&, std::string&, DBus::Error& e)
       -> void override;
 
     Client& client;

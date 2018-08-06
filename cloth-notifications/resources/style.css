@@ -3,16 +3,19 @@
     border-radius: 0;
     font-family: curie;
     font-size: 12px;
-    padding-top: 0px;
-    padding-bottom: 0px;
-    margin-top: 0px;
-    margin-bottom: 0px;
-    min-height: 0px;
 }
 
 window {
-    background: black;
-    opacity: 0.5;
+    background: #1472b3;
+    opacity: 0.75;
     border: none;
     color: white;
+}
+
+window.urgency-critical {
+    background: #d92817;
+}
+
+label {
+    padding: 10px;
 }

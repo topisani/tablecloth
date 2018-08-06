@@ -50,6 +50,8 @@ namespace cloth {
         data.layout.width = v.width * prev_ws_alpha;
         data.layout.height = v.height * prev_ws_alpha;
         data.layout.x -= dx;
+        data.layout.x += v.width * ws_alpha / 2.f;
+        data.layout.y += v.height * ws_alpha / 2.f;
         context.views.emplace_back(v, data);
       }
     }
@@ -67,8 +69,10 @@ namespace cloth {
         if (ws_alpha != 1.f) {
           data.layout.width = v.width * ws_alpha;
           data.layout.height = v.height * ws_alpha;
+          data.layout.y += v.height * prev_ws_alpha / 2.f;
+          data.layout.x += v.width * prev_ws_alpha / 2.f;
+          data.layout.x += dx;
         }
-        data.layout.x += dx;
         context.views.emplace_back(v, data);
       }
     }

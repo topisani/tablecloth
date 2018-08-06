@@ -9,21 +9,8 @@ namespace cloth::notifications {
     registry = display.get_registry();
     registry.on_global() = [&](uint32_t name, std::string interface, uint32_t version) {
       LOGD("Global: {}", interface);
-      if (interface == workspaces.interface_name) {
-        registry.bind(name, workspaces, version);
-        workspaces.on_state() = [&](unsigned current, unsigned count) {
-          signals.workspace_state.emit(current, count);
-        };
-      } else if (interface == window_manager.interface_name) {
-        registry.bind(name, window_manager, version);
-        window_manager.on_focused_window_name() = [&](const std::string& name, unsigned ws) {
-          signals.focused_window_name.emit(name);
-        };
-      } else if (interface == layer_shell.interface_name) {
+      if (interface == layer_shell.interface_name) {
         registry.bind(name, layer_shell, version);
-      } else if (interface == wl::output_t::interface_name) {
-        auto output = std::make_unique<wl::output_t>();
-        registry.bind(name, *output, version);
       }
     };
     display.roundtrip();
