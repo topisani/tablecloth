@@ -1,3 +1,4 @@
+
 [submodule "subprojects/wlroots"]
 	path = subprojects/wlroots
-	url = https://github.com/swaywm/wlroots
+	url = https://github.com/topisani/wlroots

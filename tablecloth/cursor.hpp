@@ -45,6 +45,8 @@ namespace cloth {
 
     wl::Listener on_tool_axis;
     wl::Listener on_tool_tip;
+    wl::Listener on_tool_proximity;
+    wl::Listener on_tool_button;
 
     wl::Listener on_request_set_cursor;
 
