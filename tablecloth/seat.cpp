@@ -79,8 +79,8 @@ namespace cloth {
     for (auto& touch : this->touch) {
       reset_device_mappings(touch.device);
     }
-    for (auto& tablet_tool : tablet_tools) {
-      reset_device_mappings(tablet_tool.device);
+    for (auto& tablet : tablets) {
+      reset_device_mappings(tablet.device);
     }
 
     // configure device to output mappings
@@ -97,8 +97,8 @@ namespace cloth {
       for (auto& pointer : pointers) {
         set_device_output_mappings(pointer.device, &output.wlr_output);
       }
-      for (auto& tablet_tool : tablet_tools) {
-        set_device_output_mappings(tablet_tool.device, &output.wlr_output);
+      for (auto& tablet : tablets) {
+        set_device_output_mappings(tablet.device, &output.wlr_output);
       }
       for (auto& touch : this->touch) {
         set_device_output_mappings(touch.device, &output.wlr_output);
@@ -171,7 +171,7 @@ namespace cloth {
     if (!keyboards.empty()) {
       caps |= WL_SEAT_CAPABILITY_KEYBOARD;
     }
-    if (!pointers.empty() || !tablet_tools.empty()) {
+    if (!pointers.empty() || !tablets.empty()) {
       caps |= WL_SEAT_CAPABILITY_POINTER;
     }
     if (!touch.empty()) {
@@ -220,23 +220,6 @@ namespace cloth {
     seat.configure_cursor();
   }
 
-  TabletTool::TabletTool(Seat& seat, wlr::input_device_t& device) noexcept
-    : seat(seat), device(device)
-  {
-    assert(device.type == WLR_INPUT_DEVICE_TABLET_TOOL);
-
-    device.data = this;
-    wlr_cursor_attach_input_device(seat.cursor.wlr_cursor, &device);
-
-    on_device_destroy.add_to(device.events.destroy);
-    on_device_destroy = [this] {
-      auto keep_alive = util::erase_this(this->seat.tablet_tools, this);
-      this->seat.update_capabilities();
-    };
-
-    seat.configure_cursor();
-  }
-
   Pointer::~Pointer() noexcept
   {
     wlr_cursor_detach_input_device(seat.cursor.wlr_cursor, &device);
@@ -244,12 +227,6 @@ namespace cloth {
   }
 
   Touch::~Touch() noexcept
-  {
-    wlr_cursor_detach_input_device(seat.cursor.wlr_cursor, &device);
-    this->seat.update_capabilities();
-  }
-
-  TabletTool::~TabletTool() noexcept
   {
     wlr_cursor_detach_input_device(seat.cursor.wlr_cursor, &device);
     this->seat.update_capabilities();
@@ -277,13 +254,14 @@ namespace cloth {
   void Seat::add_tablet_pad(wlr::input_device_t& device)
   {
     assert(device.type == WLR_INPUT_DEVICE_TABLET_PAD);
-    // TODO
+    tablet_pads.emplace_back(
+      *this, *wlr_tablet_pad_create(input.server.desktop.tablet_v2, wlr_seat, &device));
   }
 
   void Seat::add_tablet_tool(wlr::input_device_t& device)
   {
     assert(device.type == WLR_INPUT_DEVICE_TABLET_TOOL);
-    tablet_tools.emplace_back(*this, device);
+    tablets.emplace_back(*this, device);
   }
 
   void Seat::add_device(wlr::input_device_t& device) noexcept
@@ -490,7 +468,7 @@ namespace cloth {
     if (prev_focus != nullptr && !input.view_has_focus(*prev_focus)) {
       if (auto* xwl = dynamic_cast<XwaylandSurface*>(view);
           xwl && xwl->xwayland_surface->override_redirect) {
-        // NOTE: 
+        // NOTE:
         // This may not be the correct thing to do, but popup menus in chrome instantly disappear if
         // the parent window gets deactivated
       } else {
@@ -520,6 +498,13 @@ namespace cloth {
     if (keyboard != nullptr) {
       wlr_seat_keyboard_notify_enter(wlr_seat, view->wlr_surface, keyboard->keycodes,
                                      keyboard->num_keycodes, &keyboard->modifiers);
+      /* FIXME: Move this to a better place */
+      for (auto& pad : tablet_pads) {
+        if (pad.tablet) {
+          wlr_send_tablet_v2_tablet_pad_enter(&pad.tablet_v2_pad, &pad.tablet->tablet_v2,
+                                              view->wlr_surface);
+        }
+      }
     } else {
       wlr_seat_keyboard_notify_enter(wlr_seat, view->wlr_surface, nullptr, 0, nullptr);
     }

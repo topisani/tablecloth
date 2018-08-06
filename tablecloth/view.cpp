@@ -351,6 +351,7 @@ namespace cloth {
   {
     on_destroy = [this](void*) { finish(); };
     on_destroy.add_to(wlr_subsurface->events.destroy);
+    view.desktop.server.input.update_cursor_focus();
   }
 
   Subsurface& View::create_subsurface(wlr::subsurface_t& wlr_subsurface)
@@ -378,6 +379,7 @@ namespace cloth {
 
     this->mapped = true;
     damage_whole();
+    desktop.server.input.update_cursor_focus();
   }
 
   void View::unmap()
@@ -401,6 +403,22 @@ namespace cloth {
 
     wlr_surface = nullptr;
     width = height = 0;
+  }
+
+  void View::update_decorated(bool decorated)
+  {
+    if (this->decorated == decorated) return;
+
+    damage_whole();
+    this->decorated = decorated;
+    if (decorated) {
+      border_width = 4;
+      titlebar_height = 12;
+    } else {
+      border_width = 0;
+      titlebar_height = 0;
+    }
+    damage_whole();
   }
 
   void View::initial_focus()

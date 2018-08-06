@@ -1,14 +1,14 @@
 #include "layers.hpp"
 
 #include "util/algorithm.hpp"
-#include "util/logging.hpp"
 #include "util/exception.hpp"
+#include "util/logging.hpp"
 #include "wlroots.hpp"
 
 #include "desktop.hpp"
 #include "output.hpp"
-#include "server.hpp"
 #include "seat.hpp"
+#include "server.hpp"
 
 namespace cloth {
 
@@ -29,7 +29,10 @@ namespace cloth {
     on_unmap.add_to(wlr_popup.base->events.unmap);
     on_unmap = damage_whole;
     on_map.add_to(wlr_popup.base->events.map);
-    on_map = damage_whole;
+    on_map = [this, damage_whole] {
+      damage_whole();
+      parent.output.desktop.server.input.update_cursor_focus();
+    };
     on_commit.add_to(wlr_popup.base->surface->events.commit);
     on_commit = damage_whole;
 
@@ -238,11 +241,11 @@ namespace cloth {
     if (!layer_surface.output) {
       Seat* seat = server.input.last_active_seat();
       assert(seat); // TODO: Technically speaking we should handle this case
-      wlr::output_t* output = wlr_output_layout_output_at(layout, seat->cursor.wlr_cursor->x,
-                                                          seat->cursor.wlr_cursor->y);
+      wlr::output_t* output =
+        wlr_output_layout_output_at(layout, seat->cursor.wlr_cursor->x, seat->cursor.wlr_cursor->y);
       if (!output) {
         LOGE("Couldn't find output at (%.0f,%.0f)", seat->cursor.wlr_cursor->x,
-                seat->cursor.wlr_cursor->y);
+             seat->cursor.wlr_cursor->y);
         output = wlr_output_layout_get_center_output(layout);
       }
       if (output) {
@@ -256,8 +259,8 @@ namespace cloth {
     auto* output = output_from_wlr_output(layer_surface.output);
     if (!output) output = &outputs.front();
 
-    [[maybe_unused]]
-    auto& layer = output->layers[layer_surface.layer].emplace_back(*output, layer_surface);
+    [[maybe_unused]] auto& layer =
+      output->layers[layer_surface.layer].emplace_back(*output, layer_surface);
 
     // Temporarily set the layer's current state to client_pending
     // So that we can easily arrange it
@@ -269,7 +272,8 @@ namespace cloth {
     layer_surface.current = old_state;
   }
 
-  LayerPopup& LayerSurface::create_popup(wlr::xdg_popup_v6_t& wlr_popup) {
+  LayerPopup& LayerSurface::create_popup(wlr::xdg_popup_v6_t& wlr_popup)
+  {
     auto popup = std::make_unique<LayerPopup>(*this, wlr_popup);
     return children.push_back(std::move(popup));
   }
@@ -280,7 +284,7 @@ namespace cloth {
     layer_surface.data = this;
 
     on_surface_commit.add_to(layer_surface.surface->events.commit);
-    on_surface_commit = [this] (void* data) {
+    on_surface_commit = [this](void* data) {
       wlr::box_t old_geo = geo;
       arrange_layers(output);
       if (old_geo != geo) {
@@ -292,14 +296,14 @@ namespace cloth {
     };
 
     on_output_destroy.add_to(layer_surface.output->events.destroy);
-    on_output_destroy = [this] (void* data) {
+    on_output_destroy = [this](void* data) {
       layer_surface.output = nullptr;
       on_output_destroy.remove();
       wlr_layer_surface_close(&layer_surface);
     };
 
     on_destroy.add_to(layer_surface.events.destroy);
-    on_destroy = [this] (void* data) {
+    on_destroy = [this](void* data) {
       if (layer_surface.mapped) {
         output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
       }
@@ -307,21 +311,21 @@ namespace cloth {
       arrange_layers(output);
     };
     on_map.add_to(layer_surface.events.map);
-    on_map = [this] (void* data) {
+    on_map = [this](void* data) {
       output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
       wlr_surface_send_enter(layer_surface.surface, &output.wlr_output);
     };
     on_unmap.add_to(layer_surface.events.unmap);
-    on_unmap = [this] (void* data) {
-       output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
+    on_unmap = [this](void* data) {
+      output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
+      output.desktop.server.input.update_cursor_focus();
     };
     on_new_popup.add_to(layer_surface.events.new_popup);
-    on_new_popup = [this] (void* data) {
+    on_new_popup = [this](void* data) {
       auto& wlr_popup = *(wlr::xdg_popup_v6_t*) data;
       create_popup(wlr_popup);
     };
     // TODO: Listen for subsurfaces
-
   }
 
 } // namespace cloth

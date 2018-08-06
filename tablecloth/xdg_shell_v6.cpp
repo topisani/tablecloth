@@ -6,8 +6,8 @@
 
 #include "desktop.hpp"
 #include "input.hpp"
-#include "server.hpp"
 #include "seat.hpp"
+#include "server.hpp"
 
 namespace cloth {
 
@@ -17,11 +17,16 @@ namespace cloth {
     on_destroy.add_to(wlr_popup->base->events.destroy);
     on_destroy = [this] { util::erase_this(view.children, this); };
     on_new_popup.add_to(wlr_popup->base->events.new_popup);
-    on_new_popup = [this](void* data) { dynamic_cast<XdgSurfaceV6&>(view).create_popup(*((wlr::xdg_popup_v6_t*) data)); };
+    on_new_popup = [this](void* data) {
+      dynamic_cast<XdgSurfaceV6&>(view).create_popup(*((wlr::xdg_popup_v6_t*) data));
+    };
     on_unmap.add_to(wlr_popup->base->events.unmap);
     on_unmap = [this] { view.damage_whole(); };
     on_map.add_to(wlr_popup->base->events.map);
-    on_map = [this] { view.damage_whole(); };
+    on_map = [this] {
+      view.damage_whole();
+      view.desktop.server.input.update_cursor_focus();
+    };
 
     // TODO: Desired behaviour?
     unconstrain();
@@ -43,7 +48,7 @@ namespace cloth {
 
     int popup_lx, popup_ly;
     wlr_xdg_popup_v6_get_toplevel_coords(wlr_popup, wlr_popup->geometry.x, wlr_popup->geometry.y,
-                                      &popup_lx, &popup_ly);
+                                         &popup_lx, &popup_ly);
     popup_lx += view.x;
     popup_ly += view.y;
 
@@ -88,9 +93,9 @@ namespace cloth {
   }
 
   void XdgSurfaceV6::apply_size_constraints(int width,
-                                          int height,
-                                          int& dest_width,
-                                          int& dest_height)
+                                            int height,
+                                            int& dest_width,
+                                            int& dest_height)
   {
     dest_width = width;
     dest_height = height;
@@ -146,7 +151,8 @@ namespace cloth {
     this->pending_move_resize.width = constrained_width;
     this->pending_move_resize.height = constrained_height;
 
-    uint32_t serial = wlr_xdg_toplevel_v6_set_size(xdg_surface, constrained_width, constrained_height);
+    uint32_t serial =
+      wlr_xdg_toplevel_v6_set_size(xdg_surface, constrained_width, constrained_height);
     if (serial > 0) {
       pending_move_resize_configure_serial = serial;
     } else if (pending_move_resize_configure_serial == 0) {
@@ -182,7 +188,8 @@ namespace cloth {
     wlr_xdg_surface_v6_send_close(xdg_surface);
   }
 
-  XdgPopupV6& XdgSurfaceV6::create_popup(wlr::xdg_popup_v6_t& wlr_popup) {
+  XdgPopupV6& XdgSurfaceV6::create_popup(wlr::xdg_popup_v6_t& wlr_popup)
+  {
     auto popup = std::make_unique<XdgPopupV6>(*this, &wlr_popup);
     children.push_back(std::move(popup));
     return *popup;
@@ -248,24 +255,22 @@ namespace cloth {
       auto size = get_size();
       update_size(size.width, size.height);
 
-    	uint32_t pending_serial = pending_move_resize_configure_serial;
-    	if (pending_serial > 0 && pending_serial >= this->xdg_surface->configure_serial) {
-    		double x = this->x;
-    		double y = this->y;
-    		if (pending_move_resize.update_x) {
-    			x = pending_move_resize.x + pending_move_resize.width -
-    				size.width;
-    		}
-    		if (pending_move_resize.update_y) {
-    			y = pending_move_resize.y + pending_move_resize.height -
-    				size.height;
-    		}
-    		update_position(x, y);
+      uint32_t pending_serial = pending_move_resize_configure_serial;
+      if (pending_serial > 0 && pending_serial >= this->xdg_surface->configure_serial) {
+        double x = this->x;
+        double y = this->y;
+        if (pending_move_resize.update_x) {
+          x = pending_move_resize.x + pending_move_resize.width - size.width;
+        }
+        if (pending_move_resize.update_y) {
+          y = pending_move_resize.y + pending_move_resize.height - size.height;
+        }
+        update_position(x, y);
 
-    		if (pending_serial == this->xdg_surface->configure_serial) {
-    			pending_move_resize_configure_serial = 0;
-    		}
-    	}
+        if (pending_serial == this->xdg_surface->configure_serial) {
+          pending_move_resize_configure_serial = 0;
+        }
+      }
     };
 
     on_new_popup.add_to(xdg_surface->events.new_popup);
@@ -285,9 +290,7 @@ namespace cloth {
     };
 
     on_unmap.add_to(xdg_surface->events.unmap);
-    on_unmap = [this](void* data) {
-      unmap();
-    };
+    on_unmap = [this](void* data) { unmap(); };
 
     on_destroy.add_to(xdg_surface->events.destroy);
     on_destroy = [this] { workspace->erase_view(*this); };
@@ -302,7 +305,8 @@ namespace cloth {
       return;
     }
 
-    LOGD("new xdg V6 toplevel: title={}, class={}", util::nonull(surface.toplevel->title), util::nonull(surface.toplevel->app_id));
+    LOGD("new xdg V6 toplevel: title={}, class={}", util::nonull(surface.toplevel->title),
+         util::nonull(surface.toplevel->app_id));
     wlr_xdg_surface_v6_ping(&surface);
 
     // TODO: get the correct output instead
@@ -311,11 +315,11 @@ namespace cloth {
     auto& view = *view_ptr;
     workspace->add_view(std::move(view_ptr));
 
-  	if (surface.toplevel->client_pending.maximized) {
-  		view.maximize(true);
-  	}
-  	if (surface.toplevel->client_pending.fullscreen) {
-  		view.set_fullscreen(true, nullptr);
-  	}
+    if (surface.toplevel->client_pending.maximized) {
+      view.maximize(true);
+    }
+    if (surface.toplevel->client_pending.fullscreen) {
+      view.set_fullscreen(true, nullptr);
+    }
   }
 } // namespace cloth

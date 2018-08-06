@@ -34,6 +34,7 @@ namespace cloth {
     // These are implemented in the src/*_shell.cpp files
     void handle_xdg_shell_v6_surface(void* data);
     void handle_xdg_shell_surface(void* data);
+    void handle_xdg_toplevel_decoration(void* data);
     void handle_wl_shell_surface(void* data);
     void handle_layer_shell_surface(void* data);
     void handle_xwayland_surface(void* data);
@@ -59,17 +60,20 @@ namespace cloth {
     wlr::xdg_shell_v6_t* xdg_shell_v6 = nullptr;
     wlr::xdg_shell_t* xdg_shell = nullptr;
     wlr::gamma_control_manager_t* gamma_control_manager = nullptr;
+    wlr::gamma_control_manager_v1_t* gamma_control_manager_v1 = nullptr;
     wlr::screenshooter_t* screenshooter = nullptr;
     wlr::export_dmabuf_manager_v1_t* export_dmabuf_manager_v1 = nullptr;
     wlr::server_decoration_manager_t* server_decoration_manager = nullptr;
+    wlr::xdg_decoration_manager_v1_t* xdg_decoration_manager_v1 = nullptr;
     wlr::primary_selection_device_manager_t* primary_selection_device_manager = nullptr;
     wlr::idle_t* idle = nullptr;
     wlr::idle_inhibit_manager_v1_t* idle_inhibit = nullptr;
     wlr::input_inhibit_manager_t* input_inhibit = nullptr;
-    wlr::linux_dmabuf_t* linux_dmabuf = nullptr;
+    wlr::linux_dmabuf_v1_t* linux_dmabuf = nullptr;
     wlr::layer_shell_t* layer_shell = nullptr;
     wlr::virtual_keyboard_manager_v1_t* virtual_keyboard = nullptr;
     wlr::screencopy_manager_v1_t* screencopy = nullptr;
+    wlr::tablet_manager_v2_t* tablet_v2 = nullptr;
 
   protected:
     wl::Listener on_new_output;
@@ -78,7 +82,7 @@ namespace cloth {
     wl::Listener on_xdg_shell_surface;
     wl::Listener on_wl_shell_surface;
     wl::Listener on_layer_shell_surface;
-    wl::Listener on_decoration_new;
+    wl::Listener on_xdg_toplevel_decoration;
     wl::Listener on_input_inhibit_activate;
     wl::Listener on_input_inhibit_deactivate;
     wl::Listener on_virtual_keyboard_new;

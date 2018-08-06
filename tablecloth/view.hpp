@@ -119,6 +119,7 @@ namespace cloth {
     void damage_whole();
     void update_position(double x, double y);
     void update_size(uint32_t width, uint32_t height);
+    void update_decorated(bool decorated);
     void initial_focus();
     void map(wlr::surface_t& surface);
     void unmap();
@@ -226,6 +227,7 @@ namespace cloth {
     XdgPopupV6& create_popup(wlr::xdg_popup_v6_t& wlr_popup);
 
     auto get_name() -> std::string override;
+
   protected:
     wl::Listener on_destroy;
     wl::Listener on_new_popup;
@@ -251,9 +253,15 @@ namespace cloth {
     void apply_size_constraints(int width, int height, int& dest_width, int& dest_height);
   };
 
+  struct XdgToplevelDecoration;
+
   struct XdgSurface : View {
     XdgSurface(Workspace& workspace, wlr::xdg_surface_t* wlr_surface);
+    ~XdgSurface() noexcept;
+
     wlr::xdg_surface_t* xdg_surface;
+
+    std::unique_ptr<XdgToplevelDecoration> xdg_toplevel_decoration;
 
     uint32_t pending_move_resize_configure_serial;
 
@@ -285,6 +293,17 @@ namespace cloth {
     void apply_size_constraints(int width, int height, int& dest_width, int& dest_height);
   };
 
+  struct XdgToplevelDecoration {
+    XdgToplevelDecoration(XdgSurface& , wlr::xdg_toplevel_decoration_v1_t& xdg_deco);
+
+    XdgSurface& surface;
+    wlr::xdg_toplevel_decoration_v1_t& wlr_decoration;
+
+    wl::Listener on_destroy;
+    wl::Listener on_request_mode;
+    wl::Listener on_surface_commit;
+  };
+
   struct XwaylandSurface : View {
     XwaylandSurface(Workspace& workspace, wlr::xwayland_surface_t* wlr_surface);
     wlr::xwayland_surface_t* xwayland_surface;
@@ -297,7 +316,8 @@ namespace cloth {
     void do_set_fullscreen(bool fullscreen) override;
     void do_close() override;
 
-    ViewChild& create_popup(wlr::surface_t& wlr_popup) {
+    ViewChild& create_popup(wlr::surface_t& wlr_popup)
+    {
       assert(false);
     }
 

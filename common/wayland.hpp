@@ -166,6 +166,10 @@ namespace cloth::wl {
       _listener.link = {nullptr, nullptr};
     }
 
+
+    void operator()(void* data = nullptr) {
+      if (_func) (*_func)(data);
+    }
   private:
     std::function<void(void* data)>* _func;
     struct wl_listener _listener;

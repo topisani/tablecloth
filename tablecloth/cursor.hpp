@@ -13,6 +13,8 @@ namespace cloth {
     Cursor(Seat& seat, wlr::cursor_t* cursor) noexcept;
     ~Cursor() noexcept;
 
+    void update_position(uint32_t time);
+
     // Member data
 
     Seat& seat;
@@ -52,7 +54,6 @@ namespace cloth {
 
   private:
     void passthrough_cursor(uint32_t time);
-    void update_position(uint32_t time);
     void press_button(wlr::input_device_t& device,
                       uint32_t time,
                       wlr::Button button,

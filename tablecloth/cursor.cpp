@@ -10,12 +10,57 @@
 #include "desktop.hpp"
 #include "input.hpp"
 #include "seat.hpp"
-#include "xcursor.hpp"
 #include "server.hpp"
+#include "xcursor.hpp"
 
 namespace cloth {
 
-  Cursor::Cursor(Seat& p_seat, wlr::cursor_t* p_cursor) noexcept : seat(p_seat), wlr_cursor(p_cursor), default_xcursor(xcursor_default)
+  static void handle_tablet_tool_position(Cursor& cursor,
+                                          Tablet& tablet,
+                                          wlr::tablet_tool_t* wlr_tool,
+                                          bool change_x,
+                                          bool change_y,
+                                          double x,
+                                          double y,
+                                          double dx,
+                                          double dy)
+  {
+    if (!change_x && !change_y) {
+      return;
+    }
+    switch (wlr_tool->type) {
+    case WLR_TABLET_TOOL_TYPE_MOUSE:
+      // They are 0 either way when they weren't modified
+      wlr_cursor_move(cursor.wlr_cursor, &tablet.device, dx, dy);
+      break;
+    default:
+      wlr_cursor_warp_absolute(cursor.wlr_cursor, &tablet.device, change_x ? x : NAN,
+                               change_y ? y : NAN);
+    }
+    double sx, sy;
+    View* view = nullptr;
+    Seat& seat = cursor.seat;
+    Desktop& desktop = seat.input.server.desktop;
+    wlr::surface_t* surface =
+      desktop.surface_at(cursor.wlr_cursor->x, cursor.wlr_cursor->y, sx, sy, view);
+    auto& tool = *(TabletTool*) wlr_tool->data;
+    if (!surface) {
+      wlr_send_tablet_v2_tablet_tool_proximity_out(&tool.tablet_v2_tool);
+      /* XXX: TODO: Fallback pointer semantics */
+      return;
+    }
+    if (!wlr_surface_accepts_tablet_v2(&tablet.tablet_v2, surface)) {
+      wlr_send_tablet_v2_tablet_tool_proximity_out(&tool.tablet_v2_tool);
+      /* XXX: TODO: Fallback pointer semantics */
+      return;
+    }
+    wlr_send_tablet_v2_tablet_tool_proximity_in(&tool.tablet_v2_tool, &tablet.tablet_v2, surface);
+    wlr_send_tablet_v2_tablet_tool_motion(&tool.tablet_v2_tool, sx, sy);
+  }
+
+
+  Cursor::Cursor(Seat& p_seat, wlr::cursor_t* p_cursor) noexcept
+    : seat(p_seat), wlr_cursor(p_cursor), default_xcursor(xcursor_default)
   {
     Desktop& desktop = seat.input.server.desktop;
     wlr_cursor_attach_output_layout(wlr_cursor, desktop.layout);
@@ -133,16 +178,34 @@ namespace cloth {
     on_tool_axis = [this](void* data) {
       wlr_idle_notify_activity(seat.input.server.desktop.idle, seat.wlr_seat);
       auto* event = (wlr::event_tablet_tool_axis_t*) data;
-      if ((event->updated_axes & WLR_TABLET_TOOL_AXIS_X) &&
-          (event->updated_axes & WLR_TABLET_TOOL_AXIS_Y)) {
-        wlr_cursor_warp_absolute(wlr_cursor, event->device, event->x, event->y);
-        update_position(event->time_msec);
-      } else if ((event->updated_axes & WLR_TABLET_TOOL_AXIS_X)) {
-        wlr_cursor_warp_absolute(wlr_cursor, event->device, event->x, -1);
-        update_position(event->time_msec);
-      } else if ((event->updated_axes & WLR_TABLET_TOOL_AXIS_Y)) {
-        wlr_cursor_warp_absolute(wlr_cursor, event->device, -1, event->y);
-        update_position(event->time_msec);
+      assert(event->tool->data);
+      auto& tool = *(TabletTool*) event->tool->data;
+      auto& tablet = *(Tablet*) event->device->data;
+
+      /**
+       * We need to handle them ourselves, not pass it into the cursor
+       * without any consideration
+       */
+      handle_tablet_tool_position(
+        *this, tablet, event->tool, event->updated_axes & WLR_TABLET_TOOL_AXIS_X,
+        event->updated_axes & WLR_TABLET_TOOL_AXIS_Y, event->x, event->y, event->dx, event->dy);
+      if (event->updated_axes & WLR_TABLET_TOOL_AXIS_PRESSURE) {
+        wlr_send_tablet_v2_tablet_tool_pressure(&tool.tablet_v2_tool, event->pressure);
+      }
+      if (event->updated_axes & WLR_TABLET_TOOL_AXIS_DISTANCE) {
+        wlr_send_tablet_v2_tablet_tool_distance(&tool.tablet_v2_tool, event->distance);
+      }
+      if (event->updated_axes & (WLR_TABLET_TOOL_AXIS_TILT_X | WLR_TABLET_TOOL_AXIS_TILT_Y)) {
+        wlr_send_tablet_v2_tablet_tool_tilt(&tool.tablet_v2_tool, event->tilt_x, event->tilt_y);
+      }
+      if (event->updated_axes & WLR_TABLET_TOOL_AXIS_ROTATION) {
+        wlr_send_tablet_v2_tablet_tool_rotation(&tool.tablet_v2_tool, event->rotation);
+      }
+      if (event->updated_axes & WLR_TABLET_TOOL_AXIS_SLIDER) {
+        wlr_send_tablet_v2_tablet_tool_slider(&tool.tablet_v2_tool, event->slider);
+      }
+      if (event->updated_axes & WLR_TABLET_TOOL_AXIS_WHEEL) {
+        wlr_send_tablet_v2_tablet_tool_wheel(&tool.tablet_v2_tool, event->wheel_delta, 0);
       }
     };
 
@@ -150,8 +213,40 @@ namespace cloth {
     on_tool_tip = [this](void* data) {
       wlr_idle_notify_activity(seat.input.server.desktop.idle, seat.wlr_seat);
       auto* event = (wlr::event_tablet_tool_tip_t*) data;
-      press_button(*event->device, event->time_msec, wlr::Button::left,
-                   wlr::button_state_t(event->state), wlr_cursor->x, wlr_cursor->y);
+      auto& tool = *(TabletTool*) event->tool->data;
+
+      if (event->state == WLR_TABLET_TOOL_TIP_DOWN) {
+        wlr_send_tablet_v2_tablet_tool_down(&tool.tablet_v2_tool);
+      } else {
+        wlr_send_tablet_v2_tablet_tool_up(&tool.tablet_v2_tool);
+      }
+    };
+
+    on_tool_proximity.add_to(wlr_cursor->events.tablet_tool_proximity);
+    on_tool_proximity = [this](void* data) {
+      Desktop& desktop = seat.input.server.desktop;
+      wlr_idle_notify_activity(seat.input.server.desktop.idle, seat.wlr_seat);
+      auto* event = (wlr::event_tablet_tool_proximity_t*) data;
+      wlr::tablet_tool_t* wlr_tool = event->tool;
+      if (!wlr_tool->data) {
+        // This is attached to wlr_tool.data, and deleted when wlr_tool is destroyed
+        // TODO: cleaner solution? I mean, this works fine...
+        new TabletTool(seat, *wlr_tablet_tool_create(desktop.tablet_v2, seat.wlr_seat, wlr_tool));
+      }
+      handle_tablet_tool_position(*this, *(Tablet*) event->device->data, event->tool, true, true, event->x,
+                                  event->y, 0, 0);
+    };
+
+
+    on_tool_button.add_to(wlr_cursor->events.tablet_tool_button);
+    on_tool_button = [this](void* data) {
+      wlr_idle_notify_activity(seat.input.server.desktop.idle, seat.wlr_seat);
+      auto* event = (wlr::event_tablet_tool_button_t*) data;
+      auto& tool = *(TabletTool*) event->tool->data;
+
+      wlr_send_tablet_v2_tablet_tool_button(&tool.tablet_v2_tool,
+                                            (enum zwp_tablet_pad_v2_button_state) event->button,
+                                            (enum zwp_tablet_pad_v2_button_state) event->state);
     };
 
     on_request_set_cursor.add_to(seat.wlr_seat->events.request_set_cursor);
@@ -164,10 +259,9 @@ namespace cloth {
       if (has_focused) {
         focused_client = wl_resource_get_client(focused_surface->resource);
       }
-      if (event->seat_client->client != focused_client ||
-          mode != Mode::Passthrough) {
+      if (event->seat_client->client != focused_client || mode != Mode::Passthrough) {
         LOGD("Denying request to set cursor from unfocused client");
-        //return;
+        // return;
       }
 
       wlr_cursor_set_surface(wlr_cursor, event->surface, event->hotspot_x, event->hotspot_y);
@@ -212,8 +306,11 @@ namespace cloth {
     }
 
     if (surface) {
+      bool focus_changed = seat.wlr_seat->pointer_state.focused_surface != surface;
       wlr_seat_pointer_notify_enter(seat.wlr_seat, surface, sx, sy);
-      wlr_seat_pointer_notify_motion(seat.wlr_seat, time, sx, sy);
+      if (focus_changed) {
+        wlr_seat_pointer_notify_motion(seat.wlr_seat, time, sx, sy);
+      }
     } else {
       wlr_seat_pointer_clear_focus(seat.wlr_seat);
     }
@@ -330,7 +427,7 @@ namespace cloth {
       switch (state) {
       case WLR_BUTTON_RELEASED:
         if (!is_touch) {
-          update_position(time);
+          // update_position(time);
         }
         break;
       case WLR_BUTTON_PRESSED:

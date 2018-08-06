@@ -41,15 +41,16 @@ namespace cloth {
       }
 
       auto& seat = get_seat(seat_name);
-      LOGD("New input device: {} ({}:{}) {} seat:{}", device->name, device->vendor,
-              device->product, device_type(device->type), seat_name);
+      LOGD("New input device: {} ({}:{}) {} seat:{}", device->name, device->vendor, device->product,
+           device_type(device->type), seat_name);
 
       seat.add_device(*device);
 
       if (dc && wlr_input_device_is_libinput(device)) {
         struct libinput_device* libinput_dev = wlr_libinput_get_device_handle(device);
 
-        LOGD("input has config, tap_enabled: {}", dc->tap_enabled);;
+        LOGD("input has config, tap_enabled: {}", dc->tap_enabled);
+        ;
         if (dc->tap_enabled) {
           libinput_device_config_tap_set_enabled(libinput_dev, LIBINPUT_CONFIG_TAP_ENABLED);
         }
@@ -103,4 +104,12 @@ namespace cloth {
     }
     return false;
   }
+
+  void Input::update_cursor_focus()
+  {
+    for (auto& seat : seats) {
+      seat.cursor.update_position(chrono::duration_cast<chrono::milliseconds>(chrono::clock::now().time_since_epoch()).count());
+    };
+  }
+
 } // namespace cloth

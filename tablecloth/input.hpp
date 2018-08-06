@@ -18,6 +18,7 @@ namespace cloth {
     bool view_has_focus(View& view);
     Seat& get_seat(const std::string&);
     Seat* last_active_seat();
+    void update_cursor_focus();
     Seat& create_seat(const std::string& name);
 
     Server& server;

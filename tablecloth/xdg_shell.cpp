@@ -4,6 +4,7 @@
 #include "util/logging.hpp"
 #include "wlroots.hpp"
 
+#include "cursor.hpp"
 #include "desktop.hpp"
 #include "input.hpp"
 #include "seat.hpp"
@@ -23,7 +24,10 @@ namespace cloth {
     on_unmap.add_to(wlr_popup->base->events.unmap);
     on_unmap = [this] { view.damage_whole(); };
     on_map.add_to(wlr_popup->base->events.map);
-    on_map = [this] { view.damage_whole(); };
+    on_map = [this] {
+      view.damage_whole();
+      view.desktop.server.input.update_cursor_focus();
+    };
 
     // TODO: Desired behaviour?
     unconstrain();
@@ -173,7 +177,7 @@ namespace cloth {
 
   void XdgSurface::do_close()
   {
-    wlr::xdg_popup_t* popup = NULL;
+    wlr::xdg_popup_t* popup = nullptr;
     wl_list_for_each(popup, &xdg_surface->popups, link)
     {
       wlr_xdg_surface_send_close(popup->base);
@@ -202,8 +206,10 @@ namespace cloth {
     : View(p_workspace), xdg_surface(p_xdg_surface)
   {
     View::wlr_surface = xdg_surface->surface;
+    xdg_surface->data = this;
     width = xdg_surface->surface->current.width;
     height = xdg_surface->surface->current.height;
+
     on_request_move.add_to(xdg_surface->toplevel->events.request_move);
     on_request_move = [this](void* data) {
       Input& input = this->desktop.server.input;
@@ -286,6 +292,11 @@ namespace cloth {
     on_destroy = [this] { workspace->erase_view(*this); };
   }
 
+  XdgSurface::~XdgSurface() noexcept
+  {
+    xdg_surface->data = nullptr;
+  }
+
   void Desktop::handle_xdg_shell_surface(void* data)
   {
     auto& surface = *(wlr::xdg_surface_t*) data;
@@ -311,4 +322,49 @@ namespace cloth {
       view.set_fullscreen(true, nullptr);
     }
   }
+
+
+  // Decoration //
+
+  XdgToplevelDecoration::XdgToplevelDecoration(XdgSurface& xdgview,
+                                               wlr::xdg_toplevel_decoration_v1_t& xdg_deco)
+    : surface(xdgview), wlr_decoration(xdg_deco)
+  {
+    on_destroy.add_to(wlr_decoration.events.destroy);
+    on_destroy = [this] {
+      auto keep_alive = std::move(surface.xdg_toplevel_decoration);
+      surface.update_decorated(false);
+    };
+
+    on_request_mode.add_to(wlr_decoration.events.request_mode);
+    on_request_mode = [this] {
+      enum wlr_xdg_toplevel_decoration_v1_mode mode = wlr_decoration.client_pending_mode;
+      if (mode == WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_NONE) {
+        mode = WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
+      }
+      wlr_xdg_toplevel_decoration_v1_set_mode(&wlr_decoration, mode);
+    };
+
+    on_surface_commit.add_to(surface.xdg_surface->surface->events.commit);
+    on_surface_commit = [this] {
+      bool decorated =
+        wlr_decoration.current_mode == WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE;
+      surface.update_decorated(decorated);
+    };
+
+    on_request_mode(nullptr);
+  }
+
+  auto Desktop::handle_xdg_toplevel_decoration(void* data) -> void
+  {
+    auto& wlr_decoration = *(wlr::xdg_toplevel_decoration_v1_t*) data;
+    LOGD("new xdg toplevel decoration");
+
+    auto* xdg_surface = (XdgSurface*) wlr_decoration.surface->data;
+    assert(xdg_surface != nullptr);
+
+    xdg_surface->xdg_toplevel_decoration =
+      std::make_unique<XdgToplevelDecoration>(*xdg_surface, wlr_decoration);
+  }
+
 } // namespace cloth

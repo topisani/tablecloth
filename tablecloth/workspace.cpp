@@ -86,7 +86,7 @@ namespace cloth {
 
 #ifdef WLR_HAS_XWAYLAND
     if (auto* xwl_view = dynamic_cast<XwaylandSurface*>(view);
-        xwl_view && wlr_xwayland_surface_is_unmanaged(xwl_view->xwayland_surface)) {
+        xwl_view && !wlr_xwayland_or_surface_wants_focus(xwl_view->xwayland_surface)) {
       return view;
     }
 #endif

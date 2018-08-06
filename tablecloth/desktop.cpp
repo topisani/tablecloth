@@ -156,6 +156,8 @@ namespace cloth {
     on_layer_shell_surface.add_to(layer_shell->events.new_surface);
     on_layer_shell_surface = [this](void* data) { handle_layer_shell_surface(data); };
 
+    tablet_v2 = wlr_tablet_v2_create(server.wl_display);
+
 #ifdef WLR_HAS_XWAYLAND
     const char* cursor_theme = nullptr;
     const char* cursor_default = xcursor_default;
@@ -190,6 +192,7 @@ namespace cloth {
 #endif
 
     gamma_control_manager = wlr_gamma_control_manager_create(server.wl_display);
+    gamma_control_manager_v1 = wlr_gamma_control_manager_v1_create(server.wl_display);
     screenshooter = wlr_screenshooter_create(server.wl_display);
     export_dmabuf_manager_v1 = wlr_export_dmabuf_manager_v1_create(server.wl_display);
     server_decoration_manager = wlr_server_decoration_manager_create(server.wl_display);
@@ -215,7 +218,7 @@ namespace cloth {
     };
     on_input_inhibit_deactivate.add_to(input_inhibit->events.deactivate);
 
-    linux_dmabuf = wlr_linux_dmabuf_create(server.wl_display, server.renderer);
+    linux_dmabuf = wlr_linux_dmabuf_v1_create(server.wl_display, server.renderer);
 
     virtual_keyboard = wlr_virtual_keyboard_manager_v1_create(server.wl_display);
 
@@ -233,6 +236,10 @@ namespace cloth {
     on_virtual_keyboard_new.add_to(virtual_keyboard->events.new_virtual_keyboard);
 
     screencopy = wlr_screencopy_manager_v1_create(server.wl_display);
+
+    xdg_decoration_manager_v1 = wlr_xdg_decoration_manager_v1_create(server.wl_display);
+    on_xdg_toplevel_decoration = [this](void* data) { handle_xdg_toplevel_decoration(data); };
+    on_xdg_toplevel_decoration.add_to(xdg_decoration_manager_v1->events.new_toplevel_decoration);
   }
 
   Desktop::~Desktop() noexcept

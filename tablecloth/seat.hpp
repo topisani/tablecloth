@@ -48,18 +48,50 @@ namespace cloth {
     wl::Listener on_device_destroy;
   };
 
-  struct TabletTool {
-    TabletTool(Seat&, wlr::input_device_t&) noexcept;
-    ~TabletTool() noexcept;
+  struct Tablet {
+    Tablet(Seat&, wlr::input_device_t&) noexcept;
+    ~Tablet() noexcept;
     Seat& seat;
 
     wlr::input_device_t& device;
+    wlr::tablet_v2_tablet_t& tablet_v2;
     wl::Listener on_device_destroy;
 
     wl::Listener on_axis;
     wl::Listener on_proximity;
     wl::Listener on_tip;
     wl::Listener on_button;
+  };
+
+  struct TabletPad {
+    TabletPad(Seat& seat, wlr::tablet_v2_tablet_pad_t&) noexcept;
+    ~TabletPad() noexcept;
+    Seat& seat;
+
+    Tablet* tablet;
+
+    wlr::input_device_t& device;
+    wlr::tablet_v2_tablet_pad_t& tablet_v2_pad;
+
+    wl::Listener on_device_destroy;
+    wl::Listener on_attach;
+    wl::Listener on_button;
+    wl::Listener on_ring;
+    wl::Listener on_strip;
+    wl::Listener on_tablet_destroy;
+  };
+
+  struct TabletTool {
+    TabletTool(Seat& seat, wlr::tablet_v2_tablet_tool_t&) noexcept;
+    ~TabletTool() noexcept;
+    Seat& seat;
+
+    wlr::tablet_v2_tablet_tool_t& tablet_v2_tool;
+    Tablet* current_tablet;
+
+    wl::Listener on_set_cursor;
+    wl::Listener on_tool_destroy;
+    wl::Listener on_tablet_destroy;
   };
 
   struct SeatView {
@@ -125,7 +157,8 @@ namespace cloth {
     util::ptr_vec<Keyboard> keyboards;
     util::ptr_vec<Pointer> pointers;
     util::ptr_vec<Touch> touch;
-    util::ptr_vec<TabletTool> tablet_tools;
+    util::ptr_vec<Tablet> tablets;
+    util::ptr_vec<TabletPad> tablet_pads;
 
     wl::Listener on_new_drag_icon;
     wl::Listener on_destroy;

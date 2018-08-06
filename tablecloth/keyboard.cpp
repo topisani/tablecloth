@@ -162,7 +162,20 @@ namespace cloth {
         auto ws_str = command.substr(move_ws_prefix.size());
         std::from_chars(&*ws_str.begin(), &*ws_str.end(), workspace);
         if (workspace >= 0 && workspace < 10) {
-          input.server.desktop.workspaces.at(workspace).add_view(focus->workspace->erase_view(*focus));
+          input.server.desktop.workspaces.at(workspace).add_view(
+            focus->workspace->erase_view(*focus));
+        }
+      }
+    } else if (command == "toggle_decoration_mode") {
+      View* focus = seat.get_focus();
+      if (auto xdg = dynamic_cast<XdgSurface*>(focus); xdg) {
+        auto* decoration = xdg->xdg_toplevel_decoration.get();
+        if (decoration) {
+          auto mode = decoration->wlr_decoration.current_mode;
+          mode = (mode == WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE)
+                   ? WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE
+                   : WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE;
+          wlr_xdg_toplevel_decoration_v1_set_mode(&decoration->wlr_decoration, mode);
         }
       }
     } else {
