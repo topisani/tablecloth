@@ -116,24 +116,6 @@ namespace cloth {
     return wlr_output_layout_intersects(&output_layout, &wlr_output, &layout_box);
   }
 
-  static void surface_send_frame_done(wlr::surface_t* surface, int sx, int sy, void* _data)
-  {
-    auto& cvd = *(ContextAndData*) _data;
-    auto when = chrono::to_timespec(cvd.context.when);
-    float rotation = cvd.data.layout.rotation;
-
-    double lx, ly;
-    get_layout_position(cvd.data.layout, lx, ly, *surface, sx, sy);
-
-    if (!surface_intersect_output(*surface, *cvd.context.output.desktop.layout,
-                                  cvd.context.output.wlr_output, lx, ly, rotation, nullptr)) {
-      return;
-    }
-
-    wlr_surface_send_frame_done(surface, &when);
-  }
-
-
   //////////////////////////////////////////
   // RenderContext render functions
   //////////////////////////////////////////
@@ -201,7 +183,7 @@ namespace cloth {
 
   auto RenderContext::render_decorations(View& view, RenderData& data) -> void
   {
-    if (!view.decorated || view.wlr_surface == nullptr) {
+    if (!view.decorated || view.maximized || view.wlr_surface == nullptr) {
       return;
     }
 
@@ -209,6 +191,12 @@ namespace cloth {
     assert(renderer);
 
     wlr::box_t box = get_decoration_box(view, output);
+    double x_scale = data.layout.width / double(view.width);
+    double y_scale = data.layout.height / double(view.height);
+    box.x = data.layout.x + (box.x - view.x) * x_scale;
+    box.y = data.layout.y + (box.y - view.y) * y_scale;
+    box.width *= x_scale;
+    box.height *= y_scale;
 
     wlr::box_t rotated;
     wlr_box_rotated_bounds(&box, view.rotation, &rotated);
@@ -236,17 +224,26 @@ namespace cloth {
     pixman_region32_fini(&damage);
   }
 
+  struct SurfaceRenderData {
+    RenderContext& context;
+    // The data for the toplevel view this surface is linked to.
+    RenderData parent_data;
+    // The scaling applied.
+    double x_scale = 1.0;
+    double y_scale = 1.0;
+  };
+
   auto RenderContext::render_surface(wlr::surface_t* surface, int sx, int sy, void* _data) -> void
   {
     if (!surface) {
-      //LOGE("null surface in render_surface");
+      // LOGE("null surface in render_surface");
       return;
     }
 
-    auto& cvd = *(ContextAndData*) _data;
+    auto& data = *(SurfaceRenderData*) _data;
 
-    Output& output = cvd.context.output;
-    float rotation = cvd.data.layout.rotation;
+    Output& output = data.context.output;
+    float rotation = data.parent_data.layout.rotation;
 
     wlr::texture_t* texture = wlr_surface_get_texture(surface);
     if (texture == nullptr) {
@@ -257,14 +254,13 @@ namespace cloth {
     assert(renderer);
 
     double lx, ly;
-    get_layout_position(cvd.data.layout, lx, ly, *surface, sx, sy);
+    get_layout_position(data.parent_data.layout, lx, ly, *surface, sx * data.x_scale,
+                        sy * data.x_scale);
 
-    wlr::box_t box;
-    bool intersects = surface_intersect_output(*surface, *output.desktop.layout, output.wlr_output,
-                                               lx, ly, rotation, &box);
-    if (!intersects) {
-      return;
-    }
+    wlr::box_t box = {.x = (int) lx,
+                      .y = (int) ly,
+                      .width = int(surface->current.width * data.x_scale),
+                      .height = int(surface->current.height * data.x_scale)};
 
     wlr::box_t rotated;
     wlr_box_rotated_bounds(&box, rotation, &rotated);
@@ -273,7 +269,7 @@ namespace cloth {
     pixman_region32_init(&damage);
     pixman_region32_union_rect(&damage, &damage, rotated.x, rotated.y, rotated.width,
                                rotated.height);
-    pixman_region32_intersect(&damage, &damage, &cvd.context.pixman_damage);
+    pixman_region32_intersect(&damage, &damage, &data.context.pixman_damage);
     bool damaged = pixman_region32_not_empty(&damage);
     if (damaged) {
       float matrix[9];
@@ -284,12 +280,30 @@ namespace cloth {
       pixman_box32_t* rects = pixman_region32_rectangles(&damage, &nrects);
       for (int i = 0; i < nrects; ++i) {
         scissor_output(output, &rects[i]);
-        wlr_render_texture_with_matrix(renderer, texture, matrix, cvd.data.alpha);
+        wlr_render_texture_with_matrix(renderer, texture, matrix, data.parent_data.alpha);
       }
     }
 
     pixman_region32_fini(&damage);
   };
+
+  static void surface_send_frame_done(wlr::surface_t* surface, int sx, int sy, void* _data)
+  {
+    auto& cvd = *(SurfaceRenderData*) _data;
+    auto when = chrono::to_timespec(cvd.context.when);
+    float rotation = cvd.parent_data.layout.rotation;
+
+    double lx, ly;
+    get_layout_position(cvd.parent_data.layout, lx, ly, *surface, sx, sy);
+
+    if (!surface_intersect_output(*surface, *cvd.context.output.desktop.layout,
+                                  cvd.context.output.wlr_output, lx, ly, rotation, nullptr)) {
+      return;
+    }
+
+    wlr_surface_send_frame_done(surface, &when);
+  }
+
 
 
   auto RenderContext::render(View& view, RenderData& data) -> void
@@ -306,7 +320,7 @@ namespace cloth {
   auto RenderContext::render(Layer& layer) -> void
   {
     for (auto& layer_surface : layer) {
-      // TODO: alpha and rotation for layer surfaces.
+      // TODO: alpha, rotation and scaling for layer surfaces.
       RenderData data = {.layout = {
                            .x = layer_surface.geo.x + (double) output_box->x,
                            .y = layer_surface.geo.y + (double) output_box->y,
@@ -315,8 +329,8 @@ namespace cloth {
                          }};
       for_each_surface(*layer_surface.layer_surface.surface, render_surface, data);
 
-      ContextAndData cd = {*this, data};
-      wlr_layer_surface_for_each_surface(&layer_surface.layer_surface, render_surface, &cd);
+      SurfaceRenderData surfdat = {*this, data};
+      wlr_layer_surface_for_each_surface(&layer_surface.layer_surface, render_surface, &surfdat);
     }
   } // namespace cloth
 
@@ -512,11 +526,11 @@ namespace cloth {
 
   static void damage_whole_surface(wlr::surface_t* surface, int sx, int sy, void* _data)
   {
-    auto& [context, data] = *(ContextAndData*) _data;
+    auto& [context, data, x_scale, y_scale] = *(SurfaceRenderData*) _data;
     float rotation = data.layout.rotation;
 
     double lx, ly;
-    get_layout_position(data.layout, lx, ly, *surface, sx, sy);
+    get_layout_position(data.layout, lx, ly, *surface, sx * x_scale, sy * y_scale);
 
     if (!wlr_surface_has_buffer(surface)) {
       return;
@@ -584,12 +598,12 @@ namespace cloth {
 
   static void damage_from_surface(wlr::surface_t* surface, int sx, int sy, void* _data)
   {
-    auto& [context, data] = *(ContextAndData*) _data;
+    auto& [context, data, x_scale, y_scale] = *(SurfaceRenderData*) _data;
     wlr::output_t& wlr_output = context.output.wlr_output;
     float rotation = data.layout.rotation;
 
     double lx, ly;
-    get_layout_position(data.layout, lx, ly, *surface, sx, sy);
+    get_layout_position(data.layout, lx, ly, *surface, sx * x_scale, sy * y_scale);
 
     if (!wlr_surface_has_buffer(surface)) {
       return;
@@ -656,7 +670,9 @@ namespace cloth {
                                        wlr_surface_iterator_func_t iterator,
                                        const RenderData& data) -> void
   {
-    ContextAndData cd = {*this, data};
+    SurfaceRenderData cd = {*this, data,
+                            .x_scale = data.layout.width / double(surface.current.width),
+                            .y_scale = data.layout.height / double(surface.current.height)};
     wlr_surface_for_each_surface(&surface, iterator, &cd);
   }
 
@@ -665,10 +681,11 @@ namespace cloth {
                                        const RenderData& data) -> void
   {
     if (!view.wlr_surface) {
-      //LOGE("Null surface for view title='{}', type='{}'", view.get_name(), (int) view.type());
+      // LOGE("Null surface for view title='{}', type='{}'", view.get_name(), (int) view.type());
       return;
     }
-    ContextAndData cd = {*this, data};
+    SurfaceRenderData cd = {*this, data, .x_scale = data.layout.width / double(view.width),
+                            .y_scale = data.layout.height / double(view.height)};
     if (auto* xdg_surface_v6 = dynamic_cast<XdgSurfaceV6*>(&view); xdg_surface_v6) {
       wlr_xdg_surface_v6_for_each_surface(xdg_surface_v6->xdg_surface, iterator, &cd);
     } else if (auto* xdg_surface = dynamic_cast<XdgSurface*>(&view); xdg_surface) {

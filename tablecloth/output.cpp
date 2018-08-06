@@ -37,7 +37,8 @@ namespace cloth {
     if (prev_workspace != workspace && prev_workspace && ws_alpha >= 1.f) {
       ws_alpha = 0;
     }
-    if (ws_alpha < 1.f) ws_alpha += 0.05;
+    if (ws_alpha <= 1.f) ws_alpha += 0.075;
+    if (ws_alpha > 1.f) ws_alpha = 1.f;
 
     float prev_ws_alpha = 1.f - ws_alpha;
     if (prev_ws_alpha > 0 && prev_workspace) {
@@ -46,6 +47,8 @@ namespace cloth {
       for (auto& v : prev_workspace->visible_views()) {
         auto data = get_render_data(v);
         data.alpha *= prev_ws_alpha;
+        data.layout.width = v.width * prev_ws_alpha;
+        data.layout.height = v.height * prev_ws_alpha;
         data.layout.x -= dx;
         context.views.emplace_back(v, data);
       }
@@ -61,6 +64,10 @@ namespace cloth {
       for (auto& v : workspace->visible_views()) {
         auto data = get_render_data(v);
         data.alpha *= ws_alpha;
+        if (ws_alpha != 1.f) {
+          data.layout.width = v.width * ws_alpha;
+          data.layout.height = v.height * ws_alpha;
+        }
         data.layout.x += dx;
         context.views.emplace_back(v, data);
       }
