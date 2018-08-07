@@ -124,9 +124,9 @@ namespace cloth::bar {
       thread = [this] {
         using namespace chrono;
         auto now = clock::now();
-        label.set_text(fmt::format("{:02}:{:02}",
-                                   duration_cast<hours>(now.time_since_epoch()).count() % 24,
-                                   duration_cast<minutes>(now.time_since_epoch()).count() % 60));
+        auto t = std::time(nullptr);
+        auto localtime = std::localtime(&t);
+        label.set_text(fmt::format("{:02}:{:02}", localtime->tm_hour, localtime->tm_min));
         thread.sleep_until(floor<minutes>(now + minutes(1)));
       };
     };
