@@ -306,9 +306,14 @@ namespace cloth {
     }
 
     if (surface) {
-      bool focus_changed = seat.wlr_seat->pointer_state.focused_surface != surface;
+      // https://github.com/swaywm/wlroots/commit/2e6eb097b6e23b8923bbfc68b1843d5ccde1955b
+      // Whenever a new surface is created, we have to update the cursor focus,
+      // even if there's no input event. So, we generate one motion event, and
+      // reuse the code to update the proper cursor focus. We need to do this
+      // for all surface roles - toplevels, popups, subsurfaces.
+      bool focus_changed = (seat.wlr_seat->pointer_state.focused_surface != surface);
       wlr_seat_pointer_notify_enter(seat.wlr_seat, surface, sx, sy);
-      if (focus_changed) {
+      if (!focus_changed) {
         wlr_seat_pointer_notify_motion(seat.wlr_seat, time, sx, sy);
       }
     } else {
