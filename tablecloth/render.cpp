@@ -211,13 +211,17 @@ namespace cloth {
       float matrix[9];
       wlr_matrix_project_box(matrix, &box, WL_OUTPUT_TRANSFORM_NORMAL, view.rotation,
                              output.wlr_output.transform_matrix);
-      float color[] = {0.2, 0.2, 0.2, view.alpha};
+      std::array<float, 4> color;
+      if (view.active)
+        color = {0.1, 0.2, 0.5, view.alpha};
+      else
+        color = {0.2, 0.2, 0.2, view.alpha};
 
       int nrects;
       pixman_box32_t* rects = pixman_region32_rectangles(&damage, &nrects);
       for (int i = 0; i < nrects; ++i) {
         scissor_output(output, &rects[i]);
-        wlr_render_quad_with_matrix(renderer, color, matrix);
+        wlr_render_quad_with_matrix(renderer, color.data(), matrix);
       }
     }
 

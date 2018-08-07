@@ -142,14 +142,15 @@ namespace cloth {
     Desktop& desktop;
 
     bool mapped = false;
+    bool active = false;
     double x, y;
     uint32_t width, height;
     float rotation = 0;
     float alpha = 1;
 
-    bool decorated;
-    int border_width;
-    int titlebar_height;
+    bool decorated = false;
+    int border_width = 0;
+    int titlebar_height = 0;
 
     bool maximized;
 

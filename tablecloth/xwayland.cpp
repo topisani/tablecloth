@@ -199,13 +199,14 @@ namespace cloth {
         // Seat::set_focus() checks this variable, and does not deactivate the previously focused
         // window if it is set That code should probably check if the previously focused window is
         // indeed the parent
+        update_decorated(false);
         initial_focus();
       } else {
         if (surface.decorations == WLR_XWAYLAND_SURFACE_DECORATIONS_ALL) {
           // TODO: Desired behaviour?
-          decorated = true;
-          border_width = 4;
-          titlebar_height = 12;
+          update_decorated(true);
+        } else {
+          update_decorated(false);
         }
         setup();
       }

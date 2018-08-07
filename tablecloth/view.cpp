@@ -15,7 +15,9 @@
 
 namespace cloth {
 
-  View::View(Workspace& workspace) : workspace(&workspace), desktop(workspace.desktop) {}
+  View::View(Workspace& workspace) : workspace(&workspace), desktop(workspace.desktop) {
+    update_decorated(true);
+  }
 
   View::~View() noexcept
   {
@@ -124,7 +126,9 @@ namespace cloth {
 
   void View::activate(bool activate)
   {
+    active = activate;
     do_activate(activate);
+    if (decorated) damage_whole();
   }
 
   void View::resize(int width, int height)
@@ -363,7 +367,9 @@ namespace cloth {
 
   void View::map(wlr::surface_t& surface)
   {
+    if (wlr_surface) wlr_surface->data = nullptr;
     wlr_surface = &surface;
+    wlr_surface->data = this;
 
     wlr::subsurface_t* subsurface;
     wl_list_for_each(subsurface, &wlr_surface->subsurfaces, parent_link)
@@ -385,6 +391,7 @@ namespace cloth {
   void View::unmap()
   {
     assert(this->wlr_surface != nullptr);
+    this->wlr_surface->data = nullptr;
     this->mapped = false;
     events.unmap.emit(this);
     damage_whole();
@@ -407,7 +414,7 @@ namespace cloth {
 
   void View::update_decorated(bool decorated)
   {
-    if (this->decorated == decorated) return;
+    //if (this->decorated == decorated) return;
 
     damage_whole();
     this->decorated = decorated;

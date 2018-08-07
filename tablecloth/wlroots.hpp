@@ -201,6 +201,7 @@ namespace cloth::wlr {
   using seat_touch_grab_t = struct wlr_seat_touch_grab;
   using seat_t = struct wlr_seat;
   using server_decoration_manager_t = struct wlr_server_decoration_manager;
+  using server_decoration_t = struct wlr_server_decoration;
   using session_t = struct wlr_session;
   using subcompositor_t = struct wlr_subcompositor;
   using subsurface_state_t = struct wlr_subsurface_state;

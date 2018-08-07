@@ -12,6 +12,9 @@ namespace cloth::notifications {
       if (interface == layer_shell.interface_name) {
         registry.bind(name, layer_shell, version);
       }
+      if (interface == wl::output_t::interface_name) {
+        registry.bind(name, output, version);
+      }
     };
     display.roundtrip();
   }

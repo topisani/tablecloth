@@ -156,7 +156,7 @@ namespace cloth::notifications {
     Gdk::wayland::window::set_use_custom_surface(window);
     surface = Gdk::wayland::window::get_wl_surface(window);
     layer_surface = server.client.layer_shell.get_layer_surface(
-      surface, nullptr, wl::zwlr_layer_shell_v1_layer::overlay, "cloth.notification");
+      surface, server.client.output, wl::zwlr_layer_shell_v1_layer::overlay, "cloth.notification");
     layer_surface.set_size(1, 1);
     layer_surface.on_configure() = [&](uint32_t serial, uint32_t width, uint32_t height) {
       LOGD("Configured");
@@ -176,11 +176,13 @@ namespace cloth::notifications {
     window.resize(1, 1);
 
     surface.commit();
+    LOGD("Constructed");
   } // namespace cloth::notifications
 
   Notification::~Notification()
   {
     server.NotificationClosed(id, 0);
+    LOGD("Destructed");
   }
 
 } // namespace cloth::notifications

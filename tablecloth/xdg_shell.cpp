@@ -210,6 +210,8 @@ namespace cloth {
     width = xdg_surface->surface->current.width;
     height = xdg_surface->surface->current.height;
 
+    update_decorated(true);
+
     on_request_move.add_to(xdg_surface->toplevel->events.request_move);
     on_request_move = [this](void* data) {
       Input& input = this->desktop.server.input;

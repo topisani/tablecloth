@@ -10,7 +10,6 @@
 #include "util/iterators.hpp"
 
 #include "wlr-layer-shell-unstable-v1-protocol.h"
-#include "workspaces-server-protocol.h"
 
 namespace cloth {
 
@@ -197,7 +196,20 @@ namespace cloth {
     export_dmabuf_manager_v1 = wlr_export_dmabuf_manager_v1_create(server.wl_display);
     server_decoration_manager = wlr_server_decoration_manager_create(server.wl_display);
     wlr_server_decoration_manager_set_default_mode(server_decoration_manager,
-                                                   WLR_SERVER_DECORATION_MANAGER_MODE_CLIENT);
+                                                   WLR_SERVER_DECORATION_MANAGER_MODE_SERVER);
+    on_server_decoration.add_to(server_decoration_manager->events.new_decoration);
+    on_server_decoration = [this] (void* data) {
+      auto* decoration = (wlr::server_decoration_t*) data;
+      // set in View::map and View::unmap
+      auto* view = (View*) decoration->surface->data;
+      if (view) {
+        LOGD("Updated server decoration for view");
+        view->update_decorated(decoration->mode == WLR_SERVER_DECORATION_MANAGER_MODE_SERVER);
+      } else {
+        LOGD("No view found for server decoration");
+      }
+    };
+
     primary_selection_device_manager =
       wlr_primary_selection_device_manager_create(server.wl_display);
     idle = wlr_idle_create(server.wl_display);

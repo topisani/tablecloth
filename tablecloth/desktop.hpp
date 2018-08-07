@@ -78,6 +78,7 @@ namespace cloth {
   protected:
     wl::Listener on_new_output;
     wl::Listener on_layout_change;
+    wl::Listener on_server_decoration;
     wl::Listener on_xdg_shell_v6_surface;
     wl::Listener on_xdg_shell_surface;
     wl::Listener on_wl_shell_surface;

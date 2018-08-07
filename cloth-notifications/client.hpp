@@ -30,6 +30,7 @@ namespace cloth::notifications {
     wl::display_t display;
     wl::registry_t registry;
     wl::zwlr_layer_shell_v1_t layer_shell;
+    wl::output_t output;
     DBus::BusDispatcher dispatcher;
     std::thread dbus_thread;
 
