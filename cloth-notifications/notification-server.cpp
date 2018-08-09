@@ -8,31 +8,36 @@
 namespace cloth::notifications {
 
   auto get_image(const std::map<std::string, ::DBus::Variant>& hints, const std::string& app_icon)
+    -> std::pair<Glib::RefPtr<Gdk::Pixbuf>, bool>
   {
     try {
-      auto [key, is_path] = [&]() -> std::pair<std::string, bool> {
-        if (hints.count("image-data")) return {"image-data", false};
-        if (hints.count("image_data")) return {"image_data", false}; // deprecated
-        if (hints.count("image-path")) return {hints.at("image-path"), true};
-        if (hints.count("image_path")) return {hints.at("image_path"), true}; // deprecated
-        if (!app_icon.empty()) return {app_icon, true};
-        if (hints.count("icon_data")) return {hints.at("icon_data"), false};
-        return {"", true};
+      auto [key, is_path, is_icon] = [&]() -> std::tuple<std::string, bool, bool> {
+        if (hints.count("image-data")) return {"image-data", false, false};
+        if (hints.count("image_data")) return {"image_data", false, false}; // deprecated
+        if (hints.count("image-path")) return {hints.at("image-path"), true, false};
+        if (hints.count("image_path")) return {hints.at("image_path"), true, false}; // deprecated
+        if (!app_icon.empty()) return {app_icon, true, true};
+        if (hints.count("icon_data")) return {hints.at("icon_data"), false, true};
+        return {"", true, false};
       }();
 
       if (is_path && !key.empty()) {
-        return Gdk::Pixbuf::create_from_file(key);
+        return std::pair(Gdk::Pixbuf::create_from_file(key), is_icon);
       } else if (!key.empty()) {
         auto [width, height, rowstride, has_alpha, bits_per_sample, channels, image_data, _] =
           DBus::Struct<int, int, int, bool, int, int, std::vector<uint8_t>>(hints.at("image-data"));
-        return Gdk::Pixbuf::create_from_data(image_data.data(), Gdk::Colorspace::COLORSPACE_RGB,
-                                             has_alpha, bits_per_sample, width, height, rowstride);
+        LOGD("Image data: {}, {}, {}, {}, {}, {}", width, height, rowstride, has_alpha,
+             bits_per_sample, channels);
+        return std::pair(
+          Gdk::Pixbuf::create_from_data(image_data.data(), Gdk::Colorspace::COLORSPACE_RGB,
+                                        has_alpha, bits_per_sample, width, height, rowstride),
+          is_icon);
       }
 
     } catch (Glib::FileError& e) {
       LOGE("FileError: {}", e.what());
     }
-    return Glib::RefPtr<Gdk::Pixbuf>{};
+    return std::pair(Glib::RefPtr<Gdk::Pixbuf>{}, false);
   }
 
   auto NotificationServer::GetCapabilities(DBus::Error& e) -> std::vector<std::string>
@@ -47,9 +52,12 @@ namespace cloth::notifications {
                                   const std::string& body,
                                   const std::vector<std::string>& actions,
                                   const std::map<std::string, ::DBus::Variant>& hints,
-                                  const int32_t& expire_timeout, DBus::Error& e) -> uint32_t
+                                  const int32_t& expire_timeout_in,
+                                  DBus::Error& e) -> uint32_t
   {
     unsigned notification_id = not_id_in;
+    int expire_timeout = expire_timeout_in;
+
     if (notification_id == 0) notification_id = ++_id;
 
     LOGI("[{}]: {}", summary, body);
@@ -64,21 +72,35 @@ namespace cloth::notifications {
     Urgency urgency = Urgency::Normal;
     if (hints.count("urgency")) urgency = Urgency{uint8_t(hints.at("urgency"))};
 
-    auto image = get_image(hints, app_icon);
-    notifications.emplace_back(*this, notification_id, summary, body, actions, urgency, image);
+    if (expire_timeout < 0 && urgency != Urgency::Critical) expire_timeout = 5;
+    LOGD("Timeout: {}", expire_timeout);
 
+    auto image = get_image(hints, app_icon);
+
+    Glib::signal_idle().connect_once([=] {
+      notifications.underlying().erase(
+        util::remove_if(notifications.underlying(),
+                        [&](auto& n_ptr) { return n_ptr->id == notification_id; }),
+        notifications.underlying().end());
+      notifications.emplace_back(*this, notification_id, summary, body, actions, urgency,
+                                 expire_timeout, image);
+    });
     return notification_id;
   }
 
-  auto NotificationServer::CloseNotification(const uint32_t& id, DBus::Error& e) -> void {
-    auto found = util::find_if(notifications, [id] (Notification& n) { return n.id == id; });
-    if (found != notifications.end()) notifications.underlying().erase(found.data());
+  auto NotificationServer::CloseNotification(const uint32_t& id, DBus::Error& e) -> void
+  {
+    Glib::signal_idle().connect_once([this, id = id] {
+      auto found = util::find_if(notifications, [id](Notification& n) { return n.id == id; });
+      if (found != notifications.end()) notifications.underlying().erase(found.data());
+    });
   }
 
   auto NotificationServer::GetServerInformation(std::string& name,
                                                 std::string& vendor,
                                                 std::string& version,
-                                                std::string& spec_version, DBus::Error& e) -> void
+                                                std::string& spec_version,
+                                                DBus::Error& e) -> void
   {
     name = "cloth-notifications";
     vendor = "topisani";
@@ -94,8 +116,9 @@ namespace cloth::notifications {
                              const std::string& body_str,
                              const std::vector<std::string>& actions,
                              Urgency urgency,
-                             Glib::RefPtr<Gdk::Pixbuf> pixbuf)
-    : server(server), id(id), pixbuf(pixbuf)
+                             int expire_timeout,
+                             std::pair<Glib::RefPtr<Gdk::Pixbuf>, bool> image_data)
+    : server(server), id(id), pixbuf(image_data.first)
   {
     window.set_title("Cloth Notification");
     window.set_decorated(false);
@@ -129,14 +152,17 @@ namespace cloth::notifications {
     auto& box1 = *Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL));
     box1.pack_end(box2);
 
-    if (pixbuf) {
-      auto w = pixbuf->get_width();
-      auto h = pixbuf->get_height();
+    if (image_data.first) {
+      auto w = image_data.first->get_width();
+      auto h = image_data.first->get_height();
+      LOGD("Image data now: {}, {}", w, h);
       if (w > max_image_width || h > max_image_height) {
         auto scale = std::min(max_image_width / float(w), max_image_height / float(h));
-        this->pixbuf = pixbuf->scale_simple(w * scale, h * scale, Gdk::InterpType::INTERP_BILINEAR);
+        this->pixbuf =
+          image_data.first->scale_simple(w * scale, h * scale, Gdk::InterpType::INTERP_BILINEAR);
       }
       image.set(this->pixbuf);
+      if (image_data.second) image.get_style_context()->add_class("icon");
       box1.pack_start(image);
     }
 
@@ -156,7 +182,9 @@ namespace cloth::notifications {
     Gdk::wayland::window::set_use_custom_surface(window);
     surface = Gdk::wayland::window::get_wl_surface(window);
     layer_surface = server.client.layer_shell.get_layer_surface(
-      surface, server.client.output, wl::zwlr_layer_shell_v1_layer::overlay, "cloth.notification");
+      surface, nullptr, wl::zwlr_layer_shell_v1_layer::top, "cloth.notification");
+    layer_surface.set_anchor(wl::zwlr_layer_surface_v1_anchor::top |
+                             wl::zwlr_layer_surface_v1_anchor::right);
     layer_surface.set_size(1, 1);
     layer_surface.on_configure() = [&](uint32_t serial, uint32_t width, uint32_t height) {
       LOGD("Configured");
@@ -164,8 +192,6 @@ namespace cloth::notifications {
       window.show_all();
       if (width != window.get_width()) {
         layer_surface.set_size(window.get_width(), window.get_height());
-        layer_surface.set_anchor(wl::zwlr_layer_surface_v1_anchor::top |
-                                 wl::zwlr_layer_surface_v1_anchor::right);
         layer_surface.set_margin(20, 20, 20, 20);
         layer_surface.set_exclusive_zone(0);
         surface.commit();
@@ -176,13 +202,20 @@ namespace cloth::notifications {
     window.resize(1, 1);
 
     surface.commit();
-    LOGD("Constructed");
+
+    sleeper_thread = [this, expire_timeout] {
+      sleeper_thread.sleep_for(chrono::seconds(expire_timeout));
+      if (expire_timeout > 0 && sleeper_thread.running()) {
+        Glib::signal_idle().connect_once(
+          [this] { util::erase_this(this->server.notifications, this); });
+      }
+      sleeper_thread.stop();
+    };
   } // namespace cloth::notifications
 
   Notification::~Notification()
   {
     server.NotificationClosed(id, 0);
-    LOGD("Destructed");
   }
 
 } // namespace cloth::notifications

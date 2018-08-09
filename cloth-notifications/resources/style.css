@@ -16,6 +16,10 @@ window.urgency-critical {
     background: #d92817;
 }
 
+image.icon {
+    padding: 20px;
+}
+
 label {
     padding: 10px;
 }

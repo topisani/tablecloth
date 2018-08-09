@@ -6,6 +6,7 @@
 
 #include <protocols.hpp>
 #include <util/ptr_vec.hpp>
+#include <util/chrono.hpp>
 
 #include <dbus-notifications-adaptor.hpp>
 
@@ -36,9 +37,12 @@ namespace cloth::notifications {
                  const std::string& body,
                  const std::vector<std::string>& actions,
                  Urgency urgency,
-                 Glib::RefPtr<Gdk::Pixbuf> image = {});
+                 int expire_timeout,
+                 std::pair<Glib::RefPtr<Gdk::Pixbuf>, bool> pixbuf = {});
 
     ~Notification();
+
+    Notification(const Notification&) = delete;
 
     NotificationServer& server;
     const unsigned id;
@@ -49,6 +53,7 @@ namespace cloth::notifications {
     Gtk::Label title;
     Gtk::Label body;
     std::vector<Gtk::Button> actions;
+    util::SleeperThread sleeper_thread;
 
     wl::surface_t surface;
     wl::zwlr_layer_surface_v1_t layer_surface;
