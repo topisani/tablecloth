@@ -21,8 +21,7 @@ namespace cloth::bar::widgets {
     {
       try {
         for (auto& node : fs::directory_iterator(data_dir)) {
-          if (fs::is_directory(node) && fs::exists(node / "charge_now") &&
-              fs::exists(node / "charge_full")) {
+          if (fs::is_directory(node) && fs::exists(node / "capacity") && fs::exists(node / "status")) {
             batteries.push_back(node);
           }
         }
@@ -35,19 +34,21 @@ namespace cloth::bar::widgets {
 
       thread = [this] {
         update();
-        thread.sleep_for(chrono::minutes(1));
+        thread.sleep_for(chrono::seconds(30));
       };
     }
 
     auto update() -> void
     {
       try {
+        std::ostringstream str;
         for (auto& bat : batteries) {
-          int full, now;
-          std::ifstream(bat / "charge_now") >> now;
-          std::ifstream(bat / "charge_full") >> full;
-          int pct = float(now) / float(full) * 100.f;
-          label.set_text(fmt::format("{}%", pct));
+          int capacity;
+          std::string status;
+          std::ifstream(bat / "capacity") >> capacity;
+          std::ifstream(bat / "status") >> status;
+          label.set_text(fmt::format("{}% {} ", capacity, status));
+          return;
         }
       } catch (std::exception& e) {
         LOGE(e.what());

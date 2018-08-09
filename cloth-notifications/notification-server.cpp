@@ -72,7 +72,14 @@ namespace cloth::notifications {
     Urgency urgency = Urgency::Normal;
     if (hints.count("urgency")) urgency = Urgency{uint8_t(hints.at("urgency"))};
 
-    if (expire_timeout < 0 && urgency != Urgency::Critical) expire_timeout = 5;
+    if (expire_timeout < 0) {
+      switch (urgency) {
+        case Urgency::Low: expire_timeout = 5; break;
+        case Urgency::Normal: expire_timeout = 10; break;
+        case Urgency::Critical: expire_timeout = 0; break;
+      }
+    }
+
     LOGD("Timeout: {}", expire_timeout);
 
     auto image = get_image(hints, app_icon);

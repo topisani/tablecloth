@@ -189,11 +189,9 @@ namespace cloth {
 
   void View::maximize(bool maximized)
   {
-    if (this->maximized == maximized) return;
+    if (this->maximized != maximized) do_maximize(maximized);
 
-    do_maximize(maximized);
-
-    if (!this->maximized && maximized) {
+    if (maximized) {
       this->maximized = true;
       this->saved.x = this->x;
       this->saved.y = this->y;
