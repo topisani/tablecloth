@@ -23,6 +23,7 @@ namespace cloth::msg {
     wl::registry_t registry;
     wl::workspace_manager_t workspaces;
     wl::cloth_window_manager_t cloth_windows;
+    std::vector<wl::output_t> outputs;
 
     auto bind_interfaces()
     {
@@ -38,6 +39,9 @@ namespace cloth::msg {
           if (listen) cloth_windows.on_focused_window_name() = [&] (const std::string& name, uint32_t ws) {
             std::cout << fmt::format("focused {}:{}", ws + 1, name) << std::endl;
           };
+        } else if (interface == wl::output_t::interface_name) {
+          auto& output = outputs.emplace_back();
+          registry.bind(name, output, version);
         }
       };
       display.roundtrip();
@@ -72,6 +76,7 @@ namespace cloth::msg {
       }
       if (cycle_focus) cloth_windows.cycle_focus();
       if (!commands.empty()) cloth_windows.run_command(commands);
+      display.roundtrip();
     }
 
     int main(int argc, char* argv[])
