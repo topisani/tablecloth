@@ -6,6 +6,7 @@
 #include <numeric>
 #include <string>
 #include <string_view>
+#include <cstring>
 
 namespace cloth::util {
 
@@ -23,7 +24,21 @@ namespace cloth::util {
     return result;
   }
 
-  inline const char* nonull(const char* str) {
+  inline std::vector<std::string> split_string(std::string str, std::string sep)
+  {
+    char* cstr = const_cast<char*>(str.c_str());
+    char* current;
+    std::vector<std::string> arr;
+    current = std::strtok(cstr, sep.c_str());
+    while (current != NULL) {
+      arr.push_back(current);
+      current = std::strtok(NULL, sep.c_str());
+    }
+    return arr;
+  }
+
+  inline const char* nonull(const char* str)
+  {
     if (str == nullptr) return "";
     return str;
   };
@@ -46,10 +61,9 @@ namespace cloth::util {
 
   /// Return a closure which compares the adress any reference to T to the address of t
   template<typename T>
-  constexpr auto addr_eq(T&& t) {
-    return [&t] (auto&& t2) {
-      return &t == &t2;
-    };
+  constexpr auto addr_eq(T&& t)
+  {
+    return [&t](auto&& t2) { return &t == &t2; };
   }
 
   template<typename T>
@@ -91,7 +105,6 @@ namespace cloth::util {
 
     template<typename Cont>
     struct reverse {
-
       reverse(Cont&& cont) noexcept : _container(std::forward<Cont>(cont)) {}
 
       auto begin()
@@ -128,7 +141,7 @@ namespace cloth::util {
     };
 
     template<typename ContRef>
-    reverse(ContRef&& cont) -> reverse<ContRef&&>;
+    reverse(ContRef&& cont)->reverse<ContRef&&>;
 
     template<typename Cont>
     struct constant {
@@ -158,7 +171,7 @@ namespace cloth::util {
     };
 
     template<typename ContRef>
-    constant(ContRef&& cont) -> constant<ContRef&&>;
+    constant(ContRef&& cont)->constant<ContRef&&>;
 
   } // namespace view
 

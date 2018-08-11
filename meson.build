@@ -40,6 +40,10 @@ wayland_scanner_client = generator(wayland_scanner_prog, output: '@BASENAME@-cli
 wayland_scanner_server = generator(wayland_scanner_prog, output: '@BASENAME@-server-protocol.h', arguments: ['server-header', '@INPUT@', '@OUTPUT@'])
 wayland_scanner_code = generator(wayland_scanner_prog, output: '@BASENAME@-protocol.c', arguments: ['code', '@INPUT@', '@OUTPUT@'])
 
+dbus_dep = dependency('dbus-c++-1')
+dbus_proxy = generator(find_program('dbusxx-xml2cpp'), output: '@BASENAME@-proxy.hpp', arguments: ['@INPUT@', '--proxy=@OUTPUT@'])
+dbus_adaptor = generator(find_program('dbusxx-xml2cpp'), output: '@BASENAME@-adaptor.hpp', arguments: ['@INPUT@', '--adaptor=@OUTPUT@'])
+
 waylandpp = dependency('wayland-client++')
 wayland_scannerpp = generator(find_program('wayland-scanner++'), output: [
         '@BASENAME@-protocol.hpp',
@@ -53,3 +57,4 @@ subdir('tablecloth')
 subdir('cloth-msg')
 subdir('cloth-bar')
 subdir('cloth-notifications')
+#subdir('cloth-lock')

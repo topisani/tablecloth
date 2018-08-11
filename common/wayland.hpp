@@ -104,8 +104,8 @@ namespace cloth::wl {
 
     ~Listener() noexcept
     {
+      remove();
       if (_func) delete _func;
-      if (_listener.link.next) wl_list_remove(&_listener.link);
     }
 
     Listener(const Listener& rhs) = delete;
@@ -168,7 +168,7 @@ namespace cloth::wl {
 
 
     void operator()(void* data = nullptr) {
-      if (_func) (*_func)(data);
+      if (_func && *_func) (*_func)(data);
     }
   private:
     std::function<void(void* data)>* _func;
