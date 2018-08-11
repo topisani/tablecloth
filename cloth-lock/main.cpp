@@ -13,7 +13,7 @@
 int main(int argc, char* argv[])
 {
   try {
-    cloth::lock::LockScreen c(argc, argv);
+    cloth::lock::Client c(argc, argv);
 
     return c.main(argc, argv);
   } catch (const std::exception& e) {

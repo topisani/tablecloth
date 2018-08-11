@@ -94,6 +94,11 @@ namespace cloth::msg {
 
       bind_interfaces();
 
+      if (!cloth_windows || !workspaces) {
+        LOGE("Couldn't bind cloth interfaces");
+        return 1;
+      }
+
       send_messages();
 
       while (listen) display.dispatch();

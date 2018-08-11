@@ -571,6 +571,7 @@ namespace cloth {
   {
     if (!layer) {
       focused_layer = nullptr;
+      set_focus(get_focus());
       return;
     }
     wlr::keyboard_t* keyboard = wlr_seat_get_keyboard(wlr_seat);

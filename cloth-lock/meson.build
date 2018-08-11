@@ -29,4 +29,6 @@ protocol_sources = custom_target('lock-protocols',
 
 sources += protocol_sources
 
-executable('cloth-lock', sources, dependencies : [thread_dep, fmt, wlroots, wlr_protos, libinput, wayland_cursor_dep, dep_cloth_common, waylandpp, gtkmm])
+pam_dep =meson.get_compiler('cpp').find_library('pam')
+
+executable('cloth-lock', sources, dependencies : [thread_dep, fmt, wlroots, wlr_protos, libinput, wayland_cursor_dep, dep_cloth_common, waylandpp, gtkmm, pam_dep])
