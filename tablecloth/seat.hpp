@@ -30,30 +30,35 @@ namespace cloth {
     wl::Listener on_destroy;
   };
 
-  struct Pointer {
+  struct Device {
+    Device(Seat& seat, wlr::input_device_t& device) noexcept;
+
+    Seat& seat;
+    wlr::input_device_t& wlr_device;
+
+    wl::Listener on_output_transform;
+  };
+
+  struct Pointer : Device {
     Pointer(Seat&, wlr::input_device_t&) noexcept;
     ~Pointer() noexcept;
-    Seat& seat;
 
-    wlr::input_device_t& device;
     wl::Listener on_device_destroy;
+    wl::Listener on_output_transform;
   };
 
-  struct Touch {
+  struct Touch : Device {
     Touch(Seat&, wlr::input_device_t&) noexcept;
     ~Touch() noexcept;
-    Seat& seat;
 
-    wlr::input_device_t& device;
     wl::Listener on_device_destroy;
+    wl::Listener on_output_transform;
   };
 
-  struct Tablet {
+  struct Tablet : Device {
     Tablet(Seat&, wlr::input_device_t&) noexcept;
     ~Tablet() noexcept;
-    Seat& seat;
 
-    wlr::input_device_t& device;
     wlr::tablet_v2_tablet_t& tablet_v2;
     wl::Listener on_device_destroy;
 
@@ -63,14 +68,12 @@ namespace cloth {
     wl::Listener on_button;
   };
 
-  struct TabletPad {
+  struct TabletPad : Device {
     TabletPad(Seat& seat, wlr::tablet_v2_tablet_pad_t&) noexcept;
     ~TabletPad() noexcept;
-    Seat& seat;
 
     Tablet* tablet;
 
-    wlr::input_device_t& device;
     wlr::tablet_v2_tablet_pad_t& tablet_v2_pad;
 
     wl::Listener on_device_destroy;
@@ -83,8 +86,10 @@ namespace cloth {
 
   struct TabletTool {
     TabletTool(Seat& seat, wlr::tablet_v2_tablet_tool_t&) noexcept;
-    ~TabletTool() noexcept;
+
     Seat& seat;
+
+    ~TabletTool() noexcept;
 
     wlr::tablet_v2_tablet_tool_t& tablet_v2_tool;
     Tablet* current_tablet;
@@ -163,8 +168,8 @@ namespace cloth {
     wl::Listener on_new_drag_icon;
     wl::Listener on_destroy;
 
-    void reset_device_mappings(wlr::input_device_t& device) noexcept;
-    void set_device_output_mappings(wlr::input_device_t& device, wlr::output_t* output) noexcept;
+    void reset_device_mappings(Device& device) noexcept;
+    void set_device_output_mappings(Device& device, wlr::output_t* output) noexcept;
 
     void init_cursor();
 

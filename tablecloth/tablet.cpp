@@ -13,7 +13,8 @@
 
 namespace cloth {
 
-  TabletTool::TabletTool(Seat& seat, wlr::tablet_v2_tablet_tool_t& tool) noexcept
+  TabletTool::TabletTool(Seat& seat,
+                         wlr::tablet_v2_tablet_tool_t& tool) noexcept
     : seat(seat), tablet_v2_tool(tool)
   {
     tablet_v2_tool.wlr_tool->data = this;
@@ -42,30 +43,30 @@ namespace cloth {
 
   static void attach_tablet_pad(TabletPad& pad, Tablet& tablet)
   {
-    LOGD("Attaching tablet pad \"{}\" to tablet \"{}\" ", pad.device.name, tablet.device.name);
+    LOGD("Attaching tablet pad \"{}\" to tablet \"{}\" ", pad.wlr_device.name, tablet.wlr_device.name);
     pad.tablet = &tablet;
-    pad.on_tablet_destroy.add_to(tablet.device.events.destroy);
+    pad.on_tablet_destroy.add_to(tablet.wlr_device.events.destroy);
   }
 
   TabletPad::TabletPad(Seat& p_seat, wlr::tablet_v2_tablet_pad_t& p_pad) noexcept
-    : seat(p_seat), device(*p_pad.wlr_device), tablet_v2_pad(p_pad)
+    : Device(p_seat, *p_pad.wlr_device), tablet_v2_pad(p_pad)
   {
-    device.data = this;
+    wlr_device.data = this;
     on_tablet_destroy = [this] {
       tablet = nullptr;
       on_tablet_destroy.remove();
     };
 
-    on_device_destroy.add_to(device.events.destroy);
+    on_device_destroy.add_to(wlr_device.events.destroy);
     on_device_destroy = [this] { util::erase_this(seat.tablet_pads, this); };
 
-    on_attach.add_to(device.tablet_pad->events.attach_tablet);
+    on_attach.add_to(wlr_device.tablet_pad->events.attach_tablet);
     on_attach = [this](void* data) {
       auto* wlr_tool = (wlr::tablet_tool_t*) data;
       attach_tablet_pad(*this, *(Tablet*) wlr_tool->data);
     };
 
-    on_ring.add_to(device.tablet_pad->events.ring);
+    on_ring.add_to(wlr_device.tablet_pad->events.ring);
     on_ring = [this](void* data) {
       auto* event = (wlr::event_tablet_pad_ring_t*) data;
       wlr_send_tablet_v2_tablet_pad_ring(&tablet_v2_pad, event->ring, event->position,
@@ -73,7 +74,7 @@ namespace cloth {
                                          event->time_msec);
     };
 
-    on_strip.add_to(device.tablet_pad->events.strip);
+    on_strip.add_to(wlr_device.tablet_pad->events.strip);
     on_strip = [this](void* data) {
       auto* event = (wlr::event_tablet_pad_strip_t*) data;
       wlr_send_tablet_v2_tablet_pad_strip(&tablet_v2_pad, event->strip, event->position,
@@ -81,7 +82,7 @@ namespace cloth {
                                           event->time_msec);
     };
 
-    on_button.add_to(device.tablet_pad->events.button);
+    on_button.add_to(wlr_device.tablet_pad->events.button);
     on_button = [this](void* data) {
       auto* event = (wlr::event_tablet_pad_button_t*) data;
       wlr_send_tablet_v2_tablet_pad_mode(&tablet_v2_pad, event->group, event->mode,
@@ -91,17 +92,17 @@ namespace cloth {
     };
 
     /* Search for a sibling tablet */
-    if (!wlr_input_device_is_libinput(&device)) {
+    if (!wlr_input_device_is_libinput(&wlr_device)) {
       /* We can only do this on libinput devices */
       return;
     }
     struct libinput_device_group* group =
-      libinput_device_get_device_group(wlr_libinput_get_device_handle(&device));
+      libinput_device_get_device_group(wlr_libinput_get_device_handle(&wlr_device));
     for (auto& tablet : seat.tablets) {
-      if (!wlr_input_device_is_libinput(&tablet.device)) {
+      if (!wlr_input_device_is_libinput(&tablet.wlr_device)) {
         continue;
       }
-      struct libinput_device* li_dev = wlr_libinput_get_device_handle(&tablet.device);
+      struct libinput_device* li_dev = wlr_libinput_get_device_handle(&tablet.wlr_device);
       if (libinput_device_get_device_group(li_dev) == group) {
         attach_tablet_pad(*this, tablet);
         break;
@@ -117,26 +118,26 @@ namespace cloth {
   // TABLET //
 
   Tablet::Tablet(Seat& p_seat, wlr::input_device_t& p_device) noexcept
-    : seat(p_seat),
-      device(p_device),
-      tablet_v2(*wlr_tablet_create(seat.input.server.desktop.tablet_v2, seat.wlr_seat, &device))
+    : Device(p_seat, p_device),
+      tablet_v2(*wlr_tablet_create(seat.input.server.desktop.tablet_v2, seat.wlr_seat, &wlr_device))
   {
-    device.data = this;
+    wlr_device.data = this;
 
-    on_device_destroy.add_to(device.events.destroy);
+    on_device_destroy.add_to(wlr_device.events.destroy);
     on_device_destroy = [this] { util::erase_this(seat.tablets, this); };
 
-    wlr_cursor_attach_input_device(seat.cursor.wlr_cursor, &device);
+    wlr_cursor_attach_input_device(seat.cursor.wlr_cursor, &wlr_device);
 
     seat.configure_cursor();
 
-    struct libinput_device_group* group = libinput_device_get_device_group(wlr_libinput_get_device_handle(&device));
+    struct libinput_device_group* group =
+      libinput_device_get_device_group(wlr_libinput_get_device_handle(&wlr_device));
     for (auto& pad : seat.tablet_pads) {
-      if (!wlr_input_device_is_libinput(&pad.device)) {
+      if (!wlr_input_device_is_libinput(&pad.wlr_device)) {
         continue;
       }
 
-      struct libinput_device* li_dev = wlr_libinput_get_device_handle(&pad.device);
+      struct libinput_device* li_dev = wlr_libinput_get_device_handle(&pad.wlr_device);
       if (libinput_device_get_device_group(li_dev) == group) {
         attach_tablet_pad(pad, *this);
       }
@@ -145,7 +146,7 @@ namespace cloth {
 
   Tablet::~Tablet() noexcept
   {
-    wlr_cursor_detach_input_device(seat.cursor.wlr_cursor, &device);
+    wlr_cursor_detach_input_device(seat.cursor.wlr_cursor, &wlr_device);
     seat.update_capabilities();
   }
 

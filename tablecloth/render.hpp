@@ -62,6 +62,8 @@ namespace cloth {
                                            double oy,
                                            float rotation = 0) -> void;
 
+                                           auto reset() -> void;
+
     // DATA //
 
     Output& output;
@@ -70,7 +72,7 @@ namespace cloth {
     chrono::time_point when = chrono::clock::now();
     std::vector<ViewAndData> views;
     std::array<float, 4> clear_color = {0.25f, 0.25f, 0.25f, 1.0f};
-    std::unique_ptr<ViewAndData> fullscreen_view;
+    View* fullscreen_view = nullptr;
     wlr::output_damage_t* damage;
     wlr::box_t* output_box;
 

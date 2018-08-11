@@ -207,7 +207,8 @@ namespace cloth {
                                 std::string_view name,
                                 std::string_view value)
     {
-      auto* found = &*util::find_if(config.keyboards, [&](auto& c) { return c.seat == device_name; });
+      auto* found =
+        &*util::find_if(config.keyboards, [&](auto& c) { return c.seat == device_name; });
 
       if (found == &*config.keyboards.end()) {
         found = &config.keyboards.emplace_back();
@@ -353,7 +354,6 @@ namespace cloth {
           dc->name = device_name;
           dc->seat = Config::default_seat_name;
         }
-
         if (name == "map-to-output") {
           dc->mapped_output = value;
         } else if (name == "geometry") {
@@ -367,6 +367,14 @@ namespace cloth {
             dc->tap_enabled = false;
           } else {
             LOGE("got unknown tap_enabled value: {}", value);
+          }
+        } else if (name == "natural_scroll") {
+          if (util::iequals(value, "true")) {
+            dc->natural_scroll = true;
+          } else if (util::iequals(value, "false")) {
+            dc->natural_scroll = false;
+          } else {
+            LOGE("got unknown natural_scroll value: {}", value);
           }
         } else {
           LOGE("got unknown device config: {}", name);
@@ -440,19 +448,19 @@ namespace cloth {
     }
   }
 
-  Config::~Config() noexcept { }
+  Config::~Config() noexcept {}
 
 
   Config::Output* Config::get_output(wlr::output_t& output) noexcept
   {
-    auto found = util::find_if(outputs, [&] (auto& el) { return el.name == output.name; });
+    auto found = util::find_if(outputs, [&](auto& el) { return el.name == output.name; });
     if (found != outputs.end()) return &*found;
     return nullptr;
   }
 
   Config::Device* Config::get_device(wlr::input_device_t& device) noexcept
   {
-    auto found = util::find_if(devices, [&] (auto& el) { return el.name == device.name; });
+    auto found = util::find_if(devices, [&](auto& el) { return el.name == device.name; });
     if (found != devices.end()) return &*found;
     return nullptr;
   }
@@ -460,7 +468,7 @@ namespace cloth {
   Config::Keyboard* Config::get_keyboard(wlr::input_device_t* device) noexcept
   {
     auto name = device ? device->name : "";
-    auto found = util::find_if(keyboards, [&] (auto& el) { return el.name == name; });
+    auto found = util::find_if(keyboards, [&](auto& el) { return el.name == name; });
     if (found != keyboards.end()) return &*found;
     return nullptr;
   }
@@ -468,7 +476,7 @@ namespace cloth {
   Config::Cursor* Config::get_cursor(std::string_view seat_name) noexcept
   {
     auto name = seat_name.empty() ? Config::default_seat_name : seat_name;
-    auto found = util::find_if(cursors, [&] (auto& el) { return el.seat == name; });
+    auto found = util::find_if(cursors, [&](auto& el) { return el.seat == name; });
     if (found != cursors.end()) return &*found;
     return nullptr;
   }

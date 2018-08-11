@@ -31,10 +31,10 @@ namespace cloth {
     switch (wlr_tool->type) {
     case WLR_TABLET_TOOL_TYPE_MOUSE:
       // They are 0 either way when they weren't modified
-      wlr_cursor_move(cursor.wlr_cursor, &tablet.device, dx, dy);
+      wlr_cursor_move(cursor.wlr_cursor, &tablet.wlr_device, dx, dy);
       break;
     default:
-      wlr_cursor_warp_absolute(cursor.wlr_cursor, &tablet.device, change_x ? x : NAN,
+      wlr_cursor_warp_absolute(cursor.wlr_cursor, &tablet.wlr_device, change_x ? x : NAN,
                                change_y ? y : NAN);
     }
     double sx, sy;

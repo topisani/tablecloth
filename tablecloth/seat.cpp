@@ -13,6 +13,29 @@
 
 namespace cloth {
 
+  template<wl::output_transform_t T>
+  constexpr float transform_matrix[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+
+  template<>
+  constexpr float transform_matrix<WL_OUTPUT_TRANSFORM_NORMAL>[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+  template<>
+  constexpr float transform_matrix<WL_OUTPUT_TRANSFORM_90>[9] = {0, 1, 0, -1, 0, 1, 0, 0, 1};
+  template<>
+  constexpr float transform_matrix<WL_OUTPUT_TRANSFORM_180>[9] = {-1, 0, 1, 0, -1, 1, 0, 0, 1};
+  template<>
+  constexpr float transform_matrix<WL_OUTPUT_TRANSFORM_270>[9] = {0, -1, 1, 1, 0, 0, 0, 0, 1};
+
+  constexpr auto get_transform_matrix(wl::output_transform_t t) -> const float*
+  {
+    switch (t) {
+    case WL_OUTPUT_TRANSFORM_NORMAL: return transform_matrix<WL_OUTPUT_TRANSFORM_NORMAL>;
+    case WL_OUTPUT_TRANSFORM_90: return transform_matrix<WL_OUTPUT_TRANSFORM_90>;
+    case WL_OUTPUT_TRANSFORM_180: return transform_matrix<WL_OUTPUT_TRANSFORM_180>;
+    case WL_OUTPUT_TRANSFORM_270: return transform_matrix<WL_OUTPUT_TRANSFORM_270>;
+    default: return transform_matrix<WL_OUTPUT_TRANSFORM_NORMAL>;
+    }
+  }
+
   Seat::Seat(Input& input, const std::string& name)
     : wlr_seat(wlr_seat_create(input.server.wl_display, name.c_str())),
       input(input),
@@ -34,34 +57,54 @@ namespace cloth {
     wlr_seat_destroy(wlr_seat);
   }
 
-  void Seat::reset_device_mappings(wlr::input_device_t& device) noexcept
+  void Seat::reset_device_mappings(Device& device) noexcept
   {
     wlr::cursor_t* cursor = this->cursor.wlr_cursor;
     Config& config = input.config;
 
-    wlr_cursor_map_input_to_output(cursor, &device, nullptr);
+    wlr_cursor_map_input_to_output(cursor, &device.wlr_device, nullptr);
+    device.on_output_transform.remove();
     Config::Device* dconfig;
-    if ((dconfig = config.get_device(device))) {
+    if ((dconfig = config.get_device(device.wlr_device))) {
       // TODO wlr_cursor_map_input_to_region(cursor, &device, &dconfig->mapped_box);
     }
   }
 
-  void Seat::set_device_output_mappings(wlr::input_device_t& device, wlr::output_t* output) noexcept
+  void Seat::set_device_output_mappings(Device& device, wlr::output_t* output) noexcept
   {
     wlr::cursor_t* cursor = this->cursor.wlr_cursor;
     Config& config = input.config;
-    Config::Device* dconfig = config.get_device(device);
+    Config::Device* dconfig = config.get_device(device.wlr_device);
 
     std::string_view mapped_output = "";
     if (dconfig != nullptr) {
       mapped_output = dconfig->mapped_output;
     }
     if (mapped_output.empty()) {
-      mapped_output = device.output_name;
+      mapped_output = device.wlr_device.output_name;
     }
 
-    if (mapped_output == device.output_name) {
-      // TODO wlr_cursor_map_input_to_output(cursor, &device, output);
+    if (mapped_output == output->name) {
+      LOGD("Input device {} mapped to output {}", device.wlr_device.name, output->name);
+      // TODO: wlr_cursor_map_input_to_output(cursor, &device, output);
+      device.on_output_transform.add_to(output->events.transform);
+      device.on_output_transform = [&device, output](void* data) {
+        LOGD("Output transform for device {}. Libinput: {}", device.wlr_device.name,
+             wlr_input_device_is_libinput(&device.wlr_device));
+        if (wlr_input_device_is_libinput(&device.wlr_device)) {
+          auto* libinput_handle = wlr_libinput_get_device_handle(&device.wlr_device);
+          //libinput_device_config_calibration_set_matrix(libinput_handle, get_transform_matrix(output->transform));
+          libinput_device_config_rotation_set_angle(libinput_handle, [&] {
+            switch (output->transform) {
+            case WL_OUTPUT_TRANSFORM_NORMAL: return 0;
+            case WL_OUTPUT_TRANSFORM_90: return 90;
+            case WL_OUTPUT_TRANSFORM_180: return 180;
+            case WL_OUTPUT_TRANSFORM_270: return 270;
+            default: return 0;
+            }
+          }());
+        }
+      };
     }
   }
 
@@ -74,13 +117,13 @@ namespace cloth {
     // reset mappings
     wlr_cursor_map_to_output(cursor, nullptr);
     for (auto& pointer : pointers) {
-      reset_device_mappings(pointer.device);
+      reset_device_mappings(pointer);
     }
     for (auto& touch : this->touch) {
-      reset_device_mappings(touch.device);
+      reset_device_mappings(touch);
     }
     for (auto& tablet : tablets) {
-      reset_device_mappings(tablet.device);
+      reset_device_mappings(tablet);
     }
 
     // configure device to output mappings
@@ -95,13 +138,13 @@ namespace cloth {
       }
 
       for (auto& pointer : pointers) {
-        set_device_output_mappings(pointer.device, &output.wlr_output);
+        set_device_output_mappings(pointer, &output.wlr_output);
       }
       for (auto& tablet : tablets) {
-        set_device_output_mappings(tablet.device, &output.wlr_output);
+        set_device_output_mappings(tablet, &output.wlr_output);
       }
       for (auto& touch : this->touch) {
-        set_device_output_mappings(touch.device, &output.wlr_output);
+        set_device_output_mappings(touch, &output.wlr_output);
       }
     }
   }
@@ -131,7 +174,10 @@ namespace cloth {
     on_unmap.add_to(wlr_drag_icon.events.unmap);
     on_map = handle_damage_whole;
     on_map.add_to(wlr_drag_icon.events.map);
-    on_destroy = handle_damage_whole;
+    on_destroy = [this] {
+      auto keep_alive = util::erase_this(this->seat.drag_icons, this);
+      keep_alive->damage_whole();
+    };
     on_destroy.add_to(wlr_drag_icon.events.destroy);
 
     update_position();
@@ -188,7 +234,12 @@ namespace cloth {
     }
   }
 
-  Pointer::Pointer(Seat& seat, wlr::input_device_t& device) noexcept : seat(seat), device(device)
+  Device::Device(Seat& seat, wlr::input_device_t& device) noexcept : seat(seat), wlr_device(device)
+  {
+    device.data = this;
+  }
+
+  Pointer::Pointer(Seat& seat, wlr::input_device_t& device) noexcept : Device(seat, device)
   {
     assert(device.type == WLR_INPUT_DEVICE_POINTER);
 
@@ -204,7 +255,7 @@ namespace cloth {
     seat.configure_cursor();
   }
 
-  Touch::Touch(Seat& seat, wlr::input_device_t& device) noexcept : seat(seat), device(device)
+  Touch::Touch(Seat& seat, wlr::input_device_t& device) noexcept : Device(seat, device)
   {
     assert(device.type == WLR_INPUT_DEVICE_TOUCH);
 
@@ -222,13 +273,13 @@ namespace cloth {
 
   Pointer::~Pointer() noexcept
   {
-    wlr_cursor_detach_input_device(seat.cursor.wlr_cursor, &device);
+    wlr_cursor_detach_input_device(seat.cursor.wlr_cursor, &wlr_device);
     this->seat.update_capabilities();
   }
 
   Touch::~Touch() noexcept
   {
-    wlr_cursor_detach_input_device(seat.cursor.wlr_cursor, &device);
+    wlr_cursor_detach_input_device(seat.cursor.wlr_cursor, &wlr_device);
     this->seat.update_capabilities();
   }
 
@@ -274,6 +325,7 @@ namespace cloth {
     case WLR_INPUT_DEVICE_TABLET_TOOL: add_tablet_tool(device); break;
     }
 
+    configure_cursor();
     update_capabilities();
   }
 

@@ -54,6 +54,9 @@ namespace cloth {
         if (dc->tap_enabled) {
           libinput_device_config_tap_set_enabled(libinput_dev, LIBINPUT_CONFIG_TAP_ENABLED);
         }
+        if (dc->natural_scroll) {
+          libinput_device_config_scroll_set_natural_scroll_enabled(libinput_dev, true);
+        }
       }
     };
     on_new_input.add_to(server.backend->events.new_input);

@@ -338,6 +338,12 @@ namespace cloth {
     }
   } // namespace cloth
 
+  auto RenderContext::reset() -> void
+  {
+    views.clear();
+    fullscreen_view = nullptr;
+    clear_color = {0.25f, 0.25f, 0.25f, 1.0f};
+  }
 
   auto RenderContext::do_render() -> void
   {
@@ -349,8 +355,8 @@ namespace cloth {
     output_box = wlr_output_layout_get_box(output.desktop.layout, &output.wlr_output);
 
     // Check if we can delegate the fullscreen surface to the output
-    if (fullscreen_view != nullptr && fullscreen_view->view.wlr_surface != nullptr) {
-      View& view = fullscreen_view->view;
+    if (fullscreen_view && fullscreen_view->wlr_surface != nullptr) {
+      View& view = *fullscreen_view;
 
       // Make sure the view is centered on screen
       wlr::box_t view_box = view.get_box();
@@ -397,8 +403,16 @@ namespace cloth {
         render(output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM]);
 
         // If a view is fullscreen on this output, render it
-        if (fullscreen_view != nullptr) {
-          auto& [view, data] = *fullscreen_view;
+        if (fullscreen_view) {
+          auto& view = *fullscreen_view;
+          RenderData data = {.layout =
+                               {
+                                 .x = 0,
+                                 .y = 0,
+                                 .width = (double) output.wlr_output.width,
+                                 .height = (double) output.wlr_output.height,
+                               },
+                             .alpha = 1.f};
 
           if (output.wlr_output.fullscreen_surface == view.wlr_surface) {
             // The output will render the fullscreen view
@@ -462,12 +476,21 @@ namespace cloth {
     pixman_region32_fini(&pixman_damage);
 
     // Send frame done events to all surfaces
-    if (fullscreen_view != nullptr) {
-      auto& [view, data] = *fullscreen_view;
+    if (fullscreen_view) {
+      auto& view = *fullscreen_view;
       if (output.wlr_output.fullscreen_surface == view.wlr_surface) {
         // The surface is managed by the output.wlr_output
         return;
       }
+
+      RenderData data = {.layout =
+                           {
+                             .x = 0,
+                             .y = 0,
+                             .width = (double) output.wlr_output.width,
+                             .height = (double) output.wlr_output.height,
+                           },
+                         .alpha = 1.f};
 
       for_each_surface(view, surface_send_frame_done, data);
 

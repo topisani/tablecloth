@@ -34,6 +34,7 @@ namespace cloth {
       std::string seat;
       std::string mapped_output;
       bool tap_enabled = true;
+      bool natural_scroll = true;
       wlr::box_t mapped_box;
     };
 

@@ -13,17 +13,14 @@
 
 namespace cloth {
 
-  auto get_render_data(View& v) -> RenderData {
-    return {
-      .layout = {
-        .x = v.x,
-        .y = v.y,
-        .width = (double) v.width,
-        .height = (double) v.height,
-        .rotation = v.rotation
-      },
-      .alpha = v.alpha
-    };
+  auto get_render_data(View& v) -> RenderData
+  {
+    return {.layout = {.x = v.x,
+                       .y = v.y,
+                       .width = (double) v.width,
+                       .height = (double) v.height,
+                       .rotation = v.rotation},
+            .alpha = v.alpha};
   }
 
   auto Output::render() -> void
@@ -32,7 +29,7 @@ namespace cloth {
       return;
     }
 
-    context.views.clear();
+    context.reset();
 
     if (prev_workspace != workspace && prev_workspace && ws_alpha >= 1.f) {
       ws_alpha = 0;
@@ -40,45 +37,49 @@ namespace cloth {
     if (ws_alpha <= 1.f) ws_alpha += 0.075;
     if (ws_alpha > 1.f) ws_alpha = 1.f;
 
-    float prev_ws_alpha = 1.f - ws_alpha;
-    if (prev_ws_alpha > 0 && prev_workspace) {
-      double dx = wlr_output.width * ws_alpha;
-      if (workspace->index < prev_workspace->index) dx = -dx;
-      for (auto& v : prev_workspace->visible_views()) {
-        auto data = get_render_data(v);
-        data.alpha *= prev_ws_alpha;
-        data.layout.width = v.width * prev_ws_alpha;
-        data.layout.height = v.height * prev_ws_alpha;
-        data.layout.x -= dx;
-        data.layout.x += v.width * ws_alpha / 2.f;
-        data.layout.y += v.height * ws_alpha / 2.f;
-        context.views.emplace_back(v, data);
-      }
-    }
-
-    if (ws_alpha >= 1.f) {
-      prev_workspace = workspace;
-    }
-
-    if (ws_alpha > 0) {
-      double dx = wlr_output.width * (1 -ws_alpha);
-      if (prev_workspace && workspace->index < prev_workspace->index) dx = -dx;
-      for (auto& v : workspace->visible_views()) {
-        auto data = get_render_data(v);
-        data.alpha *= ws_alpha;
-        if (ws_alpha != 1.f) {
-          data.layout.width = v.width * ws_alpha;
-          data.layout.height = v.height * ws_alpha;
-          data.layout.y += v.height * prev_ws_alpha / 2.f;
-          data.layout.x += v.width * prev_ws_alpha / 2.f;
-          data.layout.x += dx;
+    if (prev_workspace == workspace && workspace->fullscreen_view) {
+      context.fullscreen_view = workspace->fullscreen_view;
+    } else {
+      float prev_ws_alpha = 1.f - ws_alpha;
+      if (prev_ws_alpha > 0 && prev_workspace) {
+        double dx = wlr_output.width * ws_alpha;
+        if (workspace->index < prev_workspace->index) dx = -dx;
+        for (auto& v : prev_workspace->visible_views()) {
+          auto data = get_render_data(v);
+          data.alpha *= prev_ws_alpha;
+          data.layout.width = v.width * prev_ws_alpha;
+          data.layout.height = v.height * prev_ws_alpha;
+          data.layout.x -= dx;
+          data.layout.x += v.width * ws_alpha / 2.f;
+          data.layout.y += v.height * ws_alpha / 2.f;
+          context.views.emplace_back(v, data);
         }
-        context.views.emplace_back(v, data);
+      }
+
+      if (ws_alpha >= 1.f) {
+        prev_workspace = workspace;
+      }
+
+      if (ws_alpha > 0) {
+        double dx = wlr_output.width * (1 - ws_alpha);
+        if (prev_workspace && workspace->index < prev_workspace->index) dx = -dx;
+        for (auto& v : workspace->visible_views()) {
+          auto data = get_render_data(v);
+          data.alpha *= ws_alpha;
+          if (ws_alpha != 1.f) {
+            data.layout.width = v.width * ws_alpha;
+            data.layout.height = v.height * ws_alpha;
+            data.layout.y += v.height * prev_ws_alpha / 2.f;
+            data.layout.x += v.width * prev_ws_alpha / 2.f;
+            data.layout.x += dx;
+          }
+          context.views.emplace_back(v, data);
+        }
       }
     }
 
     context.do_render();
-    
+
     if (ws_alpha < 1.f) context.damage_whole();
   }
 
@@ -112,10 +113,7 @@ namespace cloth {
   }
 
   Output::Output(Desktop& p_desktop, Workspace& ws, wlr::output_t& wlr) noexcept
-    : desktop(p_desktop),
-      workspace(&ws),
-      wlr_output(wlr),
-      last_frame(chrono::clock::now())
+    : desktop(p_desktop), workspace(&ws), wlr_output(wlr), last_frame(chrono::clock::now())
   {
     wlr_output.data = this;
 
@@ -192,13 +190,17 @@ namespace cloth {
   {
     context.damage_whole_drag_icon(icon);
   }
-  auto Output::damage_from_local_surface(wlr::surface_t& surface, double ox, double oy, float rotation)
-    -> void
+  auto Output::damage_from_local_surface(wlr::surface_t& surface,
+                                         double ox,
+                                         double oy,
+                                         float rotation) -> void
   {
     context.damage_from_local_surface(surface, ox, oy, rotation);
   }
-  auto Output::damage_whole_local_surface(wlr::surface_t& surface, double ox, double oy, float rotation)
-    -> void
+  auto Output::damage_whole_local_surface(wlr::surface_t& surface,
+                                          double ox,
+                                          double oy,
+                                          float rotation) -> void
   {
     context.damage_whole_local_surface(surface, ox, oy, rotation);
   }
