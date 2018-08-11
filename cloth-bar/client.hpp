@@ -4,6 +4,7 @@
 
 #include <gtkmm.h>
 #include <wayland-client.hpp>
+#include <thread>
 
 #include <protocols.hpp>
 
@@ -12,6 +13,10 @@
 #include "gdkwayland.hpp"
 
 #include "bar.hpp"
+
+#include <dbus-c++/dbus.h>
+
+#include <widgets/status-icons.hpp>
 
 namespace cloth::bar {
 
@@ -31,6 +36,8 @@ namespace cloth::bar {
     wl::cloth_window_manager_t window_manager;
     wl::zwlr_layer_shell_v1_t layer_shell;
     util::ptr_vec<Bar> bars;
+    DBus::BusDispatcher dispatcher;
+    std::thread dbus_thread;
 
     struct {
       sigc::signal<void(int, int)> workspace_state;
@@ -44,6 +51,8 @@ namespace cloth::bar {
     {}
 
     auto bind_interfaces();
+
+    auto dbus_main() -> void;
 
     auto setup_css();
 

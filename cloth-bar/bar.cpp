@@ -153,21 +153,26 @@ namespace cloth::bar {
     box1.pack_start(center, false, false);
     box1.pack_end(right, true, true);
 
-    auto& focused_window = *Gtk::manage(new Gtk::Label());
+    auto& rofi_btn = *Gtk::manage(new Gtk::Button("ROFI"));
+    rofi_btn.signal_clicked().connect(
+      [&]() { client.window_manager.run_command("exec killall rofi || rofi -show drun &"); });
+
+    auto& focused_window = *Gtk::manage(new Gtk::Button());
     focused_window.get_style_context()->add_class("focused-window-title");
     client.signals.focused_window_name.connect([&focused_window](std::string focused_window_name) {
       if (focused_window_name.size() > 70) {
         focused_window_name.erase(67);
         focused_window_name += "...";
       }
-      focused_window.set_text(focused_window_name);
+      focused_window.set_label(focused_window_name);
     });
 
+    focused_window.signal_clicked().connect([&] { client.window_manager.run_command("next_window");});
     focused_window.set_hexpand(false);
 
-    auto& button = *Gtk::manage(new Gtk::Button("TERM"));
+    auto& button = *Gtk::manage(new Gtk::Button("VKBD"));
     button.signal_clicked().connect(
-      [&]() { client.window_manager.run_command("exec weston-terminal"); });
+      [&]() { client.window_manager.run_command("exec killall virtboard || virtboard &"); });
 
     auto& clock = *new ClockWidget();
 
@@ -178,6 +183,7 @@ namespace cloth::bar {
 
     left.pack_start(focused_window, false, true, 0);
     center.pack_start(workspace_selector, true, false, 10);
+    right.pack_end(rofi_btn, false, true, 0);
     right.pack_end(button, false, false, 0);
     right.pack_end(clock, false, false, 0);
     right.pack_end(battery, false, false, 0);

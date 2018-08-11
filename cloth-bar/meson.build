@@ -30,4 +30,8 @@ protocol_sources = custom_target('gen-protocols',
 
 sources += protocol_sources
 
-executable('cloth-bar', sources, dependencies : [thread_dep, fmt, wlroots, wlr_protos, libinput, wayland_cursor_dep, dep_cloth_common, waylandpp, gtkmm])
+sources += dbus_proxy.process('../protocol/dbus-menu.xml')
+sources += dbus_adaptor.process('../protocol/dbus-status-notifier-item.xml')
+sources += dbus_adaptor.process('../protocol/dbus-status-notifier-watcher.xml')
+
+executable('cloth-bar', sources, dependencies : [thread_dep, fmt, wlroots, wlr_protos, libinput, wayland_cursor_dep, dep_cloth_common, waylandpp, gtkmm, dbus_dep])

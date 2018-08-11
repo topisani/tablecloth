@@ -20,6 +20,8 @@ window {
 .focused-window-title {
     padding: 0px 10px;
     min-height: 0px;
+    background: black;
+    color: white;
 }
 
 .workspace-selector {
