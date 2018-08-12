@@ -17,11 +17,12 @@ namespace cloth::notifications {
         if (hints.count("image-path")) return {hints.at("image-path"), true, false};
         if (hints.count("image_path")) return {hints.at("image_path"), true, false}; // deprecated
         if (!app_icon.empty()) return {app_icon, true, true};
-        if (hints.count("icon_data")) return {hints.at("icon_data"), false, true};
+        if (hints.count("icon_data")) return {"icon_data", false, true};
         return {"", true, false};
       }();
 
       if (is_path && !key.empty()) {
+        if (util::starts_with("file://", key)) key = key.substr(7);
         return std::pair(Gdk::Pixbuf::create_from_file(key), is_icon);
       } else if (!key.empty()) {
         auto [width, height, rowstride, has_alpha, bits_per_sample, channels, image_data, _] =
@@ -64,13 +65,23 @@ namespace cloth::notifications {
     std::ostringstream strm;
     strm << "hints = { ";
     for (auto& [k, v] : hints) {
-      strm << k << " ";
+      strm << k << "<" << char(v.reader().type()) << "> ";
     }
     strm << " }";
     LOGD("{}", strm.str());
 
     Urgency urgency = Urgency::Normal;
-    if (hints.count("urgency")) urgency = Urgency{uint8_t(hints.at("urgency"))};
+    if (hints.count("urgency")) urgency = [&] {
+      auto& urg = hints.at("urgency");
+      switch (urg.reader().type()) {
+        case 'y': return Urgency{uint8_t(urg)};
+        case 'u': return Urgency{uint8_t(uint32_t(urg))};
+        case 'i': return Urgency{uint8_t(int32_t(urg))};
+        default:
+          LOGE("Urgency hint has wrong type {}", urg.reader().type());
+          return Urgency::Normal;
+      }
+    }();
 
     if (expire_timeout < 0) {
       switch (urgency) {
@@ -92,6 +103,7 @@ namespace cloth::notifications {
       notifications.emplace_back(*this, notification_id, summary, body, actions, urgency,
                                  expire_timeout, image);
     });
+
     return notification_id;
   }
 
@@ -136,6 +148,8 @@ namespace cloth::notifications {
 
     title.set_markup(fmt::format("<b>{}</b>", title_str));
     body.set_text(body_str);
+    body.set_line_wrap(true);
+    body.set_max_width_chars(80);
     auto& actions_box = *Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL));
     auto prev = actions.begin();
     auto cur = prev + 1;
