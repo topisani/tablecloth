@@ -30,20 +30,10 @@ namespace cloth {
     wl::Listener on_destroy;
   };
 
-  struct Device {
-    Device(Seat& seat, wlr::input_device_t& device) noexcept;
-
-    Seat& seat;
-    wlr::input_device_t& wlr_device;
-
-    wl::Listener on_output_transform;
-  };
-
   struct Pointer : Device {
     Pointer(Seat&, wlr::input_device_t&) noexcept;
     ~Pointer() noexcept;
 
-    wl::Listener on_device_destroy;
     wl::Listener on_output_transform;
   };
 
@@ -51,16 +41,15 @@ namespace cloth {
     Touch(Seat&, wlr::input_device_t&) noexcept;
     ~Touch() noexcept;
 
-    wl::Listener on_device_destroy;
     wl::Listener on_output_transform;
   };
 
+  /// The device that connects to the tools
   struct Tablet : Device {
     Tablet(Seat&, wlr::input_device_t&) noexcept;
     ~Tablet() noexcept;
 
     wlr::tablet_v2_tablet_t& tablet_v2;
-    wl::Listener on_device_destroy;
 
     wl::Listener on_axis;
     wl::Listener on_proximity;
@@ -68,6 +57,7 @@ namespace cloth {
     wl::Listener on_button;
   };
 
+  /// Unrelated to the pen stuff, just handles different input on the pad
   struct TabletPad : Device {
     TabletPad(Seat& seat, wlr::tablet_v2_tablet_pad_t&) noexcept;
     ~TabletPad() noexcept;
@@ -76,7 +66,6 @@ namespace cloth {
 
     wlr::tablet_v2_tablet_pad_t& tablet_v2_pad;
 
-    wl::Listener on_device_destroy;
     wl::Listener on_attach;
     wl::Listener on_button;
     wl::Listener on_ring;
@@ -84,6 +73,7 @@ namespace cloth {
     wl::Listener on_tablet_destroy;
   };
 
+  /// Not a separate device, just added on the tablet proximity event.
   struct TabletTool {
     TabletTool(Seat& seat, wlr::tablet_v2_tablet_tool_t&) noexcept;
 
@@ -121,7 +111,7 @@ namespace cloth {
     Seat(Input& input, const std::string& name);
     ~Seat();
 
-    void add_device(wlr::input_device_t& device) noexcept;
+    Device& add_device(wlr::input_device_t& device) noexcept;
     void update_capabilities() noexcept;
     void configure_cursor();
     void configure_xcursor();
@@ -175,11 +165,11 @@ namespace cloth {
 
     void handle_new_drag_icon(void* data);
 
-    void add_keyboard(wlr::input_device_t& device);
-    void add_pointer(wlr::input_device_t& device);
-    void add_touch(wlr::input_device_t& device);
-    void add_tablet_pad(wlr::input_device_t& device);
-    void add_tablet_tool(wlr::input_device_t& device);
+    auto add_keyboard(wlr::input_device_t& device) -> Keyboard&;
+    auto add_pointer(wlr::input_device_t& device) -> Pointer&;
+    auto add_touch(wlr::input_device_t& device) -> Touch&;
+    auto add_tablet_pad(wlr::input_device_t& device) -> TabletPad&;
+    auto add_tablet_tool(wlr::input_device_t& device) -> Tablet&;
     SeatView& add_view(View& view);
 
   private:

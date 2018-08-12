@@ -300,12 +300,12 @@ namespace cloth {
                                            const xkb_keysym_t** keysyms,
                                            uint32_t* modifiers)
   {
-    *modifiers = wlr_keyboard_get_modifiers(device.keyboard);
+    *modifiers = wlr_keyboard_get_modifiers(wlr_device.keyboard);
     xkb_mod_mask_t consumed =
-      xkb_state_key_get_consumed_mods2(device.keyboard->xkb_state, keycode, XKB_CONSUMED_MODE_XKB);
+      xkb_state_key_get_consumed_mods2(wlr_device.keyboard->xkb_state, keycode, XKB_CONSUMED_MODE_XKB);
     *modifiers = *modifiers & ~consumed;
 
-    return xkb_state_key_get_syms(device.keyboard->xkb_state, keycode, keysyms);
+    return xkb_state_key_get_syms(wlr_device.keyboard->xkb_state, keycode, keysyms);
   }
 
   /// Get keysyms and modifiers from the keyboard as if modifiers didn't change
@@ -319,10 +319,10 @@ namespace cloth {
                                     const xkb_keysym_t** keysyms,
                                     uint32_t* modifiers)
   {
-    *modifiers = wlr_keyboard_get_modifiers(device.keyboard);
+    *modifiers = wlr_keyboard_get_modifiers(wlr_device.keyboard);
 
-    xkb_layout_index_t layout_index = xkb_state_key_get_layout(device.keyboard->xkb_state, keycode);
-    return xkb_keymap_key_get_syms_by_level(device.keyboard->keymap, keycode, layout_index, 0,
+    xkb_layout_index_t layout_index = xkb_state_key_get_layout(wlr_device.keyboard->xkb_state, keycode);
+    return xkb_keymap_key_get_syms_by_level(wlr_device.keyboard->keymap, keycode, layout_index, 0,
                                             keysyms);
   }
 
@@ -350,15 +350,15 @@ namespace cloth {
     }
 
     if (!handled) {
-      wlr_seat_set_keyboard(seat.wlr_seat, &device);
+      wlr_seat_set_keyboard(seat.wlr_seat, &wlr_device);
       wlr_seat_keyboard_notify_key(seat.wlr_seat, event.time_msec, event.keycode, event.state);
     }
   }
 
   void Keyboard::handle_modifiers()
   {
-    wlr_seat_set_keyboard(seat.wlr_seat, &device);
-    wlr_seat_keyboard_notify_modifiers(seat.wlr_seat, &device.keyboard->modifiers);
+    wlr_seat_set_keyboard(seat.wlr_seat, &wlr_device);
+    wlr_seat_keyboard_notify_modifiers(seat.wlr_seat, &wlr_device.keyboard->modifiers);
   }
 
   static void keyboard_config_merge(Config::Keyboard& config, Config::Keyboard* fallback)
@@ -393,7 +393,7 @@ namespace cloth {
     }
   }
 
-  Keyboard::Keyboard(Seat& seat, wlr::input_device_t& device) : seat(seat), device(device)
+  Keyboard::Keyboard(Seat& seat, wlr::input_device_t& device) : Device(seat, device)
   {
     assert(device.type == WLR_INPUT_DEVICE_KEYBOARD);
 

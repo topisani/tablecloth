@@ -215,10 +215,16 @@ namespace cloth {
       auto* event = (wlr::event_tablet_tool_tip_t*) data;
       auto& tool = *(TabletTool*) event->tool->data;
 
+      auto button = event->tool->type == WLR_TABLET_TOOL_TYPE_ERASER ? wlr::Button::right : wlr::Button::left;
+
       if (event->state == WLR_TABLET_TOOL_TIP_DOWN) {
         wlr_send_tablet_v2_tablet_tool_down(&tool.tablet_v2_tool);
+        press_button(*event->device, event->time_msec, button, WLR_BUTTON_PRESSED,
+                     event->x, event->y);
       } else {
         wlr_send_tablet_v2_tablet_tool_up(&tool.tablet_v2_tool);
+        press_button(*event->device, event->time_msec, button, WLR_BUTTON_RELEASED,
+                     event->x, event->y);
       }
     };
 
@@ -233,8 +239,10 @@ namespace cloth {
         // TODO: cleaner solution? I mean, this works fine...
         new TabletTool(seat, *wlr_tablet_tool_create(desktop.tablet_v2, seat.wlr_seat, wlr_tool));
       }
-      handle_tablet_tool_position(*this, *(Tablet*) event->device->data, event->tool, true, true, event->x,
-                                  event->y, 0, 0);
+      if (event->state == WLR_TABLET_TOOL_PROXIMITY_IN) {
+        handle_tablet_tool_position(*this, *(Tablet*) event->device->data, event->tool, true, true,
+                                    event->x, event->y, 0, 0);
+      }
     };
 
 
@@ -391,7 +399,7 @@ namespace cloth {
   {
     auto& desktop = seat.input.server.desktop;
 
-    bool is_touch = device.type == WLR_INPUT_DEVICE_TOUCH;
+    bool is_touch = device.type == WLR_INPUT_DEVICE_TOUCH && device.type == WLR_INPUT_DEVICE_TABLET_TOOL;
 
     double sx, sy;
     View* view;

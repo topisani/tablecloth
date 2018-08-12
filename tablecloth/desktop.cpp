@@ -243,7 +243,8 @@ namespace cloth {
         return;
       }
 
-      seat->add_device(keyboard.input_device);
+      auto& device = seat->add_device(keyboard.input_device);
+      device.on_device_destroy.add_to(keyboard.events.destroy);
     };
     on_virtual_keyboard_new.add_to(virtual_keyboard->events.new_virtual_keyboard);
 

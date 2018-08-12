@@ -11,16 +11,24 @@ namespace cloth {
   using xkb_keysym_t = uint32_t;
   using xkb_keycode_t = uint32_t;
 
-  struct Keyboard {
+  struct Device {
+    Device(Seat& seat, wlr::input_device_t& device) noexcept;
+    virtual ~Device() noexcept = default;
+
+    Seat& seat;
+    wlr::input_device_t& wlr_device;
+
+    wl::Listener on_output_transform;
+    wl::Listener on_device_destroy;
+  };
+
+  struct Keyboard : Device {
     Keyboard(Seat& seat, wlr::input_device_t& device);
 
     static constexpr const int pressed_keysyms_cap = 32;
-    Seat& seat;
 
-    wlr::input_device_t& device;
     Config::Keyboard config;
 
-    wl::Listener on_device_destroy;
     wl::Listener on_keyboard_key;
     wl::Listener on_keyboard_modifiers;
 

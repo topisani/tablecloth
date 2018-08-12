@@ -216,6 +216,7 @@ namespace cloth::wlr {
   using tablet_pad_impl_t = struct wlr_tablet_pad_impl;
   using tablet_pad_t = struct wlr_tablet_pad;
   using tablet_tool_client_v2_t = struct wlr_tablet_tool_client_v2;
+  using tablet_tool_proximity_state_t = enum wlr_tablet_tool_proximity_state;
   using tablet_tool_t = struct wlr_tablet_tool;
   using tablet_t = struct wlr_tablet;
   using tablet_v2_event_cursor_t = struct wlr_tablet_v2_event_cursor;
@@ -274,7 +275,8 @@ namespace cloth::wlr {
   using xdg_toplevel_v6_move_event_t = struct wlr_xdg_toplevel_v6_move_event;
   using xdg_toplevel_v6_resize_event_t = struct wlr_xdg_toplevel_v6_resize_event;
   using xdg_toplevel_v6_set_fullscreen_event_t = struct wlr_xdg_toplevel_v6_set_fullscreen_event;
-  using xdg_toplevel_v6_show_window_menu_event_t = struct wlr_xdg_toplevel_v6_show_window_menu_event;
+  using xdg_toplevel_v6_show_window_menu_event_t =
+    struct wlr_xdg_toplevel_v6_show_window_menu_event;
   using xdg_toplevel_v6_state_t = struct wlr_xdg_toplevel_v6_state;
   using xdg_toplevel_v6_t = struct wlr_xdg_toplevel_v6;
   using xwm_t = struct wlr_xwm;

@@ -283,50 +283,54 @@ namespace cloth {
     this->seat.update_capabilities();
   }
 
-  void Seat::add_keyboard(wlr::input_device_t& device)
+  auto Seat::add_keyboard(wlr::input_device_t& device) -> Keyboard&
   {
     assert(device.type == WLR_INPUT_DEVICE_KEYBOARD);
-    keyboards.emplace_back(*this, device);
+    auto& kbd = keyboards.emplace_back(*this, device);
     wlr_seat_set_keyboard(wlr_seat, &device);
+    return kbd;
   }
 
-  void Seat::add_pointer(wlr::input_device_t& device)
+  auto Seat::add_pointer(wlr::input_device_t& device) -> Pointer&
   {
     assert(device.type == WLR_INPUT_DEVICE_POINTER);
-    pointers.emplace_back(*this, device);
+    return pointers.emplace_back(*this, device);
   }
 
-  void Seat::add_touch(wlr::input_device_t& device)
+  auto Seat::add_touch(wlr::input_device_t& device) -> Touch&
   {
     assert(device.type == WLR_INPUT_DEVICE_TOUCH);
-    touch.emplace_back(*this, device);
+    return touch.emplace_back(*this, device);
   }
 
-  void Seat::add_tablet_pad(wlr::input_device_t& device)
+  auto Seat::add_tablet_pad(wlr::input_device_t& device) -> TabletPad&
   {
     assert(device.type == WLR_INPUT_DEVICE_TABLET_PAD);
-    tablet_pads.emplace_back(
-      *this, *wlr_tablet_pad_create(input.server.desktop.tablet_v2, wlr_seat, &device));
+    return tablet_pads.emplace_back(
+    *this, *wlr_tablet_pad_create(input.server.desktop.tablet_v2, wlr_seat, &device));
   }
 
-  void Seat::add_tablet_tool(wlr::input_device_t& device)
+  auto Seat::add_tablet_tool(wlr::input_device_t& device) -> Tablet&
   {
     assert(device.type == WLR_INPUT_DEVICE_TABLET_TOOL);
-    tablets.emplace_back(*this, device);
+    return tablets.emplace_back(*this, device);
   }
 
-  void Seat::add_device(wlr::input_device_t& device) noexcept
+  auto Seat::add_device(wlr::input_device_t& device) noexcept -> Device&
   {
+    auto& ref = [&] () -> Device& {
     switch (device.type) {
-    case WLR_INPUT_DEVICE_KEYBOARD: add_keyboard(device); break;
-    case WLR_INPUT_DEVICE_POINTER: add_pointer(device); break;
-    case WLR_INPUT_DEVICE_TOUCH: add_touch(device); break;
-    case WLR_INPUT_DEVICE_TABLET_PAD: add_tablet_pad(device); break;
-    case WLR_INPUT_DEVICE_TABLET_TOOL: add_tablet_tool(device); break;
+    case WLR_INPUT_DEVICE_KEYBOARD: return add_keyboard(device); break;
+    case WLR_INPUT_DEVICE_POINTER: return add_pointer(device); break;
+    case WLR_INPUT_DEVICE_TOUCH: return add_touch(device); break;
+    case WLR_INPUT_DEVICE_TABLET_PAD: return add_tablet_pad(device); break;
+    case WLR_INPUT_DEVICE_TABLET_TOOL: return add_tablet_tool(device); break;
     }
+    }();
 
     configure_cursor();
     update_capabilities();
+    return ref;
   }
 
   void Seat::configure_xcursor()
@@ -369,7 +373,7 @@ namespace cloth {
         continue;
       }
 
-      uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard.device.keyboard);
+      uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard.wlr_device.keyboard);
       if ((modifiers ^ keyboard.config.meta_key) == 0) {
         return true;
       }
