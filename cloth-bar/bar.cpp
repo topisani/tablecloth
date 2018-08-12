@@ -172,7 +172,7 @@ namespace cloth::bar {
 
     auto& button = *Gtk::manage(new Gtk::Button("VKBD"));
     button.signal_clicked().connect(
-      [&]() { client.window_manager.run_command("exec killall virtboard || virtboard &"); });
+      [&]() { client.window_manager.run_command("exec killall cloth-kbd || cloth-kbd &"); });
 
     auto& clock = *new ClockWidget();
 
