@@ -1,0 +1,16 @@
+window {
+    background: rgba(0, 0, 0, 0);
+    opacity: 1.0;
+    border: none;
+    color: white;
+}
+
+button {
+    padding: 30px;
+    border-radius: 0px;
+}
+
+.clock-widget {
+    padding: 0px 10px;
+    min-height: 0px;
+}
