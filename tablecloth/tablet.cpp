@@ -33,7 +33,7 @@ namespace cloth {
     };
 
     on_tool_destroy.add_to(tablet_v2_tool.wlr_tool->events.destroy);
-    on_tool_destroy = [this] {  };
+    on_tool_destroy = [] {  };
   }
 
   TabletTool::~TabletTool() noexcept {}

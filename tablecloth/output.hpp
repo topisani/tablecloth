@@ -55,7 +55,7 @@ namespace cloth {
   private:
     auto render() -> void;
 
-    RenderContext context = {*this};
+    render::Context context = {*this};
 
     Workspace* prev_workspace = nullptr;
 

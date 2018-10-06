@@ -137,7 +137,6 @@ namespace cloth {
     float rotation = 0;
     float alpha = 1;
 
-
     bool maximized = false;
 
     Output* fullscreen_output = nullptr;

@@ -24,9 +24,20 @@ namespace cloth {
     auto box() const noexcept -> wlr::box_t;
     auto part_at(double sx, double sy) const noexcept -> DecoPart;
     auto damage() -> void;
-    auto is_visible() { return _visible; }
-    auto border_width() { return _border_width; }
-    auto titlebar_height() { return _titlebar_height; }
+    auto is_visible()
+    {
+      return _visible;
+    }
+    auto border_width()
+    {
+      return _border_width;
+    }
+    auto titlebar_height()
+    {
+      return _titlebar_height;
+    }
+    auto shadow_offset() -> float;
+    auto shadow_radius() -> float;
 
     View& view;
 
@@ -34,6 +45,8 @@ namespace cloth {
     int _border_width = 0;
     int _titlebar_height = 0;
     bool _visible = false;
+    float _shadow_offset = 4;
+    float _shadow_radius = 20;
   };
 
 } // namespace cloth

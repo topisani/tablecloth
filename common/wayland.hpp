@@ -157,6 +157,7 @@ namespace cloth::wl {
 
     void add_to(wl_signal& sig) noexcept
     {
+      remove();
       wl_signal_add(&sig, &_listener);
     }
 

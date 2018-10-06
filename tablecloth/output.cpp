@@ -13,7 +13,7 @@
 
 namespace cloth {
 
-  auto get_render_data(View& v) -> RenderData
+  auto get_render_data(View& v) -> render::RenderData
   {
     return {.layout = {.x = v.x,
                        .y = v.y,

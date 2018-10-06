@@ -7,14 +7,16 @@
 #include "server.hpp"
 #include "view.hpp"
 
-namespace cloth {
+#include "render_utils.hpp"
+
+namespace cloth::render {
 
   struct ContextAndData {
-    RenderContext& context;
+    Context& context;
     const RenderData& data;
   };
 
-  RenderContext::RenderContext(Output& output)
+  Context::Context(Output& output)
     : output(output), damage(wlr_output_damage_create(&output.wlr_output))
   {}
 
@@ -26,13 +28,13 @@ namespace cloth {
    * Rotate a child's position relative to a parent. The parent size is (pw, ph),
    * the child position is (*sx, *sy) and its size is (sw, sh).
    */
-  static void rotate_child_position(double& sx,
+  auto rotate_child_position(double& sx,
                                     double& sy,
                                     double sw,
                                     double sh,
                                     double pw,
                                     double ph,
-                                    float rotation)
+                                    float rotation) -> void
   {
     if (rotation != 0.0) {
       // Coordinates relative to the center of the subsurface
@@ -45,12 +47,12 @@ namespace cloth {
     }
   }
 
-  static void get_layout_position(const LayoutData& data,
+  auto get_layout_position(const LayoutData& data,
                                   double& lx,
                                   double& ly,
                                   const wlr::surface_t& surface,
                                   int sx,
-                                  int sy)
+                                  int sy) -> void
   {
     double _sx = sx, _sy = sy;
     rotate_child_position(_sx, _sy, surface.current.width, surface.current.height, data.width,
@@ -59,7 +61,7 @@ namespace cloth {
     ly = data.y + _sy;
   }
 
-  static bool has_standalone_surface(View& view)
+  auto has_standalone_surface(View& view) -> bool
   {
     if (!wl_list_empty(&view.wlr_surface->subsurfaces)) {
       return false;
@@ -85,13 +87,13 @@ namespace cloth {
    * nullptr, it populates it with the surface box in the output, in output-local
    * coordinates.
    */
-  static bool surface_intersect_output(wlr::surface_t& surface,
+  auto surface_intersect_output(wlr::surface_t& surface,
                                        wlr::output_layout_t& output_layout,
                                        wlr::output_t& wlr_output,
                                        double lx,
                                        double ly,
                                        float rotation,
-                                       wlr::box_t* box)
+                                       wlr::box_t* box) -> bool
   {
     double ox = lx, oy = ly;
     wlr_output_layout_output_coords(&output_layout, &wlr_output, &ox, &oy);
@@ -116,12 +118,13 @@ namespace cloth {
     return wlr_output_layout_intersects(&output_layout, &wlr_output, &layout_box);
   }
 
+
   //////////////////////////////////////////
-  // RenderContext render functions
+  // Context render functions
   //////////////////////////////////////////
 
 
-  auto RenderContext::layers_send_done() -> void
+  auto Context::layers_send_done() -> void
   {
     auto when_ts = chrono::to_timespec(when);
     for (auto& layer : output.layers) {
@@ -137,7 +140,7 @@ namespace cloth {
     }
   }
 
-  static void scissor_output(Output& output, pixman_box32_t* rect)
+  auto scissor_output(Output& output, pixman_box32_t* rect) -> void
   {
     wlr::renderer_t* renderer = wlr_backend_get_renderer(output.wlr_output.backend);
     assert(renderer);
@@ -158,78 +161,8 @@ namespace cloth {
     wlr_renderer_scissor(renderer, &box);
   }
 
-  static wlr::box_t get_decoration_box(View& view, Output& output)
-  {
-    wlr::output_t& wlr_output = output.wlr_output;
-
-    wlr::box_t deco_box = view.deco.box();
-    double sx = deco_box.x - view.x;
-    double sy = deco_box.y - view.y;
-    rotate_child_position(sx, sy, deco_box.width, deco_box.height, view.wlr_surface->current.width,
-                          view.wlr_surface->current.height, view.rotation);
-    double x = sx + view.x;
-    double y = sy + view.y;
-
-    wlr::box_t box;
-
-    wlr_output_layout_output_coords(output.desktop.layout, &wlr_output, &x, &y);
-
-    box.x = x * wlr_output.scale;
-    box.y = y * wlr_output.scale;
-    box.width = deco_box.width * wlr_output.scale;
-    box.height = deco_box.height * wlr_output.scale;
-    return box;
-  }
-
-  auto RenderContext::render_decorations(View& view, RenderData& data) -> void
-  {
-    if (!view.deco.is_visible() || view.maximized || view.wlr_surface == nullptr) {
-      return;
-    }
-
-    wlr::renderer_t* renderer = wlr_backend_get_renderer(output.wlr_output.backend);
-    assert(renderer);
-
-    wlr::box_t box = get_decoration_box(view, output);
-    double x_scale = data.layout.width / double(view.width);
-    double y_scale = data.layout.height / double(view.height);
-    box.x = data.layout.x + (box.x - view.x) * x_scale;
-    box.y = data.layout.y + (box.y - view.y) * y_scale;
-    box.width *= x_scale;
-    box.height *= y_scale;
-
-    wlr::box_t rotated;
-    wlr_box_rotated_bounds(&box, view.rotation, &rotated);
-
-    pixman_region32_t damage;
-    pixman_region32_init(&damage);
-    pixman_region32_union_rect(&damage, &damage, rotated.x, rotated.y, rotated.width,
-                               rotated.height);
-    pixman_region32_intersect(&damage, &damage, &pixman_damage);
-    bool damaged = pixman_region32_not_empty(&damage);
-    if (damaged) {
-      float matrix[9];
-      wlr_matrix_project_box(matrix, &box, WL_OUTPUT_TRANSFORM_NORMAL, view.rotation,
-                             output.wlr_output.transform_matrix);
-      std::array<float, 4> color;
-      if (view.active)
-        color = {0x00 / 255.f, 0x59 / 255.f, 0x73 / 255.f, view.alpha};
-      else
-        color = {0.2, 0.2, 0.2, view.alpha};
-
-      int nrects;
-      pixman_box32_t* rects = pixman_region32_rectangles(&damage, &nrects);
-      for (int i = 0; i < nrects; ++i) {
-        scissor_output(output, &rects[i]);
-        wlr_render_quad_with_matrix(renderer, color.data(), matrix);
-      }
-    }
-
-    pixman_region32_fini(&damage);
-  }
-
   struct SurfaceRenderData {
-    RenderContext& context;
+    Context& context;
     // The data for the toplevel view this surface is linked to.
     RenderData parent_data;
     // The scaling applied.
@@ -237,7 +170,7 @@ namespace cloth {
     double y_scale = 1.0;
   };
 
-  auto RenderContext::render_surface(wlr::surface_t* surface, int sx, int sy, void* _data) -> void
+  auto Context::render_surface(wlr::surface_t* surface, int sx, int sy, void* _data) -> void
   {
     if (!surface) {
       // LOGE("null surface in render_surface");
@@ -310,7 +243,7 @@ namespace cloth {
 
 
 
-  auto RenderContext::render(View& view, RenderData& data) -> void
+  auto Context::render(View& view, RenderData& data) -> void
   {
     // Do not render views fullscreened on other outputs
     if (view.fullscreen_output != nullptr && view.fullscreen_output != &output) {
@@ -321,7 +254,7 @@ namespace cloth {
     for_each_surface(view, render_surface, data);
   }
 
-  auto RenderContext::render(Layer& layer) -> void
+  auto Context::render(Layer& layer) -> void
   {
     for (auto& layer_surface : layer) {
       // TODO: alpha, rotation and scaling for layer surfaces.
@@ -338,14 +271,14 @@ namespace cloth {
     }
   } // namespace cloth
 
-  auto RenderContext::reset() -> void
+  auto Context::reset() -> void
   {
     views.clear();
     fullscreen_view = nullptr;
     clear_color = {0.25f, 0.25f, 0.25f, 1.0f};
   }
 
-  auto RenderContext::do_render() -> void
+  auto Context::do_render() -> void
   {
     renderer = wlr_backend_get_renderer(output.wlr_output.backend);
     assert(renderer);
@@ -467,7 +400,7 @@ namespace cloth {
     damage_done();
   }
 
-  auto RenderContext::damage_done() -> void
+  auto Context::damage_done() -> void
   {
     // Damage finish
 
@@ -510,7 +443,7 @@ namespace cloth {
 
 
   //////////////////////////////////////////
-  // RenderContext damage functions
+  // Context damage functions
   //////////////////////////////////////////
 
 
@@ -544,7 +477,7 @@ namespace cloth {
     return false;
   }
 
-  auto RenderContext::damage_whole() -> void
+  auto Context::damage_whole() -> void
   {
     wlr_output_damage_add_whole(damage);
   }
@@ -576,7 +509,7 @@ namespace cloth {
     wlr_output_damage_add_box(context.damage, &box);
   }
 
-  auto RenderContext::damage_whole_local_surface(wlr::surface_t& surface,
+  auto Context::damage_whole_local_surface(wlr::surface_t& surface,
                                                  double ox,
                                                  double oy,
                                                  float rotation) -> void
@@ -590,20 +523,7 @@ namespace cloth {
     for_each_surface(surface, damage_whole_surface, data);
   }
 
-  auto RenderContext::damage_whole_decoration(View& view) -> void
-  {
-    if (!view.deco.is_visible() || view.wlr_surface == nullptr) {
-      return;
-    }
-
-    wlr::box_t box = get_decoration_box(view, output);
-
-    wlr_box_rotated_bounds(&box, view.rotation, &box);
-
-    wlr_output_damage_add_box(damage, &box);
-  }
-
-  auto RenderContext::damage_whole_view(View& view) -> void
+  auto Context::damage_whole_view(View& view) -> void
   {
     if (!view_accept_damage(output, view)) {
       return;
@@ -615,7 +535,7 @@ namespace cloth {
     for_each_surface(view, damage_whole_surface, data);
   }
 
-  auto RenderContext::damage_whole_drag_icon(DragIcon& icon) -> void
+  auto Context::damage_whole_drag_icon(DragIcon& icon) -> void
   {
     RenderData data{.layout = {.x = icon.x, .y = icon.y}};
     for_each_surface(*icon.wlr_drag_icon.surface, damage_whole_surface, data);
@@ -663,7 +583,7 @@ namespace cloth {
     pixman_region32_fini(&damage);
   }
 
-  auto RenderContext::damage_from_local_surface(wlr::surface_t& surface,
+  auto Context::damage_from_local_surface(wlr::surface_t& surface,
                                                 double ox,
                                                 double oy,
                                                 float rotation) -> void
@@ -674,7 +594,7 @@ namespace cloth {
     for_each_surface(surface, damage_from_surface, data);
   }
 
-  auto RenderContext::damage_from_view(View& view) -> void
+  auto Context::damage_from_view(View& view) -> void
   {
     if (!view_accept_damage(output, view)) {
       return;
@@ -687,11 +607,11 @@ namespace cloth {
 
 
   //////////////////////////////////////////
-  // RenderContext for_each wrappers
+  // Context for_each wrappers
   //////////////////////////////////////////
 
 
-  auto RenderContext::for_each_surface(wlr::surface_t& surface,
+  auto Context::for_each_surface(wlr::surface_t& surface,
                                        wlr_surface_iterator_func_t iterator,
                                        const RenderData& data) -> void
   {
@@ -701,7 +621,7 @@ namespace cloth {
     wlr_surface_for_each_surface(&surface, iterator, &cd);
   }
 
-  auto RenderContext::for_each_surface(View& view,
+  auto Context::for_each_surface(View& view,
                                        wlr_surface_iterator_func_t iterator,
                                        const RenderData& data) -> void
   {
@@ -726,7 +646,7 @@ namespace cloth {
 
 #ifdef WLR_HAS_XWAYLAND
 
-  auto RenderContext::for_each_surface(wlr::xwayland_surface_t& surface,
+  auto Context::for_each_surface(wlr::xwayland_surface_t& surface,
                                        wlr_surface_iterator_func_t iterator,
                                        RenderData data) -> void
   {
@@ -747,7 +667,7 @@ namespace cloth {
   }
 #endif
 
-  auto RenderContext::for_each_drag_icon(Input& input,
+  auto Context::for_each_drag_icon(Input& input,
                                          wlr_surface_iterator_func_t iterator,
                                          RenderData data) -> void
   {
