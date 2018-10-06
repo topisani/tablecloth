@@ -12,6 +12,8 @@
 
 #include "widgets/battery.hpp"
 
+#include <sys/wait.h>
+
 namespace cloth::bar {
 
   Bar::Bar(Client& client, std::unique_ptr<wl::output_t>&& p_output)
@@ -140,6 +142,14 @@ namespace cloth::bar {
     util::SleeperThread thread;
   };
 
+  auto& Bar::cmd_button(const std::string& label, const std::string& cmd, const std::string& klass)
+  {
+    auto& button = *Gtk::manage(new Gtk::Button(label));
+    if (!klass.empty()) button.get_style_context()->add_class(klass);
+    button.signal_clicked().connect([&, cmd = cmd]() { client.window_manager.run_command(cmd); });
+    return button;
+  }
+
   auto Bar::setup_widgets() -> void
   {
     auto& left = *Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 0));
@@ -153,10 +163,6 @@ namespace cloth::bar {
     box1.pack_start(center, false, false);
     box1.pack_end(right, true, true);
 
-    auto& rofi_btn = *Gtk::manage(new Gtk::Button("ROFI"));
-    rofi_btn.signal_clicked().connect(
-      [&]() { client.window_manager.run_command("exec killall rofi || rofi -show drun &"); });
-
     auto& focused_window = *Gtk::manage(new Gtk::Button());
     focused_window.get_style_context()->add_class("focused-window-title");
     client.signals.focused_window_name.connect([&focused_window](std::string focused_window_name) {
@@ -167,12 +173,14 @@ namespace cloth::bar {
       focused_window.set_label(focused_window_name);
     });
 
-    focused_window.signal_clicked().connect([&] { client.window_manager.run_command("next_window");});
+    focused_window.signal_clicked().connect(
+      [&] { client.window_manager.run_command("next_window"); });
     focused_window.set_hexpand(false);
 
-    auto& button = *Gtk::manage(new Gtk::Button("VKBD"));
-    button.signal_clicked().connect(
-      [&]() { client.window_manager.run_command("exec killall cloth-kbd || cloth-kbd &"); });
+    //auto& tray = *new widgets::sni::TrayWidget();
+
+    auto& rofi_btn = cmd_button("ROFI", "exec killall rofi || rofi -show drun");
+    auto& vkbd_btn = cmd_button("VKBD", "exec killall cloth-kbd || cloth-kbd");
 
     auto& clock = *new ClockWidget();
 
@@ -181,10 +189,13 @@ namespace cloth::bar {
 
     auto& battery = *new widgets::Battery();
 
+    left.pack_start(cmd_button("X", "close", "win-btn"), false, false, 0);
+    left.pack_start(cmd_button("M", "maximize", "win-btn"), false, false, 0);
+    left.pack_start(cmd_button("C", "center", "win-btn"), false, false, 0);
     left.pack_start(focused_window, false, true, 0);
     center.pack_start(workspace_selector, true, false, 10);
     right.pack_end(rofi_btn, false, true, 0);
-    right.pack_end(button, false, false, 0);
+    right.pack_end(vkbd_btn, false, false, 0);
     right.pack_end(clock, false, false, 0);
     right.pack_end(battery, false, false, 0);
   }

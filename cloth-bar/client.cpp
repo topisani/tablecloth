@@ -34,14 +34,6 @@ namespace cloth::bar {
   {
     DBus::default_dispatcher = &dispatcher;
 
-    DBus::Connection conn = DBus::Connection::SessionBus();
-    bool status = conn.acquire_name(widgets::StatusNotifierWatcher::server_name.c_str());
-    if (!status) {
-      LOGE("Could not acquire StautsNotifierWatcher server name");
-    };
-
-    widgets::StatusNotifierWatcher server(conn);
-
     dispatcher.enter();
   }
 
@@ -58,10 +50,9 @@ namespace cloth::bar {
       std::cout << cli;
       return 1;
     }
+    dbus_thread = std::thread(&Client::dbus_main, this);
 
     bind_interfaces();
-
-    dbus_thread = std::thread(&Client::dbus_main, this);
 
     gtk_main.run();
     return 0;

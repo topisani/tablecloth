@@ -42,3 +42,10 @@ window {
     padding: 0px 10px;
     min-height: 0px;
 }
+
+button.win-btn {
+    min-height: 0px;
+    padding: 0px 0px;
+    background: black;
+    color: white;
+}

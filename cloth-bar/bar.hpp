@@ -30,10 +30,12 @@ namespace cloth::bar {
   private:
     auto setup_widgets() -> void;
     auto setup_css() -> void;
+    auto& cmd_button(const std::string& label,
+                     const std::string& cmd,
+                     const std::string& klass = "");
 
     int width = 10;
     Glib::RefPtr<Gtk::StyleContext> style_context;
     Glib::RefPtr<Gtk::CssProvider> css_provider;
   };
-
-}
+} // namespace cloth::bar
