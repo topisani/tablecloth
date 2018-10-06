@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <iostream>
 
 // All includes used in wlr files
 // This is done to make sure the keyword macros don't bleed into
@@ -378,7 +379,17 @@ namespace cloth::wlr {
     gear_up = BTN_GEAR_UP,
   };
 
+  inline bool box_contains(box_t lhs, box_t rhs) {
+    return lhs.x <= rhs.x && lhs.y <= rhs.y && lhs.x + lhs.width >= rhs.x + rhs.width && lhs.y + lhs.height >= rhs.y + rhs.height;
+  }
+
 } // namespace cloth::wlr
+
+inline std::ostream& operator<<(std::ostream& strm, const cloth::wlr::box_t& box)
+{
+  strm << box.width << "x" << box.height << "+" << box.x << "+" << box.y;
+  return strm;
+}
 
 inline bool operator==(const cloth::wlr::box_t& lhs, const cloth::wlr::box_t& rhs) noexcept
 {
@@ -389,6 +400,7 @@ inline bool operator!=(const cloth::wlr::box_t& lhs, const cloth::wlr::box_t& rh
 {
   return memcmp(&lhs, &rhs, sizeof(cloth::wlr::box_t)) != 0;
 }
+
 namespace cloth {
   CLOTH_ENABLE_BITMASK_OPS(wlr::edges_t);
 }

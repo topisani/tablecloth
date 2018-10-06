@@ -246,6 +246,11 @@ namespace cloth {
       set_fullscreen(e.fullscreen, e.output);
     };
 
+    on_set_title.add_to(xdg_surface->toplevel->events.set_title);
+    on_set_title = [this] (void* data) {
+
+    };
+
     on_surface_commit.add_to(xdg_surface->surface->events.commit);
     on_surface_commit = [this](void* data) {
       if (!this->xdg_surface || !this->xdg_surface->mapped) return;
@@ -286,6 +291,7 @@ namespace cloth {
       height = box.height;
 
       map(*this->xdg_surface->surface);
+      do_resize(width, height);
       setup();
     };
 

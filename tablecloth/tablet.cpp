@@ -13,10 +13,10 @@
 
 namespace cloth {
 
-  TabletTool::TabletTool(Seat& seat,
-                         wlr::tablet_v2_tablet_tool_t& tool) noexcept
+  TabletTool::TabletTool(Seat& seat, wlr::tablet_v2_tablet_tool_t& tool) noexcept
     : seat(seat), tablet_v2_tool(tool)
   {
+    LOGD("Create tablet tool");
     tablet_v2_tool.wlr_tool->data = this;
 
     on_set_cursor.add_to(tablet_v2_tool.events.set_cursor);
@@ -33,7 +33,7 @@ namespace cloth {
     };
 
     on_tool_destroy.add_to(tablet_v2_tool.wlr_tool->events.destroy);
-    on_tool_destroy = [this] { delete this; };
+    on_tool_destroy = [this] {  };
   }
 
   TabletTool::~TabletTool() noexcept {}
@@ -43,7 +43,8 @@ namespace cloth {
 
   static void attach_tablet_pad(TabletPad& pad, Tablet& tablet)
   {
-    LOGD("Attaching tablet pad \"{}\" to tablet \"{}\" ", pad.wlr_device.name, tablet.wlr_device.name);
+    LOGD("Attaching tablet pad \"{}\" to tablet \"{}\" ", pad.wlr_device.name,
+         tablet.wlr_device.name);
     pad.tablet = &tablet;
     pad.on_tablet_destroy.add_to(tablet.wlr_device.events.destroy);
   }

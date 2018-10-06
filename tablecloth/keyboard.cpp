@@ -1,9 +1,6 @@
 #include "keyboard.hpp"
 
-#include <unistd.h>
 #include <xkbcommon/xkbcommon.h>
-#include <charconv>
-
 #include "util/algorithm.hpp"
 #include "util/exception.hpp"
 #include "util/logging.hpp"
@@ -93,129 +90,9 @@ namespace cloth {
     }
   }
 
-  static std::string exec_prefix = "exec ";
-  static std::string switch_ws_prefix = "switch_workspace ";
-  static std::string move_ws_prefix = "move_workspace ";
-
-  static bool outputs_enabled = true;
-
   void Keyboard::execute_user_binding(std::string_view command_str)
   {
-    Input& input = seat.input;
-
-    try {
-      std::vector<std::string> args = util::split_string(std::string(command_str), " ");
-      std::string command = args.at(0);
-      args.erase(args.begin());
-
-      if (command == "exit") {
-        wl_display_terminate(input.server.wl_display);
-      } else if (command == "close") {
-        View* focus = seat.get_focus();
-        if (focus != nullptr) {
-          focus->close();
-        }
-      } else if (command == "center") {
-        View* focus = seat.get_focus();
-        if (focus != nullptr) {
-          focus->center();
-        }
-      } else if (command == "fullscreen") {
-        View* focus = seat.get_focus();
-        if (focus != nullptr) {
-          bool is_fullscreen = focus->fullscreen_output != nullptr;
-          focus->set_fullscreen(!is_fullscreen, nullptr);
-        }
-      } else if (command == "next_window") {
-        input.server.desktop.current_workspace().cycle_focus();
-      } else if (command == "alpha") {
-        View* focus = seat.get_focus();
-        if (focus != nullptr) {
-          focus->cycle_alpha();
-        }
-      } else if (command == "exec") {
-        std::string shell_cmd = std::string(command_str.substr(strlen("exec ")));
-        pid_t pid = fork();
-        if (pid < 0) {
-          LOGE("cannot execute binding command: fork() failed");
-          return;
-        } else if (pid == 0) {
-          LOGD("Executing command: {}", shell_cmd);
-          execl("/bin/sh", "/bin/sh", "-c", shell_cmd.c_str(), (void*) nullptr);
-        }
-      } else if (command == "maximize") {
-        View* focus = seat.get_focus();
-        if (focus != nullptr) {
-          focus->maximize(!focus->maximized);
-        }
-      } else if (command == "nop") {
-        LOGD("nop command");
-      } else if (command == "toggle_outputs") {
-        outputs_enabled = !outputs_enabled;
-        for (auto& output : seat.input.server.desktop.outputs) {
-          wlr_output_enable(&output.wlr_output, outputs_enabled);
-        }
-      } else if (command == "switch_workspace") {
-        int workspace = -1;
-        auto ws_str = args.at(0);
-        if (ws_str == "next") // +10 fixes wrapping backwards
-          workspace = (input.server.desktop.current_workspace().index + 1 + 10) % 10;
-        else if (ws_str == "prev")
-          workspace = (input.server.desktop.current_workspace().index - 1 + 10) % 10;
-        else
-          std::from_chars(&*ws_str.begin(), &*ws_str.end(), workspace);
-        if (workspace >= 0 && workspace < 10) {
-          input.server.desktop.switch_to_workspace(workspace);
-        }
-      } else if (command == "move_workspace") {
-        View* focus = seat.get_focus();
-        if (focus != nullptr) {
-          int workspace = -1;
-          auto ws_str = args.at(0);
-          if (ws_str == "next")
-            workspace = (input.server.desktop.current_workspace().index + 1 + 10) % 10;
-          else if (ws_str == "prev")
-            workspace = (input.server.desktop.current_workspace().index - 1 + 10) % 10;
-          else
-            std::from_chars(&*ws_str.begin(), &*ws_str.end(), workspace);
-          if (workspace >= 0 && workspace < 10) {
-            input.server.desktop.workspaces.at(workspace).add_view(
-              focus->workspace->erase_view(*focus));
-          }
-        }
-      } else if (command == "toggle_decoration_mode") {
-        View* focus = seat.get_focus();
-        if (auto xdg = dynamic_cast<XdgSurface*>(focus); xdg) {
-          auto* decoration = xdg->xdg_toplevel_decoration.get();
-          if (decoration) {
-            auto mode = decoration->wlr_decoration.current_mode;
-            mode = (mode == WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE)
-                     ? WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE
-                     : WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE;
-            wlr_xdg_toplevel_decoration_v1_set_mode(&decoration->wlr_decoration, mode);
-          }
-        }
-      } else if (command == "rotate_output") {
-        auto rotation = args.at(0);
-        auto output_name = args.size() > 1 ? args.at(1) : "";
-        auto output = util::find_if(input.server.desktop.outputs,
-                                    [&](Output& o) { return o.wlr_output.name == output_name; });
-        if (output == input.server.desktop.outputs.end())
-          output = input.server.desktop.outputs.begin();
-        auto transform = [&] {
-          if (rotation == "0") return WL_OUTPUT_TRANSFORM_NORMAL;
-          if (rotation == "90") return WL_OUTPUT_TRANSFORM_90;
-          if (rotation == "180") return WL_OUTPUT_TRANSFORM_180;
-          if (rotation == "270") return WL_OUTPUT_TRANSFORM_270;
-          throw util::exception("Invalid rotation. Expected 0,90,180 or 270. Got {}", rotation);
-        }();
-        wlr_output_set_transform(&output->wlr_output, transform);
-      } else {
-        LOGE("unknown binding command: %s", command);
-      }
-    } catch (std::exception& e) {
-      LOGE("Error running command: {}", e.what());
-    }
+    seat.input.server.desktop.run_command(command_str);
   }
 
   /// Execute a built-in, hardcoded compositor binding. These are triggered from a
@@ -301,8 +178,8 @@ namespace cloth {
                                            uint32_t* modifiers)
   {
     *modifiers = wlr_keyboard_get_modifiers(wlr_device.keyboard);
-    xkb_mod_mask_t consumed =
-      xkb_state_key_get_consumed_mods2(wlr_device.keyboard->xkb_state, keycode, XKB_CONSUMED_MODE_XKB);
+    xkb_mod_mask_t consumed = xkb_state_key_get_consumed_mods2(wlr_device.keyboard->xkb_state,
+                                                               keycode, XKB_CONSUMED_MODE_XKB);
     *modifiers = *modifiers & ~consumed;
 
     return xkb_state_key_get_syms(wlr_device.keyboard->xkb_state, keycode, keysyms);
@@ -321,7 +198,8 @@ namespace cloth {
   {
     *modifiers = wlr_keyboard_get_modifiers(wlr_device.keyboard);
 
-    xkb_layout_index_t layout_index = xkb_state_key_get_layout(wlr_device.keyboard->xkb_state, keycode);
+    xkb_layout_index_t layout_index =
+      xkb_state_key_get_layout(wlr_device.keyboard->xkb_state, keycode);
     return xkb_keymap_key_get_syms_by_level(wlr_device.keyboard->keymap, keycode, layout_index, 0,
                                             keysyms);
   }

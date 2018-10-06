@@ -8,6 +8,11 @@
 #include "xcursor.hpp"
 
 #include "util/iterators.hpp"
+#include "util/exception.hpp"
+
+#include <charconv>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include "wlr-layer-shell-unstable-v1-protocol.h"
 
@@ -51,6 +56,13 @@ namespace cloth {
         return sub;
       }
     }
+    return nullptr;
+  }
+
+  Output* Desktop::output_at(double x, double y)
+  {
+    wlr::output_t* wlr_output = wlr_output_layout_output_at(layout, x, y);
+    if (wlr_output) return output_from_wlr_output(wlr_output);
     return nullptr;
   }
 
@@ -198,13 +210,13 @@ namespace cloth {
     wlr_server_decoration_manager_set_default_mode(server_decoration_manager,
                                                    WLR_SERVER_DECORATION_MANAGER_MODE_SERVER);
     on_server_decoration.add_to(server_decoration_manager->events.new_decoration);
-    on_server_decoration = [this] (void* data) {
+    on_server_decoration = [] (void* data) {
       auto* decoration = (wlr::server_decoration_t*) data;
       // set in View::map and View::unmap
       auto* view = (View*) decoration->surface->data;
       if (view) {
         LOGD("Updated server decoration for view");
-        view->update_decorated(decoration->mode == WLR_SERVER_DECORATION_MANAGER_MODE_SERVER);
+        view->deco.set_visible(decoration->mode == WLR_SERVER_DECORATION_MANAGER_MODE_SERVER);
       } else {
         LOGD("No view found for server decoration");
       }
@@ -235,6 +247,7 @@ namespace cloth {
     virtual_keyboard = wlr_virtual_keyboard_manager_v1_create(server.wl_display);
 
     on_virtual_keyboard_new = [this](void* data) {
+      LOGD("New virtual keyboard");
       auto& keyboard = *(wlr::virtual_keyboard_v1_t*) data;
 
       auto* seat = this->server.input.seat_from_wlr_seat(*keyboard.seat);
@@ -297,9 +310,156 @@ namespace cloth {
       output.workspace = &workspaces[idx];
       output.damage_whole();
     }
+    for (auto& view : workspaces[idx].visible_views()) {
+      view.arrange();
+    }
     server.workspace_manager.send_state();
     server.window_manager.send_focused_window_name(workspaces[idx]);
     return workspaces[idx];
+  }
+
+  static bool outputs_enabled = true;
+
+  static auto execute(const char* command)
+  {
+    auto pid = fork();
+    if (pid < 0) {
+      throw util::exception("Fork failed");
+    }
+
+    if (pid == 0) {
+      pid = fork();
+      if (pid == 0) {
+        execl("/bin/sh", "/bin/sh", "-c", command, nullptr);
+        _exit(EXIT_FAILURE);
+      } else {
+        _exit(pid == -1);
+      }
+    }
+
+    int status;
+    while (waitpid(pid, &status, 0) < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      throw util::exception("waitpid() on the first child failed: {}", std::strerror(errno));
+    }
+
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+      throw util::exception("first child failed to fork command");
+    }
+  }
+
+  void Desktop::run_command(std::string_view command_str)
+  {
+    Input& input = server.input;
+
+    try {
+      std::vector<std::string> args = util::split_string(std::string(command_str), " ");
+      std::string command = args.at(0);
+      args.erase(args.begin());
+
+      if (command == "exit") {
+        wl_display_terminate(input.server.wl_display);
+      } else if (command == "close") {
+        View* focus = current_workspace().focused_view();
+        if (focus != nullptr) {
+          focus->close();
+        }
+      } else if (command == "center") {
+        View* focus = current_workspace().focused_view();
+        if (focus != nullptr) {
+          focus->center();
+        }
+      } else if (command == "fullscreen") {
+        View* focus = current_workspace().focused_view();
+        if (focus != nullptr) {
+          bool is_fullscreen = focus->fullscreen_output != nullptr;
+          focus->set_fullscreen(!is_fullscreen, nullptr);
+        }
+      } else if (command == "next_window") {
+        input.server.desktop.current_workspace().cycle_focus();
+      } else if (command == "alpha") {
+        View* focus = current_workspace().focused_view();
+        if (focus != nullptr) {
+          focus->cycle_alpha();
+        }
+      } else if (command == "exec") {
+        std::string shell_cmd = std::string(command_str.substr(strlen("exec ")));
+        execute(shell_cmd.c_str());
+      } else if (command == "maximize") {
+        View* focus = current_workspace().focused_view();
+        if (focus != nullptr) {
+          focus->maximize(!focus->maximized);
+        }
+      } else if (command == "nop") {
+        LOGD("nop command");
+      } else if (command == "toggle_outputs") {
+        outputs_enabled = !outputs_enabled;
+        for (auto& output : outputs) {
+          wlr_output_enable(&output.wlr_output, outputs_enabled);
+        }
+      } else if (command == "switch_workspace") {
+        int workspace = -1;
+        auto ws_str = args.at(0);
+        if (ws_str == "next") // +10 fixes wrapping backwards
+          workspace = (input.server.desktop.current_workspace().index + 1 + 10) % 10;
+        else if (ws_str == "prev")
+          workspace = (input.server.desktop.current_workspace().index - 1 + 10) % 10;
+        else
+          std::from_chars(&*ws_str.begin(), &*ws_str.end(), workspace);
+        if (workspace >= 0 && workspace < 10) {
+          input.server.desktop.switch_to_workspace(workspace);
+        }
+      } else if (command == "move_workspace") {
+        View* focus = current_workspace().focused_view();
+        if (focus != nullptr) {
+          int workspace = -1;
+          auto ws_str = args.at(0);
+          if (ws_str == "next")
+            workspace = (input.server.desktop.current_workspace().index + 1 + 10) % 10;
+          else if (ws_str == "prev")
+            workspace = (input.server.desktop.current_workspace().index - 1 + 10) % 10;
+          else
+            std::from_chars(&*ws_str.begin(), &*ws_str.end(), workspace);
+          if (workspace >= 0 && workspace < 10) {
+            input.server.desktop.workspaces.at(workspace).add_view(
+              focus->workspace->erase_view(*focus));
+          }
+        }
+      } else if (command == "toggle_decoration_mode") {
+        View* focus = current_workspace().focused_view();
+        if (auto xdg = dynamic_cast<XdgSurface*>(focus); xdg) {
+          auto* decoration = xdg->xdg_toplevel_decoration.get();
+          if (decoration) {
+            auto mode = decoration->wlr_decoration.current_mode;
+            mode = (mode == WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE)
+                     ? WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE
+                     : WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE;
+            wlr_xdg_toplevel_decoration_v1_set_mode(&decoration->wlr_decoration, mode);
+          }
+        }
+      } else if (command == "rotate_output") {
+        auto rotation = args.at(0);
+        auto output_name = args.size() > 1 ? args.at(1) : "";
+        auto output = util::find_if(input.server.desktop.outputs,
+                                    [&](Output& o) { return o.wlr_output.name == output_name; });
+        if (output == input.server.desktop.outputs.end())
+          output = input.server.desktop.outputs.begin();
+        auto transform = [&] {
+          if (rotation == "0") return WL_OUTPUT_TRANSFORM_NORMAL;
+          if (rotation == "90") return WL_OUTPUT_TRANSFORM_90;
+          if (rotation == "180") return WL_OUTPUT_TRANSFORM_180;
+          if (rotation == "270") return WL_OUTPUT_TRANSFORM_270;
+          throw util::exception("Invalid rotation. Expected 0,90,180 or 270. Got {}", rotation);
+        }();
+        wlr_output_set_transform(&output->wlr_output, transform);
+      } else {
+        LOGE("unknown binding command: {}", command);
+      }
+    } catch (std::exception& e) {
+      LOGE("Error running command: {}", e.what());
+    }
   }
 
 } // namespace cloth

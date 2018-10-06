@@ -23,10 +23,13 @@ namespace cloth {
     Output* output_from_wlr_output(struct wlr_output* output);
 
     wlr::surface_t* surface_at(double lx, double ly, double& sx, double& sy, View*& view);
+    Output* output_at(double x, double y);
 
     util::ref_vec<View> visible_views();
     Workspace& current_workspace();
     Workspace& switch_to_workspace(int idx);
+
+    void run_command(std::string_view command);
 
   private:
     View* view_at(double lx, double ly, wlr::surface_t*& surface, double& sx, double& sy);

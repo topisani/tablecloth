@@ -72,7 +72,6 @@ namespace cloth {
 
   void Seat::set_device_output_mappings(Device& device, wlr::output_t* output) noexcept
   {
-    wlr::cursor_t* cursor = this->cursor.wlr_cursor;
     Config& config = input.config;
     Config::Device* dconfig = config.get_device(device.wlr_device);
 
@@ -423,7 +422,7 @@ namespace cloth {
       sy = grab_sy;
     }
 
-    DecoPart parts = view.get_deco_part(sx, sy);
+    DecoPart parts = view.deco.part_at(sx, sy);
 
     bool is_titlebar = parts & DecoPart::titlebar;
     wlr::edges_t edges = WLR_EDGE_NONE;
@@ -473,7 +472,7 @@ namespace cloth {
       has_button_grab = false;
     }
 
-    auto parts = view.get_deco_part(sx, sy);
+    auto parts = view.deco.part_at(sx, sy);
     if (state == WLR_BUTTON_RELEASED && (parts & DecoPart::titlebar)) {
       wlr_xcursor_manager_set_cursor_image(
         seat.cursor.xcursor_manager, seat.cursor.default_xcursor.c_str(), seat.cursor.wlr_cursor);

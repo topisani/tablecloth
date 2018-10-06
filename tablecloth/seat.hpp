@@ -87,6 +87,8 @@ namespace cloth {
     wl::Listener on_set_cursor;
     wl::Listener on_tool_destroy;
     wl::Listener on_tablet_destroy;
+
+    bool in_fallback_mode = false;
   };
 
   struct SeatView {

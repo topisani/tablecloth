@@ -135,7 +135,7 @@ namespace cloth {
       return;
     }
 
-    LOGD("new wl shell surface: title={}, class={}", surface.title, surface.class_);
+    LOGD("new wl shell surface: title={}, class={}", util::nonull(surface.title), util::nonull(surface.class_));
     wlr_wl_shell_surface_ping(&surface);
 
     auto& workspace = *outputs.front().workspace;

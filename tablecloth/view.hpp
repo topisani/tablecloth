@@ -8,6 +8,8 @@
 #include "util/ptr_vec.hpp"
 #include "wlroots.hpp"
 
+#include "decoration.hpp"
+
 namespace cloth {
 
   struct Output;
@@ -85,16 +87,6 @@ namespace cloth {
 #endif
   };
 
-  enum struct DecoPart {
-    none = 0,
-    top_border = (1 << 0),
-    bottom_border = (1 << 1),
-    left_border = (1 << 2),
-    right_border = (1 << 3),
-    titlebar = (1 << 4),
-  };
-  CLOTH_ENABLE_BITMASK_OPS(DecoPart);
-
 
   struct View {
     View(Workspace& workspace);
@@ -119,17 +111,14 @@ namespace cloth {
     void damage_whole();
     void update_position(double x, double y);
     void update_size(uint32_t width, uint32_t height);
-    void update_decorated(bool decorated);
     void initial_focus();
     void map(wlr::surface_t& surface);
     void unmap();
-    void arrange_maximized();
+    void arrange(wlr::box_t before);
+    void arrange();
 
     /// Is this view the currently focused view in its workspace
     bool is_focused();
-
-    wlr::box_t get_deco_box() const;
-    DecoPart get_deco_part(double sx, double sy);
 
     ViewChild& create_child(wlr::surface_t&);
     Subsurface& create_subsurface(wlr::subsurface_t& wlr_subsurface);
@@ -143,16 +132,13 @@ namespace cloth {
 
     bool mapped = false;
     bool active = false;
-    double x, y;
-    uint32_t width, height;
+    double x = 0 , y = 0;
+    uint32_t width = 0, height = 0;
     float rotation = 0;
     float alpha = 1;
 
-    bool decorated = false;
-    int border_width = 0;
-    int titlebar_height = 0;
 
-    bool maximized;
+    bool maximized = false;
 
     Output* fullscreen_output = nullptr;
     wlr::surface_t* wlr_surface = nullptr;
@@ -160,13 +146,11 @@ namespace cloth {
     util::ptr_vec<ViewChild> children;
 
     struct : wlr::box_t {
-      float rotation;
+      float rotation = 0;
     } saved;
 
-    struct {
-      bool update_x, update_y;
-      double x, y;
-      uint32_t width, height;
+    struct : wlr::box_t {
+      bool update_x = false, update_y = false;
     } pending_move_resize;
 
     struct {
@@ -175,6 +159,8 @@ namespace cloth {
     } events;
 
     virtual auto get_name() -> std::string = 0;
+
+    Decoration deco = {*this};
 
   protected:
     wl::Listener on_new_subsurface;
@@ -194,6 +180,7 @@ namespace cloth {
     void child_handle_commit(void* data);
     void child_handle_new_subsurface(void* data);
     void handle_new_subsurface(void* data);
+
   };
 
   struct WlShellSurface : View {
@@ -239,6 +226,7 @@ namespace cloth {
     wl::Listener on_request_maximize;
     wl::Listener on_request_fullscreen;
 
+    wl::Listener on_set_title;
     wl::Listener on_surface_commit;
 
     void do_activate(bool active) override;

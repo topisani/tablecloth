@@ -210,7 +210,7 @@ namespace cloth {
     width = xdg_surface->surface->current.width;
     height = xdg_surface->surface->current.height;
 
-    update_decorated(true);
+    deco.set_visible(true);
 
     on_request_move.add_to(xdg_surface->toplevel->events.request_move);
     on_request_move = [this](void* data) {
@@ -284,6 +284,7 @@ namespace cloth {
       height = box.height;
 
       map(*xdg_surface->surface);
+      do_resize(width, height);
       setup();
     };
 
@@ -335,7 +336,7 @@ namespace cloth {
     on_destroy.add_to(wlr_decoration.events.destroy);
     on_destroy = [this] {
       auto keep_alive = std::move(surface.xdg_toplevel_decoration);
-      surface.update_decorated(false);
+      surface.deco.set_visible(false);
     };
 
     on_request_mode.add_to(wlr_decoration.events.request_mode);
@@ -351,7 +352,7 @@ namespace cloth {
     on_surface_commit = [this] {
       bool decorated =
         wlr_decoration.current_mode == WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE;
-      surface.update_decorated(decorated);
+      surface.deco.set_visible(decorated);
     };
 
     on_request_mode(nullptr);

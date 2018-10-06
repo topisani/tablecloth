@@ -191,7 +191,7 @@ namespace cloth {
     memcpy(&output.usable_area, &usable_area, sizeof(wlr::box_t));
 
     for (View& view : output.workspace->visible_views()) {
-      if (view.maximized) view.arrange_maximized();
+      view.arrange();
     }
 
     // Arrange non-exlusive surfaces from top->bottom

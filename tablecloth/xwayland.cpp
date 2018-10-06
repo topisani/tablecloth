@@ -54,7 +54,9 @@ namespace cloth {
     bool update_x = x != this->x;
     bool update_y = y != this->y;
 
-    int constrained_width, constrained_height;
+    LOGD("XWL move resize: {}", wlr::box_t{(int) x, (int) y, width, height});
+
+    int constrained_width = width, constrained_height = height;
     apply_size_constraints(width, height, constrained_width, constrained_height);
 
     if (update_x) {
@@ -64,6 +66,8 @@ namespace cloth {
       y = y + height - constrained_height;
     }
 
+    LOGD("Constrained: {}", wlr::box_t{(int) x, (int) y, constrained_width, constrained_height});
+
     this->pending_move_resize.update_x = update_x;
     this->pending_move_resize.update_y = update_y;
     this->pending_move_resize.x = x;
@@ -71,7 +75,7 @@ namespace cloth {
     this->pending_move_resize.width = constrained_width;
     this->pending_move_resize.height = constrained_height;
 
-    wlr_xwayland_surface_configure(xwayland_surface, x, y, constrained_width, constrained_width);
+    wlr_xwayland_surface_configure(xwayland_surface, x, y, constrained_width, constrained_height);
   }
 
   void XwaylandSurface::do_maximize(bool maximized)
@@ -128,7 +132,7 @@ namespace cloth {
     on_request_configure.add_to(xwayland_surface->events.request_configure);
     on_request_configure = [this](void* data) {
       auto& e = *(wlr::xwayland_surface_configure_event_t*) data;
-      update_position(e.x, e.y);
+      move_resize(e.x, e.y, e.width, e.height);
     };
 
     on_request_move.add_to(xwayland_surface->events.request_move);
@@ -162,6 +166,7 @@ namespace cloth {
 
     // Added/removed on map/unmap
     on_surface_commit = [this](void* data) {
+      LOGD("XWL surface committed");
       apply_damage();
 
       int width = xwayland_surface->surface->current.width;
@@ -188,6 +193,7 @@ namespace cloth {
       y = surface.y;
       width = surface.surface->current.width;
       height = surface.surface->current.height;
+      //move_resize(x, y, width, height);
 
       on_surface_commit.add_to(surface.surface->events.commit);
 
@@ -199,14 +205,14 @@ namespace cloth {
         // Seat::set_focus() checks this variable, and does not deactivate the previously focused
         // window if it is set That code should probably check if the previously focused window is
         // indeed the parent
-        update_decorated(false);
+        deco.set_visible(false);
         initial_focus();
       } else {
         if (surface.decorations == WLR_XWAYLAND_SURFACE_DECORATIONS_ALL) {
           // TODO: Desired behaviour?
-          update_decorated(true);
+          deco.set_visible(true);
         } else {
-          update_decorated(false);
+          deco.set_visible(false);
         }
         setup();
       }

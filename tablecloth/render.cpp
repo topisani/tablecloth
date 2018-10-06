@@ -162,7 +162,7 @@ namespace cloth {
   {
     wlr::output_t& wlr_output = output.wlr_output;
 
-    wlr::box_t deco_box = view.get_deco_box();
+    wlr::box_t deco_box = view.deco.box();
     double sx = deco_box.x - view.x;
     double sy = deco_box.y - view.y;
     rotate_child_position(sx, sy, deco_box.width, deco_box.height, view.wlr_surface->current.width,
@@ -183,7 +183,7 @@ namespace cloth {
 
   auto RenderContext::render_decorations(View& view, RenderData& data) -> void
   {
-    if (!view.decorated || view.maximized || view.wlr_surface == nullptr) {
+    if (!view.deco.is_visible() || view.maximized || view.wlr_surface == nullptr) {
       return;
     }
 
@@ -213,7 +213,7 @@ namespace cloth {
                              output.wlr_output.transform_matrix);
       std::array<float, 4> color;
       if (view.active)
-        color = {0.1, 0.2, 0.5, view.alpha};
+        color = {0x00 / 255.f, 0x59 / 255.f, 0x73 / 255.f, view.alpha};
       else
         color = {0.2, 0.2, 0.2, view.alpha};
 
@@ -355,7 +355,7 @@ namespace cloth {
     output_box = wlr_output_layout_get_box(output.desktop.layout, &output.wlr_output);
 
     // Check if we can delegate the fullscreen surface to the output
-    if (fullscreen_view && fullscreen_view->wlr_surface != nullptr) {
+    if (false && fullscreen_view && fullscreen_view->wlr_surface != nullptr) {
       View& view = *fullscreen_view;
 
       // Make sure the view is centered on screen
@@ -416,30 +416,29 @@ namespace cloth {
 
           if (output.wlr_output.fullscreen_surface == view.wlr_surface) {
             // The output will render the fullscreen view
-            goto renderer_end;
-          }
+          } else {
+            if (view.wlr_surface != nullptr) {
+              for_each_surface(view, render_surface, data);
+            }
 
-
-          if (view.wlr_surface != nullptr) {
-            for_each_surface(view, render_surface, data);
-          }
-
-          // During normal rendering the xwayland window tree isn't traversed
-          // because all windows are rendered. Here we only want to render
-          // the fullscreen window's children so we have to traverse the tree.
+            // During normal rendering the xwayland window tree isn't traversed
+            // because all windows are rendered. Here we only want to render
+            // the fullscreen window's children so we have to traverse the tree.
 #ifdef WLR_HAS_XWAYLAND
-          if (auto* xwayland_surface = dynamic_cast<XwaylandSurface*>(&view); xwayland_surface) {
-            for_each_surface(*xwayland_surface->xwayland_surface, render_surface, data);
-          }
+            if (auto* xwayland_surface = dynamic_cast<XwaylandSurface*>(&view); xwayland_surface) {
+              for_each_surface(*xwayland_surface->xwayland_surface, render_surface, data);
+            }
 #endif
+          }
         } else {
           // Render all views
           for (auto& vd : views) {
             render(vd.view, vd.data);
           }
-          // Render top layer above shell views
-          render(output.layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP]);
         }
+
+        // Render top layer above shell views
+        render(output.layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP]);
 
         // Render drag icons
         RenderData data{.alpha = 1.f};
@@ -448,7 +447,6 @@ namespace cloth {
         render(output.layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY]);
       }
 
-    renderer_end:
       wlr_renderer_scissor(renderer, nullptr);
       wlr_renderer_end(renderer);
 
@@ -594,7 +592,7 @@ namespace cloth {
 
   auto RenderContext::damage_whole_decoration(View& view) -> void
   {
-    if (!view.decorated || view.wlr_surface == nullptr) {
+    if (!view.deco.is_visible() || view.wlr_surface == nullptr) {
       return;
     }
 
@@ -735,6 +733,7 @@ namespace cloth {
     wlr::xwayland_surface_t* child;
     wl_list_for_each(child, &surface.children, parent_link)
     {
+      if (child == nullptr || child->surface == nullptr) continue;
       // TODO: make relative to parent size and position
       data.layout.x = child->x;
       data.layout.y = child->y;

@@ -5,4 +5,4 @@ sources += [
     wayland_scanner_code.process('../protocol/tablecloth-shell.xml'),
 ]
 
-executable('tablecloth', sources, dependencies : [thread_dep, fmt, wlroots, wlr_protos, libinput, dep_cloth_common])
+executable('tablecloth', sources, dependencies : [thread_dep, fmt, wlroots, wlr_protos, libinput, dep_cloth_common, gtkmm])

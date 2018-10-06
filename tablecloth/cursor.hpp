@@ -2,10 +2,13 @@
 
 #include "wlroots.hpp"
 
+#include "gesture.hpp"
+
 namespace cloth {
 
   struct Seat;
   struct SeatView;
+  struct Tablet;
 
   struct Cursor {
     enum struct Mode { Passthrough = 0, Move, Resize, Rotate };
@@ -14,6 +17,7 @@ namespace cloth {
     ~Cursor() noexcept;
 
     void update_position(uint32_t time);
+    void set_visible(bool);
 
     // Member data
 
@@ -60,6 +64,20 @@ namespace cloth {
                       wlr::button_state_t state,
                       double lx,
                       double ly);
+
+    auto handle_tablet_tool_position(Tablet& tablet,
+                                     wlr::tablet_tool_t* wlr_tool,
+                                     bool change_x,
+                                     bool change_y,
+                                     double x,
+                                     double y,
+                                     double dx,
+                                     double dy,
+                                     unsigned time) -> void;
+
+    std::optional<TouchGesture> current_gesture = std::nullopt;
+
+    bool _is_visible = true;
   };
 
 } // namespace cloth
