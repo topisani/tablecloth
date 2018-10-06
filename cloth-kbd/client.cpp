@@ -14,9 +14,11 @@ namespace cloth::kbd {
       } else if (interface == layer_shell.interface_name) {
         registry.bind(name, layer_shell, version);
       } else if (interface == seat.interface_name) {
-        registry.bind(name, seat, version);
+        if (!seat) registry.bind(name, seat, version);
+        seat.on_name() = [] (std::string name) { LOGD("Seat: {}", name); };
       }
     };
+    display.roundtrip();
     display.roundtrip();
   }
 
@@ -35,6 +37,11 @@ namespace cloth::kbd {
     }
 
     bind_interfaces();
+
+    if (!seat || !virtual_keyboard_manager || !layer_shell) {
+      LOGE("Interface not registered");
+      return 1;
+    }
 
     VirtualKeyboard virtkbd{*this};
 

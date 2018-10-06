@@ -34,6 +34,7 @@ namespace cloth::kbd {
 
   static int set_cloexec_or_close(int fd)
   {
+    return fd;
     if (os_fd_set_cloexec(fd) != 0) {
       close(fd);
       return -1;
@@ -41,21 +42,15 @@ namespace cloth::kbd {
     return fd;
   }
 
-
   static int create_tmpfile_cloexec(char* tmpname)
   {
     int fd;
 
-#ifdef HAVE_MKOSTEMP
-    fd = mkostemp(tmpname, O_CLOEXEC);
-    if (fd >= 0) unlink(tmpname);
-#else
     fd = mkstemp(tmpname);
     if (fd >= 0) {
       fd = set_cloexec_or_close(fd);
       unlink(tmpname);
     }
-#endif
 
     return fd;
   }
@@ -63,40 +58,15 @@ namespace cloth::kbd {
 
   int os_create_anonymous_file(off_t size)
   {
-    static const char tmplt[] = "/cloth-kbd-shared-XXXXXX";
-    const char* path;
-    char* name;
-    int fd;
     int ret;
 
-    path = getenv("XDG_RUNTIME_DIR");
-    if (!path) {
-      errno = ENOENT;
-      return -1;
-    }
+    auto dir = getenv("XDG_RUNTIME_DIR");
+    auto path = fmt::format("{}/cloth-kbd-shared-XXXXXX", dir ? dir : "/tmp");
 
-    name = (char*) malloc(strlen(path) + sizeof(tmplt));
-    if (!name) return -1;
-
-    strcpy(name, path);
-    strcat(name, tmplt);
-
-    fd = create_tmpfile_cloexec(name);
-
-    free(name);
+    int fd = create_tmpfile_cloexec(path.data());
 
     if (fd < 0) return -1;
 
-#ifdef HAVE_POSIX_FALLOCATE
-    do {
-      ret = posix_fallocate(fd, 0, size);
-    } while (ret == EINTR);
-    if (ret != 0) {
-      close(fd);
-      errno = ret;
-      return -1;
-    }
-#else
     do {
       ret = ftruncate(fd, size);
     } while (ret < 0 && errno == EINTR);
@@ -104,22 +74,26 @@ namespace cloth::kbd {
       close(fd);
       return -1;
     }
-#endif
 
     return fd;
   }
 
   auto VirtualKeyboard::setup_kbd_protocol() -> void
   {
+    LOGD("Create virtual Keyboard");
     wp_keyboard = client.virtual_keyboard_manager.create_virtual_keyboard(client.seat);
     const char* keymap_str = keymap_data;
     size_t keymap_size = strlen(keymap_str) + 1;
+    LOGD("Pre create");
     int keymap_fd = os_create_anonymous_file(keymap_size);
-    if (keymap_fd >= 0) {
+    if (keymap_fd > 0) {
+      LOGD("Pre mmap");
       void* ptr = mmap(NULL, keymap_size, PROT_READ | PROT_WRITE, MAP_SHARED, keymap_fd, 0);
       if (ptr != (void*) -1) {
         std::strcpy((char*) ptr, keymap_str);
+        LOGD("FD: {}", keymap_fd);
         wp_keyboard.keymap(WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1, keymap_fd, keymap_size);
+        close(keymap_fd);
         return;
       }
       close(keymap_fd);
@@ -134,6 +108,8 @@ namespace cloth::kbd {
   {
     window.set_title("tablecloth panel");
     window.set_decorated(false);
+
+    LOGD("VKBD constructor");
 
     setup_kbd_protocol();
 
@@ -229,7 +205,8 @@ namespace cloth::kbd {
     vkbd.window.show_all();
   }
 
-  auto do_quit(KeyboardState& state) -> void {
+  auto do_quit(KeyboardState& state) -> void
+  {
     state.vkbd.client.gtk_main.quit();
   }
 } // namespace cloth::kbd
