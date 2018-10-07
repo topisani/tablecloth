@@ -30,6 +30,11 @@ namespace cloth {
       double height = 0;
       float rotation = 0;
 
+      operator wlr::box_t() const noexcept
+      {
+        return {(int) x, (int) y, (int) width, (int) height};
+      }
+
       DEFAULT_EQUALITY(LayoutData, x, y, width, height, rotation);
     };
 
@@ -53,6 +58,11 @@ namespace cloth {
       auto do_render() -> void;
 
       auto damage_whole() -> void;
+      auto damage_whole_layer(LayerSurface& layer)
+      {
+        damage_whole_layer(layer, layer.geo);
+      }
+      auto damage_whole_layer(LayerSurface& layer_surface, wlr::box_t geo) -> void;
       auto damage_whole_view(View& view) -> void;
       auto damage_whole_decoration(View& view) -> void;
       auto damage_from_view(View& view) -> void;

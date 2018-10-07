@@ -15,6 +15,9 @@ namespace cloth {
 
     Output& output;
     wlr::layer_surface_t& layer_surface;
+    bool has_shadow = false;
+    float shadow_radius = 10;
+    float shadow_offset = 0;
 
     bool configured;
     wlr::box_t geo;

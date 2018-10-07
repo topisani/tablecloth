@@ -308,7 +308,7 @@ namespace cloth {
     // with separate workspaces
     for (auto& output : outputs) {
       output.workspace = &workspaces[idx];
-      output.damage_whole();
+      output.context.damage_whole();
     }
     for (auto& view : workspaces[idx].visible_views()) {
       view.arrange();

@@ -250,13 +250,13 @@ namespace cloth {
 
       output.workspace->fullscreen_view = this;
       fullscreen_output = &output;
-      output.damage_whole();
+      output.context.damage_whole();
     }
 
     if (was_fullscreen && !fullscreen) {
       move_resize(saved);
       rotate(saved.rotation);
-      fullscreen_output->damage_whole();
+      fullscreen_output->context.damage_whole();
 
       fullscreen_output->workspace->fullscreen_view = nullptr;
       fullscreen_output = nullptr;
@@ -405,7 +405,7 @@ namespace cloth {
     }
 
     if (fullscreen_output != nullptr) {
-      fullscreen_output->damage_whole();
+      fullscreen_output->context.damage_whole();
       fullscreen_output->workspace->fullscreen_view = nullptr;
       fullscreen_output = nullptr;
     }
@@ -433,14 +433,14 @@ namespace cloth {
   auto View::apply_damage() -> void
   {
     for (auto& output : desktop.outputs) {
-      output.damage_from_view(*this);
+      output.context.damage_from_view(*this);
     }
   }
 
   auto View::damage_whole() -> void
   {
     for (auto& output : desktop.outputs) {
-      output.damage_whole_view(*this);
+      output.context.damage_whole_view(*this);
     }
   }
 

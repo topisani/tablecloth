@@ -19,19 +19,6 @@ namespace cloth {
     Output(Output&& rhs) noexcept = default;
     Output& operator=(Output&&) = default;
 
-    auto damage_whole() -> void;
-    auto damage_whole_view(View& view) -> void;
-    auto damage_whole_decoration(View& view) -> void;
-    auto damage_from_view(View& view) -> void;
-    auto damage_whole_drag_icon(DragIcon& icon) -> void;
-    auto damage_from_local_surface(wlr::surface_t& surface,
-                                   double ox,
-                                   double oy,
-                                   float rotation = 0) -> void;
-    auto damage_whole_local_surface(wlr::surface_t& surface,
-                                    double ox,
-                                    double oy,
-                                    float rotation = 0) -> void;
     // Member variables
 
     Desktop& desktop;
@@ -45,6 +32,8 @@ namespace cloth {
 
     wlr::box_t usable_area;
 
+    render::Context context = {*this};
+
   protected:
     wl::Listener on_destroy;
     wl::Listener on_mode;
@@ -55,7 +44,6 @@ namespace cloth {
   private:
     auto render() -> void;
 
-    render::Context context = {*this};
 
     Workspace* prev_workspace = nullptr;
 

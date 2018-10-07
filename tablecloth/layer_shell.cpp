@@ -12,6 +12,8 @@
 
 namespace cloth {
 
+  using namespace std::literals;
+
   LayerPopup::LayerPopup(LayerSurface& p_parent, wlr::xdg_popup_v6_t& p_wlr_popup)
     : parent(p_parent), wlr_popup(p_wlr_popup)
   {
@@ -23,7 +25,7 @@ namespace cloth {
     auto damage_whole = [this] {
       int ox = wlr_popup.geometry.x + parent.geo.x;
       int oy = wlr_popup.geometry.y + parent.geo.y;
-      parent.output.damage_whole_local_surface(*wlr_popup.base->surface, ox, oy, 0);
+      parent.output.context.damage_whole_local_surface(*wlr_popup.base->surface, ox, oy, 0);
     };
 
     on_unmap.add_to(wlr_popup.base->events.unmap);
@@ -283,16 +285,18 @@ namespace cloth {
   {
     layer_surface.data = this;
 
+    if (p_layer_surface.namespace_ == "cloth.notification"sv) {
+      has_shadow = true;
+    }
+
     on_surface_commit.add_to(layer_surface.surface->events.commit);
     on_surface_commit = [this](void* data) {
       wlr::box_t old_geo = geo;
       arrange_layers(output);
       if (old_geo != geo) {
-        output.damage_whole_local_surface(*layer_surface.surface, old_geo.x, old_geo.y);
-        output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
-      } else {
-        output.damage_from_local_surface(*layer_surface.surface, geo.x, geo.y);
+        output.context.damage_whole_layer(*this, old_geo);
       }
+      output.context.damage_whole_layer(*this);
     };
 
     on_output_destroy.add_to(layer_surface.output->events.destroy);
@@ -305,19 +309,19 @@ namespace cloth {
     on_destroy.add_to(layer_surface.events.destroy);
     on_destroy = [this](void* data) {
       if (layer_surface.mapped) {
-        output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
+        output.context.damage_whole_layer(*this);
       }
       auto keep_alive = util::erase_this(output.layers[layer_surface.layer], this);
       arrange_layers(output);
     };
     on_map.add_to(layer_surface.events.map);
     on_map = [this](void* data) {
-      output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
+      output.context.damage_whole_layer(*this);
       wlr_surface_send_enter(layer_surface.surface, &output.wlr_output);
     };
     on_unmap.add_to(layer_surface.events.unmap);
     on_unmap = [this](void* data) {
-      output.damage_whole_local_surface(*layer_surface.surface, geo.x, geo.y);
+      output.context.damage_whole_layer(*this);
       output.desktop.server.input.update_cursor_focus();
     };
     on_new_popup.add_to(layer_surface.events.new_popup);

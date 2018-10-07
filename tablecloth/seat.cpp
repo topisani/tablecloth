@@ -206,7 +206,7 @@ namespace cloth {
   void DragIcon::damage_whole()
   {
     for (auto& output : seat.input.server.desktop.outputs) {
-      output.damage_whole_drag_icon(*this);
+      output.context.damage_whole_drag_icon(*this);
     }
   }
 

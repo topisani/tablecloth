@@ -252,7 +252,7 @@ void main()
       box.width *= x_scale;
       box.height *= y_scale;
 
-      draw_shadow(box, view.rotation, 0.5, view.deco.shadow_radius(), view.deco.shadow_offset());
+      draw_shadow(box, view.rotation, 0.5 * data.alpha, view.deco.shadow_radius(), view.deco.shadow_offset());
 
       if (!view.deco.is_visible()) return;
 
@@ -271,9 +271,9 @@ void main()
                                output.wlr_output.transform_matrix);
         std::array<float, 4> color;
         if (view.active)
-          color = {0x00 / 255.f, 0x59 / 255.f, 0x73 / 255.f, view.alpha};
+          color = {0x00 / 255.f, 0x59 / 255.f, 0x73 / 255.f, data.alpha};
         else
-          color = {0.2, 0.2, 0.23, view.alpha};
+          color = {0.2, 0.2, 0.23, data.alpha};
 
         int nrects;
         pixman_box32_t* rects = pixman_region32_rectangles(&damage, &nrects);
@@ -289,7 +289,7 @@ void main()
 
     auto Context::damage_whole_decoration(View& view) -> void
     {
-      if (!view.deco.is_visible()) {
+      if (!view.deco.is_visible() && view.deco.shadow_radius() == 0) {
         return;
       }
 

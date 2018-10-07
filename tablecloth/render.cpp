@@ -266,6 +266,8 @@ namespace cloth::render {
                          }};
       for_each_surface(*layer_surface.layer_surface.surface, render_surface, data);
 
+      if (layer_surface.has_shadow) draw_shadow(data.layout, 0.f, 0.4, layer_surface.shadow_radius, layer_surface.shadow_offset);
+
       SurfaceRenderData surfdat = {*this, data};
       wlr_layer_surface_for_each_surface(&layer_surface.layer_surface, render_surface, &surfdat);
     }
@@ -521,6 +523,27 @@ namespace cloth::render {
                          .y = oy + layout->y,
                        }};
     for_each_surface(surface, damage_whole_surface, data);
+  }
+
+  auto Context::damage_whole_layer(LayerSurface& layer, wlr::box_t geo) -> void
+  {
+    wlr::output_layout_output_t* layout =
+      wlr_output_layout_get(output.desktop.layout, &output.wlr_output);
+    RenderData data = {.layout = {
+                         .x = (double) geo.x + layout->x,
+                         .y = (double) geo.y + layout->y,
+                       }};
+    for_each_surface(*layer.layer_surface.surface, damage_whole_surface, data);
+
+    if (layer.has_shadow) {
+      wlr::box_t shadow_box = geo;
+      shadow_box.x += layer.shadow_offset - layer.shadow_radius / 2.f + layout->x;
+      shadow_box.y += layer.shadow_offset - layer.shadow_radius / 2.f + layout->y;;
+      shadow_box.width += layer.shadow_radius;
+      shadow_box.height += layer.shadow_radius;
+      wlr_output_damage_add_box(damage, &shadow_box);
+    }
+
   }
 
   auto Context::damage_whole_view(View& view) -> void

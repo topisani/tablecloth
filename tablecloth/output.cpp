@@ -34,7 +34,7 @@ namespace cloth {
     if (prev_workspace != workspace && prev_workspace && ws_alpha >= 1.f) {
       ws_alpha = 0;
     }
-    if (ws_alpha <= 1.f) ws_alpha += 0.075;
+    if (ws_alpha <= 1.f) ws_alpha += 0.1;
     if (ws_alpha > 1.f) ws_alpha = 1.f;
 
     if (prev_workspace == workspace && workspace->fullscreen_view) {
@@ -47,11 +47,7 @@ namespace cloth {
         for (auto& v : prev_workspace->visible_views()) {
           auto data = get_render_data(v);
           data.alpha *= prev_ws_alpha;
-          data.layout.width = v.width * prev_ws_alpha;
-          data.layout.height = v.height * prev_ws_alpha;
           data.layout.x -= dx;
-          data.layout.x += v.width * ws_alpha / 2.f;
-          data.layout.y += v.height * ws_alpha / 2.f;
           context.views.emplace_back(v, data);
         }
       }
@@ -66,13 +62,7 @@ namespace cloth {
         for (auto& v : workspace->visible_views()) {
           auto data = get_render_data(v);
           data.alpha *= ws_alpha;
-          if (ws_alpha != 1.f) {
-            data.layout.width = v.width * ws_alpha;
-            data.layout.height = v.height * ws_alpha;
-            data.layout.y += v.height * prev_ws_alpha / 2.f;
-            data.layout.x += v.width * prev_ws_alpha / 2.f;
-            data.layout.x += dx;
-          }
+          data.layout.x += dx;
           context.views.emplace_back(v, data);
         }
       }
@@ -169,41 +159,4 @@ namespace cloth {
     arrange_layers(*this);
     context.damage_whole();
   }
-
-  auto Output::damage_whole() -> void
-  {
-    context.damage_whole();
-  }
-  auto Output::damage_whole_view(View& view) -> void
-  {
-    context.damage_whole_view(view);
-  }
-  auto Output::damage_whole_decoration(View& view) -> void
-  {
-    context.damage_whole_decoration(view);
-  }
-  auto Output::damage_from_view(View& view) -> void
-  {
-    context.damage_from_view(view);
-  }
-  auto Output::damage_whole_drag_icon(DragIcon& icon) -> void
-  {
-    context.damage_whole_drag_icon(icon);
-  }
-  auto Output::damage_from_local_surface(wlr::surface_t& surface,
-                                         double ox,
-                                         double oy,
-                                         float rotation) -> void
-  {
-    context.damage_from_local_surface(surface, ox, oy, rotation);
-  }
-  auto Output::damage_whole_local_surface(wlr::surface_t& surface,
-                                          double ox,
-                                          double oy,
-                                          float rotation) -> void
-  {
-    context.damage_whole_local_surface(surface, ox, oy, rotation);
-  }
-
-
 } // namespace cloth
