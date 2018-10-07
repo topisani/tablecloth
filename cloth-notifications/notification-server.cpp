@@ -54,8 +54,9 @@ namespace cloth::notifications {
                                   const std::vector<std::string>& actions,
                                   const std::map<std::string, ::DBus::Variant>& hints,
                                   const int32_t& expire_timeout_in,
-                                  DBus::Error& e) -> uint32_t
+                                  DBus::Error& err) -> uint32_t
   {
+    try {
     unsigned notification_id = not_id_in;
     int expire_timeout = expire_timeout_in;
 
@@ -105,7 +106,12 @@ namespace cloth::notifications {
     });
 
     return notification_id;
-  }
+    } catch (std::exception& e) {
+      LOGE("NotificationServer::Notify: {}", e.what());
+      err = DBus::ErrorFailed(e.what());
+      return not_id_in;
+    }
+   }
 
   auto NotificationServer::CloseNotification(const uint32_t& id, DBus::Error& e) -> void
   {
