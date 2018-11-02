@@ -324,7 +324,8 @@ namespace cloth::render {
       // otherwise Output isn't damaged but needs buffer swap
       if (pixman_region32_not_empty(&pixman_damage)) {
         if (output.desktop.server.config.debug_damage_tracking) {
-          wlr_renderer_clear(renderer, (float[]){1, 1, 0, 1});
+          float color[] = { 1, 1, 0, 1 };
+          wlr_renderer_clear(renderer, color);
         }
 
         int nrects;

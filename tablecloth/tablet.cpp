@@ -23,11 +23,11 @@ namespace cloth {
     on_set_cursor = [this](void* data) {
       auto& evt = *(wlr::tablet_v2_event_cursor_t*) data;
       wlr::seat_pointer_request_set_cursor_event_t event = {
+        .seat_client = evt.seat_client,
         .surface = evt.surface,
+        .serial = evt.serial,
         .hotspot_x = evt.hotspot_x,
         .hotspot_y = evt.hotspot_y,
-        .serial = evt.serial,
-        .seat_client = evt.seat_client,
       };
       this->seat.cursor.on_request_set_cursor((void*) &event);
     };

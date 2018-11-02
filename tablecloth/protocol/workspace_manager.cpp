@@ -9,11 +9,11 @@
 namespace cloth {
 
   static const struct workspace_manager_interface workspace_manager_impl = {
-    .switch_to = [] (wl::client_t*, wl::resource_t* resource, uint32_t ws) {
-      static_cast<WorkspaceManager*>(resource->data)->switch_to(ws);
-    },
     .move_surface = [] (wl::client_t*, wl::resource_t* resource, wl::resource_t* surface, uint32_t ws) {
       static_cast<WorkspaceManager*>(resource->data)->move_surface(surface, ws);
+    },
+    .switch_to = [] (wl::client_t*, wl::resource_t* resource, uint32_t ws) {
+      static_cast<WorkspaceManager*>(resource->data)->switch_to(ws);
     }
   };
 
