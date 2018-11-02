@@ -84,7 +84,7 @@ namespace cloth::msg {
       auto cli = make_cli();
       auto result = cli.parse(Args(argc, argv));
       if (!result) {
-        LOGE("Error in command line: {}", result.errorMessage());
+        cloth_error("Error in command line: {}", result.errorMessage());
         return 1;
       }
       if (show_help) {
@@ -95,7 +95,7 @@ namespace cloth::msg {
       bind_interfaces();
 
       if (!cloth_windows || !workspaces) {
-        LOGE("Couldn't bind cloth interfaces");
+        cloth_error("Couldn't bind cloth interfaces");
         return 1;
       }
 
@@ -115,7 +115,7 @@ int main(int argc, char* argv[])
     cloth::msg::Client c;
     return c.main(argc, argv);
   } catch(std::runtime_error& e) {
-    LOGE(e.what());
+    cloth_error(e.what());
     return 1;
   }
 }

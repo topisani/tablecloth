@@ -16,15 +16,15 @@ extern "C" int main(int argc, char **argv) {
   auto server = Server(argc, argv);
 	const char *socket = wl_display_add_socket_auto(server.wl_display);
 	if (!socket) {
-		LOGE("Unable to open wayland socket: {}", strerror(errno));
+		cloth_error("Unable to open wayland socket: {}", strerror(errno));
 		return 1;
 	}
 
-	LOGI("Running compositor on wayland display '{}'", socket);
+	cloth_info("Running compositor on wayland display '{}'", socket);
 	setenv("_WAYLAND_DISPLAY", socket, true);
 
 	if (!wlr_backend_start(server.backend)) {
-		LOGE("Failed to start backend");
+		cloth_error("Failed to start backend");
 		return 1;
 	}
 
@@ -40,7 +40,7 @@ extern "C" int main(int argc, char **argv) {
 		const char *cmd = server.config.startup_cmd.c_str();
 		pid_t pid = fork();
 		if (pid < 0) {
-			LOGE("cannot execute binding command: fork() failed");
+			cloth_error("cannot execute binding command: fork() failed");
 		} else if (pid == 0) {
 			execl("/bin/sh", "/bin/sh", "-c", cmd, (void *)nullptr);
 		}

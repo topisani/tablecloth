@@ -54,7 +54,7 @@ namespace cloth {
     bool update_x = x != this->x;
     bool update_y = y != this->y;
 
-    LOGD("XWL move resize: {}", wlr::box_t{(int) x, (int) y, width, height});
+    cloth_debug("XWL move resize: {}", wlr::box_t{(int) x, (int) y, width, height});
 
     int constrained_width = width, constrained_height = height;
     apply_size_constraints(width, height, constrained_width, constrained_height);
@@ -66,7 +66,7 @@ namespace cloth {
       y = y + height - constrained_height;
     }
 
-    LOGD("Constrained: {}", wlr::box_t{(int) x, (int) y, constrained_width, constrained_height});
+    cloth_debug("Constrained: {}", wlr::box_t{(int) x, (int) y, constrained_width, constrained_height});
 
     this->pending_move_resize.update_x = update_x;
     this->pending_move_resize.update_y = update_y;
@@ -166,7 +166,7 @@ namespace cloth {
 
     // Added/removed on map/unmap
     on_surface_commit = [this](void* data) {
-      LOGD("XWL surface committed");
+      cloth_debug("XWL surface committed");
       apply_damage();
 
       int width = xwayland_surface->surface->current.width;
@@ -220,7 +220,7 @@ namespace cloth {
 
     on_unmap.add_to(xwayland_surface->events.unmap);
     on_unmap = [this](void* data) {
-      LOGD("Unmapped");
+      cloth_debug("Unmapped");
       unmap();
       on_surface_commit.remove();
     };
@@ -232,7 +232,7 @@ namespace cloth {
 
     on_destroy.add_to(xwayland_surface->events.destroy);
     on_destroy = [this] {
-      LOGD("Destroyed");
+      cloth_debug("Destroyed");
       workspace->erase_view(*this);
     };
   }
@@ -242,7 +242,7 @@ namespace cloth {
     if (data == nullptr) return;
     auto& surface = *(wlr::xwayland_surface_t*) data;
 
-    LOGD("New xwayland surface: title={}, class={}, instance={}", util::nonull(surface.title),
+    cloth_debug("New xwayland surface: title={}, class={}, instance={}", util::nonull(surface.title),
          util::nonull(surface.class_), util::nonull(surface.instance));
     wlr_xwayland_surface_ping(&surface);
 

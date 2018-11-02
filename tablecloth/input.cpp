@@ -29,7 +29,7 @@ namespace cloth {
 
   Input::Input(Server& p_server, Config& p_config) noexcept : server(p_server), config(p_config)
   {
-    LOGD("Initializing roots input");
+    cloth_debug("Initializing roots input");
 
     on_new_input = [this](void* data) {
       auto* device = (wlr::input_device_t*) data;
@@ -41,7 +41,7 @@ namespace cloth {
       }
 
       auto& seat = get_seat(seat_name);
-      LOGD("New input device: {} ({}:{}) {} seat:{}", device->name, device->vendor, device->product,
+      cloth_debug("New input device: {} ({}:{}) {} seat:{}", device->name, device->vendor, device->product,
            device_type(device->type), seat_name);
 
       seat.add_device(*device);
@@ -49,7 +49,7 @@ namespace cloth {
       if (dc && wlr_input_device_is_libinput(device)) {
         struct libinput_device* libinput_dev = wlr_libinput_get_device_handle(device);
 
-        LOGD("input has config, tap_enabled: {}", dc->tap_enabled);
+        cloth_debug("input has config, tap_enabled: {}", dc->tap_enabled);
         ;
         if (dc->tap_enabled) {
           libinput_device_config_tap_set_enabled(libinput_dev, LIBINPUT_CONFIG_TAP_ENABLED);

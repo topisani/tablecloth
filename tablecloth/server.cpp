@@ -23,7 +23,7 @@ namespace cloth {
     assert(wl_display && wl_event_loop);
 
     if (backend == nullptr) {
-      LOGE("could not start backend");
+      cloth_error("could not start backend");
     }
     assert(renderer);
 

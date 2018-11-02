@@ -115,10 +115,10 @@ namespace cloth {
       server(p_server),
       config(p_config)
   {
-    LOGD("Initializing tablecloth desktop");
+    cloth_debug("Initializing tablecloth desktop");
 
     on_new_output = [this](void* data) {
-      LOGD("New output");
+      cloth_debug("New output");
       outputs.emplace_back(*this, workspaces[0], *(wlr::output_t*) data);
 
       for (auto& seat : server.input.seats) {
@@ -182,7 +182,7 @@ namespace cloth {
 
     xcursor_manager = wlr_xcursor_manager_create(cursor_theme, xcursor_size);
     if (xcursor_manager == nullptr) {
-      LOGE("Cannot create XCursor manager for theme {}", cursor_theme);
+      cloth_error("Cannot create XCursor manager for theme {}", cursor_theme);
     }
 
     if (config.xwayland) {
@@ -191,7 +191,7 @@ namespace cloth {
       on_xwayland_surface = [this](void* data) { handle_xwayland_surface(data); };
 
       if (wlr_xcursor_manager_load(xcursor_manager, 1)) {
-        LOGE("Cannot load XWayland XCursor theme");
+        cloth_error("Cannot load XWayland XCursor theme");
       }
       wlr::xcursor_t* xcursor = wlr_xcursor_manager_get_xcursor(xcursor_manager, cursor_default, 1);
       if (xcursor != nullptr) {
@@ -215,10 +215,10 @@ namespace cloth {
       // set in View::map and View::unmap
       auto* view = (View*) decoration->surface->data;
       if (view) {
-        LOGD("Updated server decoration for view");
+        cloth_debug("Updated server decoration for view");
         view->deco.set_visible(decoration->mode == WLR_SERVER_DECORATION_MANAGER_MODE_SERVER);
       } else {
-        LOGD("No view found for server decoration");
+        cloth_debug("No view found for server decoration");
       }
     };
 
@@ -247,12 +247,12 @@ namespace cloth {
     virtual_keyboard = wlr_virtual_keyboard_manager_v1_create(server.wl_display);
 
     on_virtual_keyboard_new = [this](void* data) {
-      LOGD("New virtual keyboard");
+      cloth_debug("New virtual keyboard");
       auto& keyboard = *(wlr::virtual_keyboard_v1_t*) data;
 
       auto* seat = this->server.input.seat_from_wlr_seat(*keyboard.seat);
       if (!seat) {
-        LOGE("could not find tablecloth seat");
+        cloth_error("could not find tablecloth seat");
         return;
       }
 
@@ -393,7 +393,7 @@ namespace cloth {
           focus->maximize(!focus->maximized);
         }
       } else if (command == "nop") {
-        LOGD("nop command");
+        cloth_debug("nop command");
       } else if (command == "toggle_outputs") {
         outputs_enabled = !outputs_enabled;
         for (auto& output : outputs) {
@@ -455,10 +455,10 @@ namespace cloth {
         }();
         wlr_output_set_transform(&output->wlr_output, transform);
       } else {
-        LOGE("unknown binding command: {}", command);
+        cloth_error("unknown binding command: {}", command);
       }
     } catch (std::exception& e) {
-      LOGE("Error running command: {}", e.what());
+      cloth_error("Error running command: {}", e.what());
     }
   }
 

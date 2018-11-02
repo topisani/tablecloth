@@ -234,7 +234,7 @@ namespace cloth {
   {
     auto& layer_surface = *(wlr::layer_surface_t*) data;
 
-    LOGD("new layer surface: namespace {} layer {} anchor {} size {}x{} margin {},{},{},{}",
+    cloth_debug("new layer surface: namespace {} layer {} anchor {} size {}x{} margin {},{},{},{}",
          layer_surface.namespace_, layer_surface.layer, layer_surface.layer,
          layer_surface.client_pending.desired_width, layer_surface.client_pending.desired_height,
          layer_surface.client_pending.margin.top, layer_surface.client_pending.margin.right,
@@ -246,7 +246,7 @@ namespace cloth {
       wlr::output_t* output =
         wlr_output_layout_output_at(layout, seat->cursor.wlr_cursor->x, seat->cursor.wlr_cursor->y);
       if (!output) {
-        LOGE("Couldn't find output at (%.0f,%.0f)", seat->cursor.wlr_cursor->x,
+        cloth_error("Couldn't find output at (%.0f,%.0f)", seat->cursor.wlr_cursor->x,
              seat->cursor.wlr_cursor->y);
         output = wlr_output_layout_get_center_output(layout);
       }

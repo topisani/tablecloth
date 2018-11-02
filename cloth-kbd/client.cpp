@@ -8,14 +8,14 @@ namespace cloth::kbd {
   {
     registry = display.get_registry();
     registry.on_global() = [&](uint32_t name, std::string interface, uint32_t version) {
-      LOGD("Global: {}", interface);
+      cloth_debug("Global: {}", interface);
       if (interface == virtual_keyboard_manager.interface_name) {
         registry.bind(name, virtual_keyboard_manager, version);
       } else if (interface == layer_shell.interface_name) {
         registry.bind(name, layer_shell, version);
       } else if (interface == seat.interface_name) {
         if (!seat) registry.bind(name, seat, version);
-        seat.on_name() = [] (std::string name) { LOGD("Seat: {}", name); };
+        seat.on_name() = [] (std::string name) { cloth_debug("Seat: {}", name); };
       }
     };
     display.roundtrip();
@@ -28,7 +28,7 @@ namespace cloth::kbd {
     auto result = cli.parse(clara::Args(argc, argv));
 
     if (!result) {
-      LOGE("Error in command line: {}", result.errorMessage());
+      cloth_error("Error in command line: {}", result.errorMessage());
       return 1;
     }
     if (show_help) {
@@ -39,7 +39,7 @@ namespace cloth::kbd {
     bind_interfaces();
 
     if (!seat || !virtual_keyboard_manager || !layer_shell) {
-      LOGE("Interface not registered");
+      cloth_error("Interface not registered");
       return 1;
     }
 

@@ -27,7 +27,7 @@ namespace cloth::notifications {
       } else if (!key.empty()) {
         auto [width, height, rowstride, has_alpha, bits_per_sample, channels, image_data, _] =
           DBus::Struct<int, int, int, bool, int, int, std::vector<uint8_t>>(hints.at("image-data"));
-        LOGD("Image data: {}, {}, {}, {}, {}, {}", width, height, rowstride, has_alpha,
+        cloth_debug("Image data: {}, {}, {}, {}, {}, {}", width, height, rowstride, has_alpha,
              bits_per_sample, channels);
         return std::pair(
           Gdk::Pixbuf::create_from_data(image_data.data(), Gdk::Colorspace::COLORSPACE_RGB,
@@ -36,7 +36,7 @@ namespace cloth::notifications {
       }
 
     } catch (Glib::FileError& e) {
-      LOGE("FileError: {}", e.what());
+      cloth_error("FileError: {}", e.what());
     }
     return std::pair(Glib::RefPtr<Gdk::Pixbuf>{}, false);
   }
@@ -62,14 +62,14 @@ namespace cloth::notifications {
 
     if (notification_id == 0) notification_id = ++_id;
 
-    LOGI("[{}]: {}", summary, body);
+    cloth_info("[{}]: {}", summary, body);
     std::ostringstream strm;
     strm << "hints = { ";
     for (auto& [k, v] : hints) {
       strm << k << "<" << char(v.reader().type()) << "> ";
     }
     strm << " }";
-    LOGD("{}", strm.str());
+    cloth_debug("{}", strm.str());
 
     Urgency urgency = Urgency::Normal;
     if (hints.count("urgency")) urgency = [&] {
@@ -79,7 +79,7 @@ namespace cloth::notifications {
         case 'u': return Urgency{uint8_t(uint32_t(urg))};
         case 'i': return Urgency{uint8_t(int32_t(urg))};
         default:
-          LOGE("Urgency hint has wrong type {}", urg.reader().type());
+          cloth_error("Urgency hint has wrong type {}", urg.reader().type());
           return Urgency::Normal;
       }
     }();
@@ -92,7 +92,7 @@ namespace cloth::notifications {
       }
     }
 
-    LOGD("Timeout: {}", expire_timeout);
+    cloth_debug("Timeout: {}", expire_timeout);
 
     auto image = get_image(hints, app_icon);
 
@@ -107,7 +107,7 @@ namespace cloth::notifications {
 
     return notification_id;
     } catch (std::exception& e) {
-      LOGE("NotificationServer::Notify: {}", e.what());
+      cloth_error("NotificationServer::Notify: {}", e.what());
       err = DBus::ErrorFailed(e.what());
       return not_id_in;
     }
@@ -165,7 +165,7 @@ namespace cloth::notifications {
       auto& label = *cur;
       auto& button = this->actions.emplace_back(label);
       button.signal_clicked().connect([this, action = action, label = label] {
-        LOGD("Action: {} -> {}", label, action);
+        cloth_debug("Action: {} -> {}", label, action);
         this->server.ActionInvoked(this->id, action);
         util::erase_this(this->server.notifications, this);
       });
@@ -182,7 +182,7 @@ namespace cloth::notifications {
     if (image_data.first) {
       auto w = image_data.first->get_width();
       auto h = image_data.first->get_height();
-      LOGD("Image data now: {}, {}", w, h);
+      cloth_debug("Image data now: {}, {}", w, h);
       if (w > max_image_width || h > max_image_height) {
         auto scale = std::min(max_image_width / float(w), max_image_height / float(h));
         this->pixbuf =
@@ -214,7 +214,7 @@ namespace cloth::notifications {
                              wl::zwlr_layer_surface_v1_anchor::right);
     layer_surface.set_size(1, 1);
     layer_surface.on_configure() = [&](uint32_t serial, uint32_t width, uint32_t height) {
-      LOGD("Configured");
+      cloth_debug("Configured");
       layer_surface.ack_configure(serial);
       window.show_all();
       if (width != window.get_width()) {

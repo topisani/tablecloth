@@ -209,7 +209,7 @@ namespace cloth {
     XdgSurfaceV6(Workspace& workspace, wlr::xdg_surface_v6_t* wlr_surface);
     wlr::xdg_surface_v6_t* xdg_surface;
 
-    uint32_t pending_move_resize_configure_serial;
+    uint32_t pending_move_resize_configure_serial = 0;
 
     XdgPopupV6& create_popup(wlr::xdg_popup_v6_t& wlr_popup);
 
@@ -251,7 +251,7 @@ namespace cloth {
 
     std::unique_ptr<XdgToplevelDecoration> xdg_toplevel_decoration;
 
-    uint32_t pending_move_resize_configure_serial;
+    uint32_t pending_move_resize_configure_serial = 0;
 
     XdgPopup& create_popup(wlr::xdg_popup_t& wlr_popup);
     auto get_name() -> std::string override;

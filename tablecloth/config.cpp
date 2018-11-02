@@ -165,7 +165,7 @@ namespace cloth {
         } else {
           xkb_keysym_t sym = xkb_keysym_from_name(symname, XKB_KEYSYM_NO_FLAGS);
           if (sym == XKB_KEY_NoSymbol) {
-            LOGE("got unknown key binding symbol: {}", symname);
+            cloth_error("got unknown key binding symbol: {}", symname);
             return;
           }
           bc.keysyms.push_back(sym);
@@ -198,7 +198,7 @@ namespace cloth {
       } else if (name == "default-image") {
         found->default_image = value;
       } else {
-        LOGE("got unknown cursor config: {}", name);
+        cloth_error("got unknown cursor config: {}", name);
       }
     }
 
@@ -220,7 +220,7 @@ namespace cloth {
       if (name == "meta-key") {
         found->meta_key = parse_modifier(value);
         if (found->meta_key == 0) {
-          LOGE("got unknown meta key: {}", name);
+          cloth_error("got unknown meta key: {}", name);
         }
       } else if (name == "rules") {
         found->rules = value;
@@ -237,7 +237,7 @@ namespace cloth {
       } else if (name == "repeat-delay") {
         found->repeat_delay = std::strtol(val_str.c_str(), nullptr, 10);
       } else {
-        LOGE("got unknown keyboard config: {}", name);
+        cloth_error("got unknown keyboard config: {}", name);
       }
     }
 
@@ -261,10 +261,10 @@ namespace cloth {
           } else if (util::iequals(value, "false")) {
             config.xwayland = false;
           } else {
-            LOGE("got unknown xwayland value: {}", value);
+            cloth_error("got unknown xwayland value: {}", value);
           }
         } else {
-          LOGE("got unknown core config: {}", name);
+          cloth_error("got unknown core config: {}", name);
         }
       } else if (util::starts_with(output_prefix, section)) {
         auto output_name = section.substr(output_prefix.size());
@@ -288,7 +288,7 @@ namespace cloth {
           } else if (util::iequals(value, "false")) {
             found->enable = false;
           } else {
-            LOGE("got invalid output enable value: {}", value);
+            cloth_error("got invalid output enable value: {}", value);
           }
         } else if (name == "x") {
           found->x = strtol(val_str.c_str(), nullptr, 10);
@@ -315,7 +315,7 @@ namespace cloth {
           } else if (value == "flipped-270") {
             found->transform = WL_OUTPUT_TRANSFORM_FLIPPED_270;
           } else {
-            LOGE("got unknown transform value: {}", value);
+            cloth_error("got unknown transform value: {}", value);
           }
         } else if (name == "mode") {
           char* end;
@@ -329,14 +329,14 @@ namespace cloth {
             found->mode.refresh_rate = std::strtof(end, &end);
             assert("Hz" == end);
           }
-          LOGD("Configured output {} with mode {}x{}@{}", found->name, found->mode.width,
+          cloth_debug("Configured output {} with mode {}x{}@{}", found->name, found->mode.width,
                found->mode.height, found->mode.refresh_rate);
         } else if (name == "modeline") {
           Config::OutputMode mode;
           if (parse_modeline(val_str.c_str(), &mode.info)) {
             found->modes.emplace_back(std::move(mode));
           } else {
-            LOGE("Invalid modeline: {}", value);
+            cloth_error("Invalid modeline: {}", value);
           }
         }
       } else if (util::starts_with(cursor_prefix, section)) {
@@ -366,7 +366,7 @@ namespace cloth {
           } else if (util::iequals(value, "false")) {
             dc->tap_enabled = false;
           } else {
-            LOGE("got unknown tap_enabled value: {}", value);
+            cloth_error("got unknown tap_enabled value: {}", value);
           }
         } else if (name == "natural_scroll") {
           if (util::iequals(value, "true")) {
@@ -374,10 +374,10 @@ namespace cloth {
           } else if (util::iequals(value, "false")) {
             dc->natural_scroll = false;
           } else {
-            LOGE("got unknown natural_scroll value: {}", value);
+            cloth_error("got unknown natural_scroll value: {}", value);
           }
         } else {
-          LOGE("got unknown device config: {}", name);
+          cloth_error("got unknown device config: {}", name);
         }
       } else if (section == "keyboard") {
         config_handle_keyboard(config, "", name, value);
@@ -387,7 +387,7 @@ namespace cloth {
       } else if (section == "bindings") {
         add_binding_config(config, name, value);
       } else {
-        LOGE("got unknown config section: {}", section);
+        cloth_error("got unknown config section: {}", section);
       }
 
       return 1;
@@ -414,12 +414,12 @@ namespace cloth {
       if (getcwd(cwd, sizeof(cwd)) != nullptr) {
         char buf[MAXPATHLEN];
         if (snprintf(buf, MAXPATHLEN, "%s/%s", cwd, "tablecloth.ini") >= MAXPATHLEN) {
-          LOGE("config path too long");
+          cloth_error("config path too long");
           exit(1);
         }
         config_path = buf;
       } else {
-        LOGE("could not get cwd");
+        cloth_error("could not get cwd");
         exit(1);
       }
     }
@@ -432,7 +432,7 @@ namespace cloth {
                 this);
 
     if (result == -1) {
-      LOGD("No config file found. Using sensible defaults.");
+      cloth_debug("No config file found. Using sensible defaults.");
       add_binding_config(*this, "Logo+Shift+E", "exit");
       add_binding_config(*this, "Ctrl+q", "close");
       add_binding_config(*this, "Alt+Tab", "next_window");
@@ -440,10 +440,10 @@ namespace cloth {
       kc.meta_key = WLR_MODIFIER_LOGO;
       kc.name = "";
     } else if (result == -2) {
-      LOGE("Could not allocate memory to parse config file");
+      cloth_error("Could not allocate memory to parse config file");
       exit(1);
     } else if (result != 0) {
-      LOGE("Could not parse config file");
+      cloth_error("Could not parse config file");
       exit(1);
     }
   }

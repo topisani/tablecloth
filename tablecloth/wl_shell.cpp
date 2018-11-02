@@ -131,11 +131,11 @@ namespace cloth {
     auto& surface = *(wlr::wl_shell_surface_t*) data;
 
     if (surface.state == WLR_WL_SHELL_SURFACE_STATE_POPUP) {
-      LOGD("new wl shell popup");
+      cloth_debug("new wl shell popup");
       return;
     }
 
-    LOGD("new wl shell surface: title={}, class={}", util::nonull(surface.title), util::nonull(surface.class_));
+    cloth_debug("new wl shell surface: title={}, class={}", util::nonull(surface.title), util::nonull(surface.class_));
     wlr_wl_shell_surface_ping(&surface);
 
     auto& workspace = *outputs.front().workspace;
