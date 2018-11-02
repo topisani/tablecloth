@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cassert>
-#include <iostream>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 extern "C"
