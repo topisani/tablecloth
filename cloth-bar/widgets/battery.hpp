@@ -27,7 +27,7 @@ namespace cloth::bar::widgets {
         }
 
       } catch (fs::filesystem_error& e) {
-        LOGE(e.what());
+        cloth_error(e.what());
       }
 
       label.get_style_context()->add_class("battery-status");
@@ -51,7 +51,7 @@ namespace cloth::bar::widgets {
           return;
         }
       } catch (std::exception& e) {
-        LOGE(e.what());
+        cloth_error(e.what());
       }
     }
 

@@ -8,7 +8,7 @@ namespace cloth::bar {
   {
     registry = display.get_registry();
     registry.on_global() = [&](uint32_t name, std::string interface, uint32_t version) {
-      LOGD("Global: {}", interface);
+      cloth_debug("Global: {}", interface);
       if (interface == workspaces.interface_name) {
         registry.bind(name, workspaces, version);
         workspaces.on_state() = [&] (unsigned current, unsigned count) {
@@ -43,7 +43,7 @@ namespace cloth::bar {
     auto result = cli.parse(clara::Args(argc, argv));
 
     if (!result) {
-      LOGE("Error in command line: {}", result.errorMessage());
+      cloth_error("Error in command line: {}", result.errorMessage());
       return 1;
     }
     if (show_help) {

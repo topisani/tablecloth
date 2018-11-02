@@ -44,7 +44,7 @@ namespace cloth {
     auto& tool = *(TabletTool*) wlr_tool->data;
     if (!surface) {
       wlr_send_tablet_v2_tablet_tool_proximity_out(&tool.tablet_v2_tool);
-      if (!tool.in_fallback_mode) LOGD("No surface found, Using tablet tool in fallback mode");
+      if (!tool.in_fallback_mode) cloth_debug("No surface found, Using tablet tool in fallback mode");
       tool.in_fallback_mode = true;
       update_position(time);
       return;
@@ -52,13 +52,13 @@ namespace cloth {
     if (!wlr_surface_accepts_tablet_v2(&tablet.tablet_v2, surface)) {
       wlr_send_tablet_v2_tablet_tool_proximity_out(&tool.tablet_v2_tool);
       if (!tool.in_fallback_mode)
-        LOGD("Surface does not accept tablet, using tool in fallback mode");
+        cloth_debug("Surface does not accept tablet, using tool in fallback mode");
       update_position(time);
       tool.in_fallback_mode = true;
       return;
     }
     if (tool.in_fallback_mode) {
-      LOGD("Switching tablet tool back to native mode");
+      cloth_debug("Switching tablet tool back to native mode");
       mode = Mode::Passthrough;
       tool.in_fallback_mode = false;
     }
@@ -132,7 +132,7 @@ namespace cloth {
                                  {output->wlr_output.lx, output->wlr_output.ly,
                                   output->wlr_output.width, output->wlr_output.height});
           if (current_gesture)
-            LOGD("Gesture possibly begun: {}", util::enum_cast(current_gesture.value().side));
+            cloth_debug("Gesture possibly begun: {}", util::enum_cast(current_gesture.value().side));
         }
       }
 
@@ -167,7 +167,7 @@ namespace cloth {
       if (current_gesture) {
         bool valid = current_gesture.value().on_touch_up({seat.touch_x, seat.touch_y});
         if (valid) {
-          LOGD("SlideGesture detected: {}", util::enum_cast(current_gesture.value().side));
+          cloth_debug("SlideGesture detected: {}", util::enum_cast(current_gesture.value().side));
           switch (current_gesture.value().side) {
           case Side::top:
             seat.input.server.desktop.run_command("exec killall cloth-bar || cloth-bar");
@@ -180,7 +180,7 @@ namespace cloth {
           default: break;
           }
         } else {
-          LOGD("Gesture cancelled");
+          cloth_debug("Gesture cancelled");
         }
         current_gesture = std::nullopt;
       }
@@ -340,7 +340,7 @@ namespace cloth {
         focused_client = wl_resource_get_client(focused_surface->resource);
       }
       if (event->seat_client->client != focused_client || mode != Mode::Passthrough) {
-        LOGD("Denying request to set cursor from unfocused client");
+        cloth_debug("Denying request to set cursor from unfocused client");
         return;
       }
 

@@ -20,7 +20,7 @@ namespace cloth::lock {
     : client(client), window{Gtk::WindowType::WINDOW_TOPLEVEL}, output(std::move(p_output))
   {
     output->on_mode() = [this](wl::output_mode, int32_t w, int32_t h, int32_t refresh) {
-      LOGI("LockScreen width configured: {}", w);
+      cloth_info("LockScreen width configured: {}", w);
       set_size(w, h);
     };
     window.set_title("tablecloth panel");
@@ -45,7 +45,7 @@ namespace cloth::lock {
       if (this->height != height || this->width != width) {
         width = this->width;
         height = this->height;
-        LOGD("New size: {}, {}", width, height);
+        cloth_debug("New size: {}, {}", width, height);
         layer_surface.set_size(width, height);
         layer_surface.set_exclusive_zone(-1);
         surface.commit();
@@ -136,7 +136,7 @@ namespace cloth::lock {
       }
     }
 
-    LOGD("Authenticated.\n");
+    cloth_debug("Authenticated.\n");
     retval = pam_end(local_auth_handle, retval);
 
     if (retval != PAM_SUCCESS) {
@@ -155,7 +155,7 @@ namespace cloth::lock {
         password_prompt.set_text("");
       }
     } catch (std::exception& e) {
-      LOGE("Error while checking password: {}", e.what());
+      cloth_error("Error while checking password: {}", e.what());
       password_prompt.set_text("");
     }
   }

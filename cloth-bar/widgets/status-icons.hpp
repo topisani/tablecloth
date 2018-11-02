@@ -17,22 +17,22 @@ namespace cloth::bar::widgets::sni {
 
     Item(DBus::Connection& connection) : DBus::ObjectAdaptor(connection, server_path)
     {
-      LOGD("Registered StatusNotifierItem");
+      cloth_debug("Registered StatusNotifierItem");
     }
 
     auto Activate(const int32_t& x, const int32_t& y, ::DBus::Error& error) -> void
     {
-      LOGD("Activate {}x{}", x, y);
+      cloth_debug("Activate {}x{}", x, y);
     }
 
     auto SecondaryActivate(const int32_t& x, const int32_t& y, ::DBus::Error& error) -> void
     {
-      LOGD("SecondaryActivate {}x{}", x, y);
+      cloth_debug("SecondaryActivate {}x{}", x, y);
     }
 
     auto Scroll(const int32_t& delta, const std::string& dir, ::DBus::Error& error) -> void
     {
-      LOGD("Scroll {} {}", delta, dir);
+      cloth_debug("Scroll {} {}", delta, dir);
     }
   };
 
@@ -44,17 +44,17 @@ namespace cloth::bar::widgets::sni {
 
     Watcher(DBus::Connection& connection) : DBus::ObjectAdaptor(connection, server_path)
     {
-      LOGD("Registered StatusNotifierWatcher");
+      cloth_debug("Registered StatusNotifierWatcher");
     }
 
     auto RegisterStatusNotifierItem(const std::string& service, ::DBus::Error& error) -> void
     {
-      LOGD("Registered item {}", service);
+      cloth_debug("Registered item {}", service);
     }
 
     auto RegisterNotificationHost(const std::string& service, ::DBus::Error& error) -> void
     {
-      LOGD("Registered host {}", service);
+      cloth_debug("Registered host {}", service);
     }
 
     auto ProtocolVersion(::DBus::Error& error) -> std::string

@@ -8,7 +8,7 @@ namespace cloth::notifications {
   {
     registry = display.get_registry();
     registry.on_global() = [&](uint32_t name, std::string interface, uint32_t version) {
-      LOGD("Global: {}", interface);
+      cloth_debug("Global: {}", interface);
       if (interface == layer_shell.interface_name) {
         registry.bind(name, layer_shell, version);
       }
@@ -26,7 +26,7 @@ namespace cloth::notifications {
     DBus::Connection conn = DBus::Connection::SessionBus();
     bool status = conn.acquire_name(NotificationServer::server_name.c_str());
     if (!status) {
-      LOGE("Could not acquire notification server name");
+      cloth_error("Could not acquire notification server name");
     };
 
     NotificationServer server(*this, conn);
@@ -40,7 +40,7 @@ namespace cloth::notifications {
     auto result = cli.parse(clara::Args(argc, argv));
 
     if (!result) {
-      LOGE("Error in command line: {}", result.errorMessage());
+      cloth_error("Error in command line: {}", result.errorMessage());
       return 1;
     }
     if (show_help) {

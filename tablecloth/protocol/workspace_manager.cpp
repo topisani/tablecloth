@@ -60,7 +60,7 @@ namespace cloth {
         return;
       }
     }
-    LOGE("Surface not found");
+    cloth_error("Surface not found");
   }
 
   auto WorkspaceManager::send_state() -> void {

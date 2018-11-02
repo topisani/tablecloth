@@ -332,7 +332,7 @@ namespace cloth {
 
     on_device_destroy.add_to(device.events.destroy);
     on_device_destroy = [this] {
-      LOGD("Keyboard destroyed");
+      cloth_debug("Keyboard destroyed");
       auto keep_around = util::erase_this(this->seat.keyboards, this);
       this->seat.update_capabilities();
     };

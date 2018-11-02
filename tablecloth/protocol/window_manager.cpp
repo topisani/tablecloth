@@ -53,9 +53,9 @@ namespace cloth {
   }
 
   auto WindowManager::run_command(const char* command) -> void {
-    LOGD("Running command {}", command);
+    cloth_debug("Running command {}", command);
     server.desktop.run_command(command);
-    LOGE("No keyboard found");
+    cloth_error("No keyboard found");
   }
 
   auto WindowManager::send_focused_window_name(Workspace& ws) -> void {

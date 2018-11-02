@@ -20,7 +20,7 @@ namespace cloth::bar {
     : client(client), window{Gtk::WindowType::WINDOW_TOPLEVEL}, output(std::move(p_output))
   {
     output->on_mode() = [this](wl::output_mode, int32_t w, int32_t h, int32_t refresh) {
-      LOGI("Bar width configured: {}", w);
+      cloth_info("Bar width configured: {}", w);
       set_width(w);
     };
     window.set_title("tablecloth panel");
@@ -43,7 +43,7 @@ namespace cloth::bar {
       layer_surface.ack_configure(serial);
       if (client.height != height) {
         height = client.height;
-        LOGD("New Height: {}", height);
+        cloth_debug("New Height: {}", height);
         layer_surface.set_size(width, height);
         layer_surface.set_exclusive_zone(visible ? height : 0);
         surface.commit();
