@@ -47,7 +47,7 @@ namespace cloth {
     if (view == nullptr) {
       return nullptr;
     }
-    LOGD("Set focus: name='{}'", view->get_name());
+    cloth_debug("Set focus: name='{}'", view->get_name());
     View* prev_focus = focused_view();
 
     _views.rotate_to_back(*view);

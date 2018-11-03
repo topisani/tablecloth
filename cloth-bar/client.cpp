@@ -1,5 +1,7 @@
 #include "client.hpp"
 
+#include <iostream>
+
 #include "util/logging.hpp"
 
 namespace cloth::bar {
@@ -8,7 +10,7 @@ namespace cloth::bar {
   {
     registry = display.get_registry();
     registry.on_global() = [&](uint32_t name, std::string interface, uint32_t version) {
-      LOGD("Global: {}", interface);
+      cloth_debug("Global: {}", interface);
       if (interface == workspaces.interface_name) {
         registry.bind(name, workspaces, version);
         workspaces.on_state() = [&](std::string output_name, unsigned current, unsigned count) {
@@ -26,7 +28,7 @@ namespace cloth::bar {
         registry.bind(name, *output, version);
         output->on_geometry() = [&](int32_t, int32_t, int32_t, int32_t, wl::output_subpixel,
                                     std::string make, std::string model, wl::output_transform) {
-          LOGD("Output: {}, {}", make, model);
+          cloth_debug("Output: {}, {}", make, model);
         };
         bars.emplace_back(*this, std::move(output));
       }
@@ -47,7 +49,7 @@ namespace cloth::bar {
     auto result = cli.parse(clara::Args(argc, argv));
 
     if (!result) {
-      LOGE("Error in command line: {}", result.errorMessage());
+      cloth_error("Error in command line: {}", result.errorMessage());
       return 1;
     }
     if (show_help) {

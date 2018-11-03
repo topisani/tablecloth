@@ -173,7 +173,7 @@ namespace cloth::render {
   auto Context::render_surface(wlr::surface_t* surface, int sx, int sy, void* _data) -> void
   {
     if (!surface) {
-      // LOGE("null surface in render_surface");
+      // cloth_error("null surface in render_surface");
       return;
     }
 
@@ -326,7 +326,8 @@ namespace cloth::render {
       // otherwise Output isn't damaged but needs buffer swap
       if (pixman_region32_not_empty(&pixman_damage)) {
         if (output.desktop.server.config.debug_damage_tracking) {
-          wlr_renderer_clear(renderer, (float[]){1, 1, 0, 1});
+          float color[] = { 1, 1, 0, 1 };
+          wlr_renderer_clear(renderer, color);
         }
 
         int nrects;
@@ -650,7 +651,7 @@ namespace cloth::render {
                                        const RenderData& data) -> void
   {
     if (!view.wlr_surface) {
-      // LOGE("Null surface for view title='{}', type='{}'", view.get_name(), (int) view.type());
+      // cloth_error("Null surface for view title='{}', type='{}'", view.get_name(), (int) view.type());
       return;
     }
     SurfaceRenderData cd = {*this, data, .x_scale = data.layout.width / double(view.width),

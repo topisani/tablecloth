@@ -41,7 +41,7 @@ namespace cloth {
     bool on_touch_up(Point p)
     {
       if (chrono::clock::now() > start + max_time) {
-        LOGD("Gesture cancelled: Too long");
+        cloth_debug("Gesture cancelled: Too long");
         return false;
       }
       switch (side) {

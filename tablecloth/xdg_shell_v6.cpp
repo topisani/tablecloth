@@ -307,11 +307,11 @@ namespace cloth {
     auto& surface = *(wlr::xdg_surface_v6_t*) data;
 
     if (surface.role == WLR_XDG_SURFACE_V6_ROLE_POPUP) {
-      LOGD("new xdg popup");
+      cloth_debug("new xdg popup");
       return;
     }
 
-    LOGD("new xdg V6 toplevel: title={}, class={}", util::nonull(surface.toplevel->title),
+    cloth_debug("new xdg V6 toplevel: title={}, class={}", util::nonull(surface.toplevel->title),
          util::nonull(surface.toplevel->app_id));
     wlr_xdg_surface_v6_ping(&surface);
 

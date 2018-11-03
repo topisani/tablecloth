@@ -16,18 +16,18 @@ namespace cloth {
   TabletTool::TabletTool(Seat& seat, wlr::tablet_v2_tablet_tool_t& tool) noexcept
     : seat(seat), tablet_v2_tool(tool)
   {
-    LOGD("Create tablet tool");
+    cloth_debug("Create tablet tool");
     tablet_v2_tool.wlr_tool->data = this;
 
     on_set_cursor.add_to(tablet_v2_tool.events.set_cursor);
     on_set_cursor = [this](void* data) {
       auto& evt = *(wlr::tablet_v2_event_cursor_t*) data;
       wlr::seat_pointer_request_set_cursor_event_t event = {
+        .seat_client = evt.seat_client,
         .surface = evt.surface,
+        .serial = evt.serial,
         .hotspot_x = evt.hotspot_x,
         .hotspot_y = evt.hotspot_y,
-        .serial = evt.serial,
-        .seat_client = evt.seat_client,
       };
       this->seat.cursor.on_request_set_cursor((void*) &event);
     };
@@ -43,7 +43,7 @@ namespace cloth {
 
   static void attach_tablet_pad(TabletPad& pad, Tablet& tablet)
   {
-    LOGD("Attaching tablet pad \"{}\" to tablet \"{}\" ", pad.wlr_device.name,
+    cloth_debug("Attaching tablet pad \"{}\" to tablet \"{}\" ", pad.wlr_device.name,
          tablet.wlr_device.name);
     pad.tablet = &tablet;
     pad.on_tablet_destroy.add_to(tablet.wlr_device.events.destroy);

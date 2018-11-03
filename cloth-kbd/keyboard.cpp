@@ -80,18 +80,18 @@ namespace cloth::kbd {
 
   auto VirtualKeyboard::setup_kbd_protocol() -> void
   {
-    LOGD("Create virtual Keyboard");
+    cloth_debug("Create virtual Keyboard");
     wp_keyboard = client.virtual_keyboard_manager.create_virtual_keyboard(client.seat);
     const char* keymap_str = keymap_data;
     size_t keymap_size = strlen(keymap_str) + 1;
-    LOGD("Pre create");
+    cloth_debug("Pre create");
     int keymap_fd = os_create_anonymous_file(keymap_size);
     if (keymap_fd > 0) {
-      LOGD("Pre mmap");
+      cloth_debug("Pre mmap");
       void* ptr = mmap(NULL, keymap_size, PROT_READ | PROT_WRITE, MAP_SHARED, keymap_fd, 0);
       if (ptr != (void*) -1) {
         std::strcpy((char*) ptr, keymap_str);
-        LOGD("FD: {}", keymap_fd);
+        cloth_debug("FD: {}", keymap_fd);
         wp_keyboard.keymap(WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1, keymap_fd, keymap_size);
         close(keymap_fd);
         return;
@@ -109,7 +109,7 @@ namespace cloth::kbd {
     window.set_title("tablecloth panel");
     window.set_decorated(false);
 
-    LOGD("VKBD constructor");
+    cloth_debug("VKBD constructor");
 
     setup_kbd_protocol();
 
@@ -130,7 +130,7 @@ namespace cloth::kbd {
       if (window.get_height() != height) {
         width = window.get_width();
         height = window.get_height();
-        LOGD("New size: {}, {}", width, height);
+        cloth_debug("New size: {}, {}", width, height);
         layer_surface.set_size(width, height);
         layer_surface.set_exclusive_zone(0);
         surface.commit();
@@ -173,7 +173,7 @@ namespace cloth::kbd {
   {
     char buf[256] = {'\0'};
     xkb_keysym_get_name(keysym, buf, 256);
-    LOGD("Pressed {}", buf);
+    cloth_debug("Pressed {}", buf);
     vkbd.wp_keyboard.key(0, keysym, WL_KEYBOARD_KEY_STATE_PRESSED);
     if (modifiers != Modifiers::None) {
       vkbd.wp_keyboard.modifiers(0, 0, 0, 0);
@@ -185,13 +185,13 @@ namespace cloth::kbd {
   {
     char buf[256] = {'\0'};
     xkb_keysym_get_name(keysym, buf, 256);
-    LOGD("Released {}", buf);
+    cloth_debug("Released {}", buf);
     vkbd.wp_keyboard.key(0, keysym, WL_KEYBOARD_KEY_STATE_RELEASED);
   }
 
   auto KeyboardState::send_modifier_press(Modifiers m) -> void
   {
-    LOGD("Pressed modifier {}", util::enum_cast(m));
+    cloth_debug("Pressed modifier {}", util::enum_cast(m));
     modifiers |= m;
     unsigned mods = (modifiers & Modifiers::Ctrl) ? 0b100 : 0;
     unsigned locked = (modifiers & Modifiers::Shift) ? 0b01 : 0;

@@ -180,7 +180,7 @@ namespace cloth {
         return;
       }
     }
-    LOGD("arrange, box before: {}, box after: {}", before, after);
+    cloth_debug("arrange, box before: {}, box after: {}", before, after);
     bool update_x = after.x != before.x;
     bool update_y = after.y != before.y;
     if (update_x || update_y) {
@@ -362,7 +362,7 @@ namespace cloth {
 
   Subsurface& View::create_subsurface(wlr::subsurface_t& wlr_subsurface)
   {
-    LOGD("New subsurface");
+    cloth_debug("New subsurface");
     return static_cast<Subsurface&>(
       children.push_back(std::make_unique<Subsurface>(*this, &wlr_subsurface)));
   }

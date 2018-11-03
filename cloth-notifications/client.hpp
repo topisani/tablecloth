@@ -45,7 +45,7 @@ namespace cloth::notifications {
         css_provider(Gtk::CssProvider::create())
     {
       if (!css_provider->load_from_path(css_file)) {
-        LOGE("Error loading CSS file");
+        cloth_error("Error loading CSS file");
       }
     }
 

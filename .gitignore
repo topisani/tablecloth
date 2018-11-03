@@ -31,3 +31,5 @@
 *.out
 *.app
 /build
+.gdb_history
+build-dbg

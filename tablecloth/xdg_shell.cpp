@@ -305,11 +305,11 @@ namespace cloth {
     auto& surface = *(wlr::xdg_surface_t*) data;
 
     if (surface.role == WLR_XDG_SURFACE_ROLE_POPUP) {
-      LOGD("new xdg popup");
+      cloth_debug("new xdg popup");
       return;
     }
 
-    LOGD("new xdg toplevel: title={}, class={}", util::nonull(surface.toplevel->title),
+    cloth_debug("new xdg toplevel: title={}, class={}", util::nonull(surface.toplevel->title),
          util::nonull(surface.toplevel->app_id));
     wlr_xdg_surface_ping(&surface);
 
@@ -361,7 +361,7 @@ namespace cloth {
   auto Desktop::handle_xdg_toplevel_decoration(void* data) -> void
   {
     auto& wlr_decoration = *(wlr::xdg_toplevel_decoration_v1_t*) data;
-    LOGD("new xdg toplevel decoration");
+    cloth_debug("new xdg toplevel decoration");
 
     auto* xdg_surface = (XdgSurface*) wlr_decoration.surface->data;
     assert(xdg_surface != nullptr);

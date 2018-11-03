@@ -85,11 +85,11 @@ namespace cloth {
     }
 
     if (mapped_output == output->name) {
-      LOGD("Input device {} mapped to output {}", device.wlr_device.name, output->name);
+      cloth_debug("Input device {} mapped to output {}", device.wlr_device.name, output->name);
       // TODO: wlr_cursor_map_input_to_output(cursor, &device, output);
       device.on_output_transform.add_to(output->events.transform);
       device.on_output_transform = [&device, output](void* data) {
-        LOGD("Output transform for device {}. Libinput: {}", device.wlr_device.name,
+        cloth_debug("Output transform for device {}. Libinput: {}", device.wlr_device.name,
              wlr_input_device_is_libinput(&device.wlr_device));
         if (wlr_input_device_is_libinput(&device.wlr_device)) {
           auto* libinput_handle = wlr_libinput_get_device_handle(&device.wlr_device);
@@ -349,7 +349,7 @@ namespace cloth {
     if (!cursor.xcursor_manager) {
       cursor.xcursor_manager = wlr_xcursor_manager_create(cursor_theme, xcursor_size);
       if (cursor.xcursor_manager == nullptr) {
-        LOGE("Cannot create XCursor manager for theme {}", cursor_theme);
+        cloth_error("Cannot create XCursor manager for theme {}", cursor_theme);
         return;
       }
     }
@@ -357,7 +357,7 @@ namespace cloth {
     for (auto& output : input.server.desktop.outputs) {
       float scale = output.wlr_output.scale;
       if (wlr_xcursor_manager_load(cursor.xcursor_manager, scale)) {
-        LOGE("Cannot load xcursor theme for output '{}' with scale {}", output.wlr_output.name,
+        cloth_error("Cannot load xcursor theme for output '{}' with scale {}", output.wlr_output.name,
              scale);
       }
     }

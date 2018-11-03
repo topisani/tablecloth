@@ -95,9 +95,9 @@ namespace cloth {
       }
     }
     if (!best) {
-      LOGE("Configured mode for {} not available", output.name);
+      cloth_error("Configured mode for {} not available", output.name);
     } else {
-      LOGD("Assigning configured mode to {}", output.name);
+      cloth_debug("Assigning configured mode to {}", output.name);
       wlr_output_set_mode(&output, best);
     }
   }
@@ -128,9 +128,9 @@ namespace cloth {
   {
     wlr_output.data = this;
 
-    LOGD("Output '{}' added", wlr_output.name);
-    LOGD("'{} {} {}' {}mm x {}mm", wlr_output.make, wlr_output.model, wlr_output.serial,
-         wlr_output.phys_width, wlr_output.phys_height);
+    cloth_debug("Output '{}' added", wlr_output.name);
+    cloth_debug("'{} {} {}' {}mm x {}mm", wlr_output.make, wlr_output.model, wlr_output.serial,
+                wlr_output.phys_width, wlr_output.phys_height);
 
     on_destroy.add_to(wlr_output.events.destroy);
     on_destroy = [this] { util::erase_this(desktop.outputs, this); };
@@ -179,7 +179,7 @@ namespace cloth {
             wlr_drm_connector_add_mode(&wlr_output, &mode.info);
           }
         } else if (!output_config->modes.empty()) {
-            LOGE("Can only add modes for DRM backend");
+          cloth_error("Can only add modes for DRM backend");
         }
 
         if (output_config->mode.width) {

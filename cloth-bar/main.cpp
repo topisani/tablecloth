@@ -35,10 +35,10 @@ int main(int argc, char* argv[])
 
     return c.main(argc, argv);
   } catch (const std::exception& e) {
-    LOGE(e.what());
+    cloth_error(e.what());
     return 1;
   } catch (const Glib::Exception& e) {
-    LOGE(e.what().c_str());
+    cloth_error(e.what().c_str());
     return 1;
   }
 }
