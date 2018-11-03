@@ -89,7 +89,7 @@ namespace cloth::bar {
     {
       box.get_style_context()->add_class("workspace-selector");
       bar.client.signals.workspace_state.connect(
-        [&](int current, int count) { update(current, count); });
+        [&](std::string output_name, int current, int count) { update(current, count); });
     }
 
     auto update(int current, int count) -> void
@@ -177,7 +177,7 @@ namespace cloth::bar {
       [&] { client.window_manager.run_command("next_window"); });
     focused_window.set_hexpand(false);
 
-    //auto& tray = *new widgets::sni::TrayWidget();
+    // auto& tray = *new widgets::sni::TrayWidget();
 
     auto& rofi_btn = cmd_button("ROFI", "exec killall rofi || rofi -show drun");
     auto& vkbd_btn = cmd_button("VKBD", "exec killall cloth-kbd || cloth-kbd");

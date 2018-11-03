@@ -11,6 +11,7 @@
 #include "input.hpp"
 #include "seat.hpp"
 #include "server.hpp"
+#include "view.hpp"
 #include "xcursor.hpp"
 
 namespace cloth {
@@ -43,14 +44,14 @@ namespace cloth {
     wlr::surface_t* surface = desktop.surface_at(wlr_cursor->x, wlr_cursor->y, sx, sy, view);
     auto& tool = *(TabletTool*) wlr_tool->data;
     if (!surface) {
-      wlr_send_tablet_v2_tablet_tool_proximity_out(&tool.tablet_v2_tool);
+      wlr_tablet_v2_tablet_tool_notify_proximity_out(&tool.tablet_v2_tool);
       if (!tool.in_fallback_mode) LOGD("No surface found, Using tablet tool in fallback mode");
       tool.in_fallback_mode = true;
       update_position(time);
       return;
     }
     if (!wlr_surface_accepts_tablet_v2(&tablet.tablet_v2, surface)) {
-      wlr_send_tablet_v2_tablet_tool_proximity_out(&tool.tablet_v2_tool);
+      wlr_tablet_v2_tablet_tool_notify_proximity_out(&tool.tablet_v2_tool);
       if (!tool.in_fallback_mode)
         LOGD("Surface does not accept tablet, using tool in fallback mode");
       update_position(time);
@@ -62,8 +63,8 @@ namespace cloth {
       mode = Mode::Passthrough;
       tool.in_fallback_mode = false;
     }
-    wlr_send_tablet_v2_tablet_tool_proximity_in(&tool.tablet_v2_tool, &tablet.tablet_v2, surface);
-    wlr_send_tablet_v2_tablet_tool_motion(&tool.tablet_v2_tool, sx, sy);
+    wlr_tablet_v2_tablet_tool_notify_proximity_in(&tool.tablet_v2_tool, &tablet.tablet_v2, surface);
+    wlr_tablet_v2_tablet_tool_notify_motion(&tool.tablet_v2_tool, sx, sy);
   }
 
 
@@ -79,7 +80,30 @@ namespace cloth {
       wlr_idle_notify_activity(seat.input.server.desktop.idle, seat.wlr_seat);
       set_visible(true);
       auto* event = (wlr::event_pointer_motion_t*) data;
-      wlr_cursor_move(wlr_cursor, event->device, event->delta_x, event->delta_y);
+      double dx = event->delta_x;
+      double dy = event->delta_y;
+      if (active_constraint) {
+        auto& view = pointer_view->view;
+        // TODO: handle rotated views
+        if (view.rotation == 0.0) {
+          double lx1 = wlr_cursor->x;
+          double ly1 = wlr_cursor->y;
+          double lx2 = lx1 + dx;
+          double ly2 = ly1 + dy;
+          double sx1 = lx1 - view.x;
+          double sy1 = ly1 - view.y;
+          double sx2 = lx2 - view.x;
+          double sy2 = ly2 - view.y;
+          double sx2_confined, sy2_confined;
+          if (!wlr_region_confine(&confine, sx1, sy1, sx2, sy2, &sx2_confined, &sy2_confined)) {
+            return;
+          }
+          dx = sx2_confined - sx1;
+          dy = sy2_confined - sy1;
+        }
+      }
+      wlr_cursor_move(wlr_cursor, event->device, dx, dy);
+
       update_position(event->time_msec);
     };
 
@@ -88,7 +112,18 @@ namespace cloth {
       wlr_idle_notify_activity(seat.input.server.desktop.idle, seat.wlr_seat);
       set_visible(true);
       auto* event = (wlr::event_pointer_motion_absolute_t*) data;
-      wlr_cursor_warp_absolute(wlr_cursor, event->device, event->x, event->y);
+
+      double lx, ly;
+      wlr_cursor_absolute_to_layout_coords(wlr_cursor, event->device, event->x, event->y, &lx, &ly);
+      if (pointer_view) {
+        auto& view = pointer_view->view;
+        if (active_constraint && !pixman_region32_contains_point(&confine, floor(lx - view.x),
+                                                                 floor(ly - view.y), NULL)) {
+          return;
+        }
+      }
+      wlr_cursor_warp_closest(wlr_cursor, event->device, lx, ly);
+
       update_position(event->time_msec);
     };
 
@@ -247,26 +282,35 @@ namespace cloth {
        * We need to handle them ourselves, not pass it into the cursor
        * without any consideration
        */
+
+      // TODO: handle cursor constraints for tools too.
       handle_tablet_tool_position(tablet, event->tool, event->updated_axes & WLR_TABLET_TOOL_AXIS_X,
                                   event->updated_axes & WLR_TABLET_TOOL_AXIS_Y, event->x, event->y,
                                   event->dx, event->dy, event->time_msec);
+
       if (event->updated_axes & WLR_TABLET_TOOL_AXIS_PRESSURE) {
-        wlr_send_tablet_v2_tablet_tool_pressure(&tool.tablet_v2_tool, event->pressure);
+        wlr_tablet_v2_tablet_tool_notify_pressure(&tool.tablet_v2_tool, event->pressure);
       }
       if (event->updated_axes & WLR_TABLET_TOOL_AXIS_DISTANCE) {
-        wlr_send_tablet_v2_tablet_tool_distance(&tool.tablet_v2_tool, event->distance);
+        wlr_tablet_v2_tablet_tool_notify_distance(&tool.tablet_v2_tool, event->distance);
+      }
+      if (event->updated_axes & WLR_TABLET_TOOL_AXIS_TILT_X) {
+        tool.tilt_x = event->tilt_x;
+      }
+      if (event->updated_axes & WLR_TABLET_TOOL_AXIS_TILT_Y) {
+        tool.tilt_y = event->tilt_y;
       }
       if (event->updated_axes & (WLR_TABLET_TOOL_AXIS_TILT_X | WLR_TABLET_TOOL_AXIS_TILT_Y)) {
-        wlr_send_tablet_v2_tablet_tool_tilt(&tool.tablet_v2_tool, event->tilt_x, event->tilt_y);
+        wlr_tablet_v2_tablet_tool_notify_tilt(&tool.tablet_v2_tool, tool.tilt_x, tool.tilt_y);
       }
       if (event->updated_axes & WLR_TABLET_TOOL_AXIS_ROTATION) {
-        wlr_send_tablet_v2_tablet_tool_rotation(&tool.tablet_v2_tool, event->rotation);
+        wlr_tablet_v2_tablet_tool_notify_rotation(&tool.tablet_v2_tool, event->rotation);
       }
       if (event->updated_axes & WLR_TABLET_TOOL_AXIS_SLIDER) {
-        wlr_send_tablet_v2_tablet_tool_slider(&tool.tablet_v2_tool, event->slider);
+        wlr_tablet_v2_tablet_tool_notify_slider(&tool.tablet_v2_tool, event->slider);
       }
       if (event->updated_axes & WLR_TABLET_TOOL_AXIS_WHEEL) {
-        wlr_send_tablet_v2_tablet_tool_wheel(&tool.tablet_v2_tool, event->wheel_delta, 0);
+        wlr_tablet_v2_tablet_tool_notify_wheel(&tool.tablet_v2_tool, event->wheel_delta, 0);
       }
     };
 
@@ -285,14 +329,15 @@ namespace cloth {
           press_button(*event->device, event->time_msec, button, WLR_BUTTON_PRESSED, event->x,
                        event->y);
         } else {
-          wlr_send_tablet_v2_tablet_tool_down(&tool.tablet_v2_tool);
+          wlr_tablet_v2_tablet_tool_notify_down(&tool.tablet_v2_tool);
+          wlr_tablet_tool_v2_start_implicit_grab(&tool.tablet_v2_tool);
         }
       } else {
         if (tool.in_fallback_mode) {
           press_button(*event->device, event->time_msec, button, WLR_BUTTON_RELEASED, event->x,
                        event->y);
         } else {
-          wlr_send_tablet_v2_tablet_tool_up(&tool.tablet_v2_tool);
+          wlr_tablet_v2_tablet_tool_notify_up(&tool.tablet_v2_tool);
         }
       }
     };
@@ -313,6 +358,11 @@ namespace cloth {
         handle_tablet_tool_position(*(Tablet*) event->device->data, event->tool, true, true,
                                     event->x, event->y, 0, 0, event->time_msec);
       }
+      if (event->state == WLR_TABLET_TOOL_PROXIMITY_OUT) {
+        auto& tool = *(TabletTool*) wlr_tool->data;
+        wlr_tablet_v2_tablet_tool_notify_proximity_out(&tool.tablet_v2_tool);
+        return;
+      }
     };
 
 
@@ -323,9 +373,9 @@ namespace cloth {
       auto* event = (wlr::event_tablet_tool_button_t*) data;
       auto& tool = *(TabletTool*) event->tool->data;
 
-      wlr_send_tablet_v2_tablet_tool_button(&tool.tablet_v2_tool,
-                                            (enum zwp_tablet_pad_v2_button_state) event->button,
-                                            (enum zwp_tablet_pad_v2_button_state) event->state);
+      wlr_tablet_v2_tablet_tool_notify_button(&tool.tablet_v2_tool,
+                                              (enum zwp_tablet_pad_v2_button_state) event->button,
+                                              (enum zwp_tablet_pad_v2_button_state) event->state);
     };
 
     on_request_set_cursor.add_to(seat.wlr_seat->events.request_set_cursor);
@@ -347,6 +397,36 @@ namespace cloth {
       wlr_cursor_set_surface(wlr_cursor, event->surface, event->hotspot_x, event->hotspot_y);
       cursor_client = event->seat_client->client;
     };
+
+    on_focus_change.add_to(seat.wlr_seat->pointer_state.events.focus_change);
+    on_focus_change = [this](void* data) {
+      auto* event = (wlr::seat_pointer_focus_change_event_t*) data;
+      double sx = event->sx;
+      double sy = event->sy;
+      double lx = wlr_cursor->x;
+      double ly = wlr_cursor->y;
+      LOGD("entered surface {}, lx: {}, ly: {}, sx: {}, sy: {}", (void*) event->new_surface, lx, ly, sx,
+           sy);
+      constrain(wlr_pointer_constraints_v1_constraint_for_surface(
+                  seat.input.server.desktop.pointer_constraints, event->new_surface, seat.wlr_seat),
+                sx, sy);
+    };
+
+    // Added in ::constrain()
+    on_constraint_commit = [this](void* data) {
+      assert(active_constraint->surface == data);
+      auto& desktop = seat.input.server.desktop;
+      View* view;
+      double sx, sy;
+      auto* surface = desktop.surface_at(wlr_cursor->x, wlr_cursor->y, sx, sy, view);
+      // This should never happen but views move around right when they're
+      // created from (0, 0) to their actual coordinates.
+      if (surface != active_constraint->surface) {
+        update_focus();
+      } else {
+        constrain(active_constraint, sx, sy);
+      }
+    };
   }
 
   Cursor::~Cursor() noexcept
@@ -358,14 +438,15 @@ namespace cloth {
   {
     if (vis == _is_visible) return;
     if (vis) {
-      if (wlr_cursor) wlr_xcursor_manager_set_cursor_image(xcursor_manager, default_xcursor.c_str(), wlr_cursor);
+      if (wlr_cursor)
+        wlr_xcursor_manager_set_cursor_image(xcursor_manager, default_xcursor.c_str(), wlr_cursor);
     } else {
       if (wlr_cursor) wlr_cursor_set_image(wlr_cursor, nullptr, 0, 0, 0, 0, 0, 0);
     }
     _is_visible = vis;
   }
 
-  void Cursor::passthrough_cursor(uint32_t time)
+  void Cursor::passthrough_cursor(int64_t time)
   {
     double sx, sy;
     View* view = nullptr;
@@ -380,21 +461,26 @@ namespace cloth {
     }
 
     if (cursor_client != client) {
-      if (_is_visible) wlr_xcursor_manager_set_cursor_image(xcursor_manager, default_xcursor.c_str(), wlr_cursor);
+      if (_is_visible)
+        wlr_xcursor_manager_set_cursor_image(xcursor_manager, default_xcursor.c_str(), wlr_cursor);
       cursor_client = client;
     }
 
     if (view) {
       SeatView& seat_view = seat.seat_view_from_view(*view);
-      if (pointer_view && (surface || &seat_view != pointer_view)) {
+      if (pointer_view && !wlr_surface && (surface || &seat_view != pointer_view)) {
         pointer_view->deco_leave();
-        pointer_view = nullptr;
       }
+      pointer_view = &seat_view;
       if (!surface) {
         pointer_view = &seat_view;
         seat_view.deco_motion(sx, sy);
       }
+    } else {
+      pointer_view = nullptr;
     }
+
+    wlr_surface = surface;
 
     if (surface) {
       // https://github.com/swaywm/wlroots/commit/2e6eb097b6e23b8923bbfc68b1843d5ccde1955b
@@ -404,7 +490,7 @@ namespace cloth {
       // for all surface roles - toplevels, popups, subsurfaces.
       bool focus_changed = (seat.wlr_seat->pointer_state.focused_surface != surface);
       wlr_seat_pointer_notify_enter(seat.wlr_seat, surface, sx, sy);
-      if (!focus_changed) {
+      if (!focus_changed && time > 0) {
         wlr_seat_pointer_notify_motion(seat.wlr_seat, time, sx, sy);
       }
     } else {
@@ -412,6 +498,11 @@ namespace cloth {
     }
 
     for (auto& icon : seat.drag_icons) icon.update_position();
+  }
+
+  void Cursor::update_focus()
+  {
+    passthrough_cursor(-1);
   }
 
   void Cursor::update_position(uint32_t time)
@@ -531,7 +622,7 @@ namespace cloth {
           view->workspace->set_focused_view(view);
         }
         if (surface && wlr_surface_is_layer_surface(surface)) {
-          auto* layer = wlr_layer_surface_from_wlr_surface(surface);
+          auto* layer = wlr_layer_surface_v1_from_wlr_surface(surface);
           if (layer->current.keyboard_interactive) {
             seat.set_focus_layer(layer);
           }
@@ -545,4 +636,42 @@ namespace cloth {
     }
   }
 
+  void Cursor::constrain(wlr::pointer_constraint_v1_t* constraint, double sx, double sy)
+  {
+    if (active_constraint == constraint) {
+      return;
+    }
+    LOGD("roots_cursor_constrain({}, {})", (void*) this, (void*) constraint);
+    LOGD("cursor->active_constraint: {}", (void*) active_constraint);
+    on_constraint_commit.remove();
+    if (active_constraint) {
+      wlr_pointer_constraint_v1_send_deactivated(active_constraint);
+    }
+    active_constraint = constraint;
+    if (constraint == nullptr) {
+      return;
+    }
+    wlr_pointer_constraint_v1_send_activated(constraint);
+    on_constraint_commit.add_to(constraint->surface->events.commit);
+    pixman_region32_clear(&confine);
+    pixman_region32_t* region = &constraint->region;
+    if (!pixman_region32_contains_point(region, floor(sx), floor(sy), NULL)) {
+      // Warp into region if possible
+      int nboxes;
+      pixman_box32_t* boxes = pixman_region32_rectangles(region, &nboxes);
+      if (nboxes > 0) {
+        auto& view = pointer_view->view;
+        double sx = (boxes[0].x1 + boxes[0].x2) / 2.;
+        double sy = (boxes[0].y1 + boxes[0].y2) / 2.;
+        // TODO: rotate_child_position(&sx, &sy, 0, 0, view.width, view.height, view.rotation);
+        double lx = view.x + sx;
+        double ly = view.y + sy;
+        wlr_cursor_warp_closest(wlr_cursor, NULL, lx, ly);
+      }
+    }
+    // A locked pointer will result in an empty region, thus disallowing all movement
+    if (constraint->type == WLR_POINTER_CONSTRAINT_V1_CONFINED) {
+      pixman_region32_copy(&confine, region);
+    }
+  }
 } // namespace cloth

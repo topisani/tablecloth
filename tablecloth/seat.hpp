@@ -6,6 +6,7 @@
 #include "keyboard.hpp"
 #include "util/bindings.hpp"
 #include "view.hpp"
+#include "text_input.hpp"
 #include "wlroots.hpp"
 
 namespace cloth {
@@ -76,10 +77,11 @@ namespace cloth {
   /// Not a separate device, just added on the tablet proximity event.
   struct TabletTool {
     TabletTool(Seat& seat, wlr::tablet_v2_tablet_tool_t&) noexcept;
+    ~TabletTool() noexcept;
 
     Seat& seat;
-
-    ~TabletTool() noexcept;
+    double tilt_x = 0;
+    double tilt_y = 0;
 
     wlr::tablet_v2_tablet_tool_t& tablet_v2_tool;
     Tablet* current_tablet;
@@ -89,6 +91,12 @@ namespace cloth {
     wl::Listener on_tablet_destroy;
 
     bool in_fallback_mode = false;
+  };
+
+  struct PointerConstraint {
+    PointerConstraint(wlr::pointer_constraint_v1_t* wlr_constraint);
+    wlr::pointer_constraint_v1_t* wlr_constraint;
+    wl::Listener on_destroy;
   };
 
   struct SeatView {
@@ -120,7 +128,7 @@ namespace cloth {
     bool has_meta_pressed();
     View* get_focus();
     void set_focus(View* view);
-    void set_focus_layer(wlr::layer_surface_t* layer);
+    void set_focus_layer(wlr::layer_surface_v1_t* layer);
     void begin_move(View& view);
     void begin_resize(View& view, wlr::edges_t edges);
     void begin_rotate(View& view);
@@ -131,6 +139,8 @@ namespace cloth {
 
     SeatView& seat_view_from_view(View& view);
 
+    Output* current_output();
+
     wlr::seat_t* wlr_seat = nullptr;
     Input& input;
     Cursor cursor;
@@ -140,7 +150,8 @@ namespace cloth {
     double touch_x, touch_y;
 
     // If the focused layer is set, views cannot receive keyboard focus
-    wlr::layer_surface_t* focused_layer = nullptr;
+    wlr::layer_surface_v1_t* focused_layer = nullptr;
+    InputMethodRelay im_relay = {*this};
 
     // If non-null, only this client can receive input events
     wl::client_t* exclusive_client = nullptr;

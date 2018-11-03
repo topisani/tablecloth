@@ -42,6 +42,7 @@ namespace cloth {
       cursor(*this, wlr_cursor_create())
   {
     if (!wlr_seat) throw util::exception("Could not create wlr_seat from name {}", name);
+    wlr_seat->data = this;
 
     init_cursor();
 
@@ -92,7 +93,8 @@ namespace cloth {
              wlr_input_device_is_libinput(&device.wlr_device));
         if (wlr_input_device_is_libinput(&device.wlr_device)) {
           auto* libinput_handle = wlr_libinput_get_device_handle(&device.wlr_device);
-          //libinput_device_config_calibration_set_matrix(libinput_handle, get_transform_matrix(output->transform));
+          // libinput_device_config_calibration_set_matrix(libinput_handle,
+          // get_transform_matrix(output->transform));
           libinput_device_config_rotation_set_angle(libinput_handle, [&] {
             switch (output->transform) {
             case WL_OUTPUT_TRANSFORM_NORMAL: return 0;
@@ -189,15 +191,15 @@ namespace cloth {
     wlr::drag_icon_t& wlr_icon = wlr_drag_icon;
     wlr::cursor_t* cursor = seat.cursor.wlr_cursor;
     if (wlr_icon.is_pointer) {
-      x = cursor->x + wlr_icon.sx;
-      y = cursor->y + wlr_icon.sy;
+      x = cursor->x;
+      y = cursor->y;
     } else {
       wlr::touch_point_t* point = wlr_seat_touch_get_point(seat.wlr_seat, wlr_icon.touch_id);
       if (point == nullptr) {
         return;
       }
-      x = seat.touch_x + wlr_icon.sx;
-      y = seat.touch_y + wlr_icon.sy;
+      x = seat.touch_x;
+      y = seat.touch_y;
     }
 
     damage_whole();
@@ -306,7 +308,7 @@ namespace cloth {
   {
     assert(device.type == WLR_INPUT_DEVICE_TABLET_PAD);
     return tablet_pads.emplace_back(
-    *this, *wlr_tablet_pad_create(input.server.desktop.tablet_v2, wlr_seat, &device));
+      *this, *wlr_tablet_pad_create(input.server.desktop.tablet_v2, wlr_seat, &device));
   }
 
   auto Seat::add_tablet_tool(wlr::input_device_t& device) -> Tablet&
@@ -317,14 +319,14 @@ namespace cloth {
 
   auto Seat::add_device(wlr::input_device_t& device) noexcept -> Device&
   {
-    auto& ref = [&] () -> Device& {
-    switch (device.type) {
-    case WLR_INPUT_DEVICE_KEYBOARD: return add_keyboard(device); break;
-    case WLR_INPUT_DEVICE_POINTER: return add_pointer(device); break;
-    case WLR_INPUT_DEVICE_TOUCH: return add_touch(device); break;
-    case WLR_INPUT_DEVICE_TABLET_PAD: return add_tablet_pad(device); break;
-    case WLR_INPUT_DEVICE_TABLET_TOOL: return add_tablet_tool(device); break;
-    }
+    auto& ref = [&]() -> Device& {
+      switch (device.type) {
+      case WLR_INPUT_DEVICE_KEYBOARD: return add_keyboard(device); break;
+      case WLR_INPUT_DEVICE_POINTER: return add_pointer(device); break;
+      case WLR_INPUT_DEVICE_TOUCH: return add_touch(device); break;
+      case WLR_INPUT_DEVICE_TABLET_PAD: return add_tablet_pad(device); break;
+      case WLR_INPUT_DEVICE_TABLET_TOOL: return add_tablet_tool(device); break;
+      }
     }();
 
     configure_cursor();
@@ -495,6 +497,15 @@ namespace cloth {
     return *found;
   }
 
+  Output* Seat::current_output()
+  {
+    auto* wlr_output = wlr_output_layout_output_at(input.server.desktop.layout,
+                                                   cursor.wlr_cursor->x, cursor.wlr_cursor->y);
+    if (!wlr_output) return nullptr;
+
+    return input.server.desktop.output_from_wlr_output(wlr_output);
+  }
+
   bool Seat::allow_input(wl::resource_t& resource)
   {
     return !exclusive_client || wl_resource_get_client(&resource) == exclusive_client;
@@ -534,6 +545,7 @@ namespace cloth {
     if (view == nullptr) {
       cursor.mode = Cursor::Mode::Passthrough;
       wlr_seat_keyboard_clear_focus(wlr_seat);
+      im_relay.set_focus(nullptr);
       return;
     }
 
@@ -563,6 +575,10 @@ namespace cloth {
     } else {
       wlr_seat_keyboard_notify_enter(wlr_seat, view->wlr_surface, nullptr, 0, nullptr);
     }
+
+
+    cursor.update_focus();
+    im_relay.set_focus(view->wlr_surface);
   }
 
   /**
@@ -570,7 +586,7 @@ namespace cloth {
    * flow. For layers above the shell layer, for example, you cannot unfocus them.
    * You also cannot alt-tab between layer surfaces and shell surfaces.
    */
-  void Seat::set_focus_layer(wlr::layer_surface_t* layer)
+  void Seat::set_focus_layer(wlr::layer_surface_v1_t* layer)
   {
     if (!layer) {
       focused_layer = nullptr;
@@ -596,6 +612,7 @@ namespace cloth {
     } else {
       wlr_seat_keyboard_notify_enter(wlr_seat, layer->surface, nullptr, 0, nullptr);
     }
+    cursor.update_focus();
   }
 
   void Seat::set_exclusive_client(wl::client_t* client)
@@ -707,6 +724,41 @@ namespace cloth {
     }
 
     cursor.mode = Cursor::Mode::Passthrough;
+  }
+
+  PointerConstraint::PointerConstraint(wlr::pointer_constraint_v1_t* wlr_constraint)
+    : wlr_constraint(wlr_constraint)
+  {
+    on_destroy.add_to(wlr_constraint->events.destroy);
+    on_destroy = [this](void* data) {
+      auto* wlr_constraint = (wlr::pointer_constraint_v1_t*) data;
+      auto& seat = *((Seat*) wlr_constraint->seat->data);
+      if (seat.cursor.active_constraint == wlr_constraint) {
+        seat.cursor.on_constraint_commit.remove();
+        seat.cursor.active_constraint = nullptr;
+        if (wlr_constraint->current.committed & WLR_POINTER_CONSTRAINT_V1_STATE_CURSOR_HINT &&
+            seat.cursor.pointer_view) {
+          double sx = wlr_constraint->current.cursor_hint.x;
+          double sy = wlr_constraint->current.cursor_hint.y;
+          View& view = seat.cursor.pointer_view->view;
+          // TODO: rotate_child_position(&sx, &sy, 0, 0, view->width, view->height, view->rotation);
+          double lx = view.x + sx;
+          double ly = view.y + sy;
+          wlr_cursor_warp(seat.cursor.wlr_cursor, nullptr, lx, ly);
+        }
+      }
+      delete this;
+    };
+
+    auto& seat = *((Seat*) wlr_constraint->seat->data);
+    double sx, sy;
+    View* v;
+    struct wlr_surface* surface = seat.input.server.desktop.surface_at(
+      seat.cursor.wlr_cursor->x, seat.cursor.wlr_cursor->y, sx, sy, v);
+    if (surface == wlr_constraint->surface) {
+      assert(!seat.cursor.active_constraint);
+      seat.cursor.constrain(wlr_constraint, sx, sy);
+    }
   }
 
 } // namespace cloth

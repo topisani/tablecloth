@@ -436,6 +436,7 @@ namespace cloth {
       add_binding_config(*this, "Logo+Shift+E", "exit");
       add_binding_config(*this, "Ctrl+q", "close");
       add_binding_config(*this, "Alt+Tab", "next_window");
+      add_binding_config(*this, "Logo+Escape", "break_pointer_constraint");
       auto& kc = keyboards.emplace_back();
       kc.meta_key = WLR_MODIFIER_LOGO;
       kc.name = "";

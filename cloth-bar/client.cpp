@@ -11,12 +11,12 @@ namespace cloth::bar {
       LOGD("Global: {}", interface);
       if (interface == workspaces.interface_name) {
         registry.bind(name, workspaces, version);
-        workspaces.on_state() = [&] (unsigned current, unsigned count) {
-          signals.workspace_state.emit(current, count);
+        workspaces.on_state() = [&](std::string output_name, unsigned current, unsigned count) {
+          signals.workspace_state.emit(std::move(output_name), current, count);
         };
       } else if (interface == window_manager.interface_name) {
         registry.bind(name, window_manager, version);
-        window_manager.on_focused_window_name() = [&] (const std::string& name, unsigned ws) {
+        window_manager.on_focused_window_name() = [&](const std::string& name, unsigned ws) {
           signals.focused_window_name.emit(name);
         };
       } else if (interface == layer_shell.interface_name) {
@@ -24,6 +24,10 @@ namespace cloth::bar {
       } else if (interface == wl::output_t::interface_name) {
         auto output = std::make_unique<wl::output_t>();
         registry.bind(name, *output, version);
+        output->on_geometry() = [&](int32_t, int32_t, int32_t, int32_t, wl::output_subpixel,
+                                    std::string make, std::string model, wl::output_transform) {
+          LOGD("Output: {}, {}", make, model);
+        };
         bars.emplace_back(*this, std::move(output));
       }
     };

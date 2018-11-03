@@ -70,7 +70,7 @@ namespace cloth {
     on_ring.add_to(wlr_device.tablet_pad->events.ring);
     on_ring = [this](void* data) {
       auto* event = (wlr::event_tablet_pad_ring_t*) data;
-      wlr_send_tablet_v2_tablet_pad_ring(&tablet_v2_pad, event->ring, event->position,
+      wlr_tablet_v2_tablet_pad_notify_ring(&tablet_v2_pad, event->ring, event->position,
                                          event->source == WLR_TABLET_PAD_RING_SOURCE_FINGER,
                                          event->time_msec);
     };
@@ -78,7 +78,7 @@ namespace cloth {
     on_strip.add_to(wlr_device.tablet_pad->events.strip);
     on_strip = [this](void* data) {
       auto* event = (wlr::event_tablet_pad_strip_t*) data;
-      wlr_send_tablet_v2_tablet_pad_strip(&tablet_v2_pad, event->strip, event->position,
+      wlr_tablet_v2_tablet_pad_notify_strip(&tablet_v2_pad, event->strip, event->position,
                                           event->source == WLR_TABLET_PAD_STRIP_SOURCE_FINGER,
                                           event->time_msec);
     };
@@ -86,9 +86,9 @@ namespace cloth {
     on_button.add_to(wlr_device.tablet_pad->events.button);
     on_button = [this](void* data) {
       auto* event = (wlr::event_tablet_pad_button_t*) data;
-      wlr_send_tablet_v2_tablet_pad_mode(&tablet_v2_pad, event->group, event->mode,
+      wlr_tablet_v2_tablet_pad_notify_mode(&tablet_v2_pad, event->group, event->mode,
                                          event->time_msec);
-      wlr_send_tablet_v2_tablet_pad_button(&tablet_v2_pad, event->button, event->time_msec,
+      wlr_tablet_v2_tablet_pad_notify_button(&tablet_v2_pad, event->button, event->time_msec,
                                            (enum zwp_tablet_pad_v2_button_state) event->state);
     };
 

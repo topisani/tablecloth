@@ -104,12 +104,11 @@ namespace cloth {
   {
     if (keysym >= XKB_KEY_XF86Switch_VT_1 && keysym <= XKB_KEY_XF86Switch_VT_12) {
       Server& server = seat.input.server;
-      if (wlr_backend_is_multi(server.backend)) {
-        wlr::session_t* session = wlr_multi_get_session(server.backend);
-        if (session) {
-          unsigned vt = keysym - XKB_KEY_XF86Switch_VT_1 + 1;
-          wlr_session_change_vt(session, vt);
-        }
+
+      struct wlr_session* session = wlr_backend_get_session(server.backend);
+      if (session) {
+        unsigned vt = keysym - XKB_KEY_XF86Switch_VT_1 + 1;
+        wlr_session_change_vt(session, vt);
       }
       return true;
     }

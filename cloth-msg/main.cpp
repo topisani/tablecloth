@@ -31,8 +31,8 @@ namespace cloth::msg {
       registry.on_global() = [&] (uint32_t name, std::string interface, uint32_t version) {
         if (interface == workspaces.interface_name) {
           registry.bind(name, workspaces, version);
-          if (listen) workspaces.on_state() = [&] (uint32_t current, uint32_t count) {
-            std::cout << fmt::format("workspace {}:{}", current + 1, count) << std::endl;
+          if (listen) workspaces.on_state() = [&] (std::string output_name, uint32_t current, uint32_t count) {
+            std::cout << fmt::format("workspace {}:{}:{}", output_name, current + 1, count) << std::endl;
           };
         } else if (interface == cloth_windows.interface_name) {
           registry.bind(name, cloth_windows, version);

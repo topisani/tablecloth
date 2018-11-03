@@ -4,17 +4,18 @@
 #include "wlroots.hpp"
 
 namespace cloth {
-
+  struct Seat;
   struct LayerPopup;
   struct Output;
 
   struct LayerSurface {
-    LayerSurface(Output& output, wlr::layer_surface_t& layer_surface);
+    LayerSurface(Output& output, wlr::layer_surface_v1_t& layer_surface);
 
     LayerPopup& create_popup(wlr::xdg_popup_v6_t& wlr_popup);
+    void update_cursors(const util::ptr_vec<Seat>& seats);
 
     Output& output;
-    wlr::layer_surface_t& layer_surface;
+    wlr::layer_surface_v1_t& layer_surface;
     bool has_shadow = false;
     float shadow_radius = 10;
     float shadow_offset = 0;

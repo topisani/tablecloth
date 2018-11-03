@@ -129,7 +129,7 @@ namespace cloth::render {
     auto when_ts = chrono::to_timespec(when);
     for (auto& layer : output.layers) {
       for (auto& surface : layer) {
-        wlr::layer_surface_t& layer = surface.layer_surface;
+        wlr::layer_surface_v1_t& layer = surface.layer_surface;
         wlr_surface_send_frame_done(layer.surface, &when_ts);
         wlr::xdg_popup_t* popup;
         wl_list_for_each(popup, &surface.layer_surface.popups, link)
@@ -194,10 +194,12 @@ namespace cloth::render {
     get_layout_position(data.parent_data.layout, lx, ly, *surface, sx * data.x_scale,
                         sy * data.x_scale);
 
-    wlr::box_t box = {.x = (int) lx,
-                      .y = (int) ly,
+    wlr_output_layout_output_coords(output.desktop.layout, &output.wlr_output, &lx, &ly);
+
+    wlr::box_t box = {.x = int (lx * output.wlr_output.scale),
+                      .y = int (ly * output.wlr_output.scale),
                       .width = int(surface->current.width * data.x_scale),
-                      .height = int(surface->current.height * data.x_scale)};
+                      .height = int(surface->current.height * data.y_scale)};
 
     wlr::box_t rotated;
     wlr_box_rotated_bounds(&box, rotation, &rotated);
@@ -269,7 +271,7 @@ namespace cloth::render {
       if (layer_surface.has_shadow) draw_shadow(data.layout, 0.f, 0.4, layer_surface.shadow_radius, layer_surface.shadow_offset);
 
       SurfaceRenderData surfdat = {*this, data};
-      wlr_layer_surface_for_each_surface(&layer_surface.layer_surface, render_surface, &surfdat);
+      wlr_layer_surface_v1_for_each_surface(&layer_surface.layer_surface, render_surface, &surfdat);
     }
   } // namespace cloth
 
@@ -299,7 +301,7 @@ namespace cloth::render {
       double view_y = (double) (output_box->height - view_box.height) / 2 + output_box->y;
       view.move(view_x, view_y);
 
-      if (has_standalone_surface(view)) {
+      if (has_standalone_surface(view) && output.layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY].empty()) {
         wlr_output_set_fullscreen_surface(&output.wlr_output, view.wlr_surface);
       } else {
         wlr_output_set_fullscreen_surface(&output.wlr_output, nullptr);
@@ -337,6 +339,11 @@ namespace cloth::render {
         render(output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND]);
         render(output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM]);
 
+        // Render all views
+        for (auto& vd : views) {
+          render(vd.view, vd.data);
+        }
+
         // If a view is fullscreen on this output, render it
         if (fullscreen_view) {
           auto& view = *fullscreen_view;
@@ -365,13 +372,7 @@ namespace cloth::render {
             }
 #endif
           }
-        } else {
-          // Render all views
-          for (auto& vd : views) {
-            render(vd.view, vd.data);
-          }
-        }
-
+        } 
         // Render top layer above shell views
         render(output.layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP]);
 

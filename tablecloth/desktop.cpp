@@ -7,12 +7,12 @@
 #include "wlroots.hpp"
 #include "xcursor.hpp"
 
-#include "util/iterators.hpp"
 #include "util/exception.hpp"
+#include "util/iterators.hpp"
 
-#include <charconv>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <charconv>
 
 #include "wlr-layer-shell-unstable-v1-protocol.h"
 
@@ -50,7 +50,7 @@ namespace cloth {
       double _sy = oy - surface.geo.y;
 
       wlr::surface_t* sub =
-        wlr_layer_surface_surface_at(&surface.layer_surface, _sx, _sy, &sx, &sy);
+        wlr_layer_surface_v1_surface_at(&surface.layer_surface, _sx, _sy, &sx, &sy);
 
       if (sub) {
         return sub;
@@ -78,13 +78,12 @@ namespace cloth {
       output = (Output*) wlr_output->data;
       wlr_output_layout_output_coords(layout, wlr_output, &ox, &oy);
 
-      if ((surface =
-             layer_surface_at(*output, output->layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY],
-                              ox, oy, sx, sy))) {
+      if ((surface = layer_surface_at(*output, output->layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY],
+                                      ox, oy, sx, sy))) {
         return surface;
       }
-      if ((surface = layer_surface_at(
-             *output, output->layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], ox, oy, sx, sy))) {
+      if ((surface = layer_surface_at(*output, output->layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], ox,
+                                      oy, sx, sy))) {
         return surface;
       }
     }
@@ -96,14 +95,12 @@ namespace cloth {
     }
 
     if (wlr_output) {
-      if ((surface =
-             layer_surface_at(*output, output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM],
-                              ox, oy, sx, sy))) {
+      if ((surface = layer_surface_at(*output, output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], ox,
+                                      oy, sx, sy))) {
         return surface;
       }
-      if ((surface = layer_surface_at(
-             *output, output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], ox, oy, sx,
-             sy))) {
+      if ((surface = layer_surface_at(*output, output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND],
+                                      ox, oy, sx, sy))) {
         return surface;
       }
     }
@@ -129,7 +126,7 @@ namespace cloth {
     on_new_output.add_to(server.backend->events.new_output);
 
     layout = wlr_output_layout_create();
-    wlr_xdg_output_manager_create(server.wl_display, layout);
+    wlr_xdg_output_manager_v1_create(server.wl_display, layout);
 
     on_layout_change.add_to(layout->events.change);
     on_layout_change = [this](void* data) {
@@ -163,22 +160,33 @@ namespace cloth {
     on_wl_shell_surface.add_to(wl_shell->events.new_surface);
     on_wl_shell_surface = [this](void* data) { handle_wl_shell_surface(data); };
 
-    layer_shell = wlr_layer_shell_create(server.wl_display);
+    layer_shell = wlr_layer_shell_v1_create(server.wl_display);
     on_layer_shell_surface.add_to(layer_shell->events.new_surface);
     on_layer_shell_surface = [this](void* data) { handle_layer_shell_surface(data); };
 
     tablet_v2 = wlr_tablet_v2_create(server.wl_display);
 
-#ifdef WLR_HAS_XWAYLAND
     const char* cursor_theme = nullptr;
+#ifdef WLR_HAS_XWAYLAND
     const char* cursor_default = xcursor_default;
+#endif
     Config::Cursor* cc = config.get_cursor(Config::default_seat_name);
     if (cc != nullptr) {
       cursor_theme = cc->theme.c_str();
+#ifdef WLR_HAS_XWAYLAND
       if (!cc->default_image.empty()) {
         cursor_default = cc->default_image.c_str();
       }
+#endif
     }
+
+    char cursor_size_fmt[16];
+    snprintf(cursor_size_fmt, sizeof(cursor_size_fmt), "%d", xcursor_size);
+    setenv("XCURSOR_SIZE", cursor_size_fmt, 1);
+    if (cursor_theme != NULL) {
+      setenv("XCURSOR_THEME", cursor_theme, 1);
+    }
+#ifdef WLR_HAS_XWAYLAND
 
     xcursor_manager = wlr_xcursor_manager_create(cursor_theme, xcursor_size);
     if (xcursor_manager == nullptr) {
@@ -210,7 +218,7 @@ namespace cloth {
     wlr_server_decoration_manager_set_default_mode(server_decoration_manager,
                                                    WLR_SERVER_DECORATION_MANAGER_MODE_SERVER);
     on_server_decoration.add_to(server_decoration_manager->events.new_decoration);
-    on_server_decoration = [] (void* data) {
+    on_server_decoration = [](void* data) {
       auto* decoration = (wlr::server_decoration_t*) data;
       // set in View::map and View::unmap
       auto* view = (View*) decoration->surface->data;
@@ -242,7 +250,8 @@ namespace cloth {
     };
     on_input_inhibit_deactivate.add_to(input_inhibit->events.deactivate);
 
-    linux_dmabuf = wlr_linux_dmabuf_v1_create(server.wl_display, server.renderer);
+    input_method = wlr_input_method_manager_v2_create(server.wl_display);
+    text_input = wlr_text_input_manager_v3_create(server.wl_display);
 
     virtual_keyboard = wlr_virtual_keyboard_manager_v1_create(server.wl_display);
 
@@ -266,6 +275,15 @@ namespace cloth {
     xdg_decoration_manager_v1 = wlr_xdg_decoration_manager_v1_create(server.wl_display);
     on_xdg_toplevel_decoration = [this](void* data) { handle_xdg_toplevel_decoration(data); };
     on_xdg_toplevel_decoration.add_to(xdg_decoration_manager_v1->events.new_toplevel_decoration);
+
+    pointer_constraints = wlr_pointer_constraints_v1_create(server.wl_display);
+    on_pointer_constraint.add_to(pointer_constraints->events.new_constraint);
+    on_pointer_constraint = [](void* data) {
+      auto& wlr_constraint = *((wlr_pointer_constraint_v1*) data);
+      new PointerConstraint(&wlr_constraint);
+
+    };
+    presentation = wlr_presentation_create(server.wl_display, server.backend);
   }
 
   Desktop::~Desktop() noexcept
@@ -293,9 +311,16 @@ namespace cloth {
     return res;
   }
 
+  auto Desktop::current_output() -> Output&
+  {
+    auto* output = server.input.last_active_seat()->current_output();
+    if (!output) output = &outputs[0];
+    return *output;
+  }
+
   auto Desktop::current_workspace() -> Workspace&
   {
-    return *outputs.front().workspace;
+    return *current_output().workspace;
   }
 
   auto Desktop::switch_to_workspace(int idx) -> Workspace&
@@ -304,12 +329,9 @@ namespace cloth {
     for (auto& seat : server.input.seats) {
       seat.set_focus(workspaces[idx].focused_view());
     }
-    // TODO: Properly support multiple outputs
-    // with separate workspaces
-    for (auto& output : outputs) {
-      output.workspace = &workspaces[idx];
-      output.context.damage_whole();
-    }
+    auto& output = current_output();
+    output.workspace = &workspaces[idx];
+    output.context.damage_whole();
     for (auto& view : workspaces[idx].visible_views()) {
       view.arrange();
     }
@@ -378,7 +400,7 @@ namespace cloth {
           focus->set_fullscreen(!is_fullscreen, nullptr);
         }
       } else if (command == "next_window") {
-        input.server.desktop.current_workspace().cycle_focus();
+        current_workspace().cycle_focus();
       } else if (command == "alpha") {
         View* focus = current_workspace().focused_view();
         if (focus != nullptr) {
@@ -403,13 +425,13 @@ namespace cloth {
         int workspace = -1;
         auto ws_str = args.at(0);
         if (ws_str == "next") // +10 fixes wrapping backwards
-          workspace = (input.server.desktop.current_workspace().index + 1 + 10) % 10;
+          workspace = (current_workspace().index + 1 + 10) % 10;
         else if (ws_str == "prev")
-          workspace = (input.server.desktop.current_workspace().index - 1 + 10) % 10;
+          workspace = (current_workspace().index - 1 + 10) % 10;
         else
           std::from_chars(&*ws_str.begin(), &*ws_str.end(), workspace);
         if (workspace >= 0 && workspace < 10) {
-          input.server.desktop.switch_to_workspace(workspace);
+          switch_to_workspace(workspace);
         }
       } else if (command == "move_workspace") {
         View* focus = current_workspace().focused_view();
@@ -417,14 +439,13 @@ namespace cloth {
           int workspace = -1;
           auto ws_str = args.at(0);
           if (ws_str == "next")
-            workspace = (input.server.desktop.current_workspace().index + 1 + 10) % 10;
+            workspace = (current_workspace().index + 1 + 10) % 10;
           else if (ws_str == "prev")
-            workspace = (input.server.desktop.current_workspace().index - 1 + 10) % 10;
+            workspace = (current_workspace().index - 1 + 10) % 10;
           else
             std::from_chars(&*ws_str.begin(), &*ws_str.end(), workspace);
           if (workspace >= 0 && workspace < 10) {
-            input.server.desktop.workspaces.at(workspace).add_view(
-              focus->workspace->erase_view(*focus));
+            workspaces.at(workspace).add_view(focus->workspace->erase_view(*focus));
           }
         }
       } else if (command == "toggle_decoration_mode") {
@@ -442,10 +463,9 @@ namespace cloth {
       } else if (command == "rotate_output") {
         auto rotation = args.at(0);
         auto output_name = args.size() > 1 ? args.at(1) : "";
-        auto output = util::find_if(input.server.desktop.outputs,
-                                    [&](Output& o) { return o.wlr_output.name == output_name; });
-        if (output == input.server.desktop.outputs.end())
-          output = input.server.desktop.outputs.begin();
+        auto output =
+          util::find_if(outputs, [&](Output& o) { return o.wlr_output.name == output_name; });
+        if (output == outputs.end()) output = outputs.begin();
         auto transform = [&] {
           if (rotation == "0") return WL_OUTPUT_TRANSFORM_NORMAL;
           if (rotation == "90") return WL_OUTPUT_TRANSFORM_90;

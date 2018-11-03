@@ -41,6 +41,25 @@ namespace cloth {
     // TODO: Desired behaviour?
   }
 
+  void LayerSurface::update_cursors(const util::ptr_vec<Seat>& seats)
+  {
+    for (auto& seat : seats) {
+      double sx, sy;
+      View* v;
+      auto* surface = seat.input.server.desktop.surface_at(seat.cursor.wlr_cursor->x,
+                                                           seat.cursor.wlr_cursor->y, sx, sy, v);
+      if (surface == layer_surface.surface) {
+        struct timespec time;
+        if (clock_gettime(CLOCK_MONOTONIC, &time) == 0) {
+          seat.cursor.update_position(time.tv_sec * 1000 + time.tv_nsec / 1000000);
+        } else {
+          LOGE("Failed to get time, not updating"
+               "position. Errno: {}",
+               strerror(errno));
+        }
+      }
+    }
+  }
 
   static void apply_exclusive(wlr::box_t& usable_area,
                               uint32_t anchor,
@@ -102,14 +121,15 @@ namespace cloth {
 
   static void arrange_layer(wlr::output_t& output,
                             util::ptr_vec<LayerSurface>& list,
+                            util::ptr_vec<Seat>& seats,
                             wlr::box_t& usable_area,
                             bool exclusive)
   {
     wlr::box_t full_area = {0};
     wlr_output_effective_resolution(&output, &full_area.width, &full_area.height);
-    for (auto& surface : list) {
-      wlr::layer_surface_t& layer = surface.layer_surface;
-      wlr::layer_surface_state_t& state = layer.current;
+    for (auto& surface : util::view::reverse(list)) {
+      wlr::layer_surface_v1_t& layer = surface.layer_surface;
+      wlr::layer_surface_v1_state_t& state = layer.current;
       if (exclusive != (state.exclusive_zone > 0)) {
         continue;
       }
@@ -165,14 +185,23 @@ namespace cloth {
       }
       if (box.width < 0 || box.height < 0) {
         // TODO: Bubble up a protocol error?
-        wlr_layer_surface_close(&layer);
+        wlr_layer_surface_v1_close(&layer);
         continue;
       }
       // Apply
+      wlr::box_t old_geo = surface.geo;
       surface.geo = box;
       apply_exclusive(usable_area, state.anchor, state.exclusive_zone, state.margin.top,
                       state.margin.right, state.margin.bottom, state.margin.left);
-      wlr_layer_surface_configure(&layer, box.width, box.height);
+      wlr_layer_surface_v1_configure(&layer, box.width, box.height);
+      // Having a cursor newly end up over the moved layer will not
+      // automatically send a motion event to the surface. The event needs to
+      // be synthesized.
+      // Only update layer surfaces which kept their size (and so buffers) the
+      // same, because those with resized buffers will be handled separately.
+      if (surface.geo.x != old_geo.x || surface.geo.y != old_geo.y) {
+        surface.update_cursors(seats);
+      }
     }
   }
 
@@ -182,14 +211,14 @@ namespace cloth {
     wlr_output_effective_resolution(&output.wlr_output, &usable_area.width, &usable_area.height);
 
     // Arrange exclusive surfaces from top->bottom
-    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], usable_area,
-                  true);
-    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], usable_area,
-                  true);
-    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], usable_area,
-                  true);
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY],
+                  output.desktop.server.input.seats, usable_area, true);
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP],
+                  output.desktop.server.input.seats, usable_area, true);
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM],
+                  output.desktop.server.input.seats, usable_area, true);
     arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND],
-                  usable_area, true);
+                  output.desktop.server.input.seats, usable_area, true);
     memcpy(&output.usable_area, &usable_area, sizeof(wlr::box_t));
 
     for (View& view : output.workspace->visible_views()) {
@@ -197,14 +226,14 @@ namespace cloth {
     }
 
     // Arrange non-exlusive surfaces from top->bottom
-    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], usable_area,
-                  false);
-    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], usable_area,
-                  false);
-    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], usable_area,
-                  false);
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY],
+                  output.desktop.server.input.seats, usable_area, false);
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP],
+                  output.desktop.server.input.seats, usable_area, false);
+    arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM],
+                  output.desktop.server.input.seats, usable_area, false);
     arrange_layer(output.wlr_output, output.layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND],
-                  usable_area, false);
+                  output.desktop.server.input.seats, usable_area, false);
 
     // Find topmost keyboard interactive layer, if such a layer exists
     uint32_t layers_above_shell[] = {
@@ -232,7 +261,7 @@ namespace cloth {
 
   void Desktop::handle_layer_shell_surface(void* data)
   {
-    auto& layer_surface = *(wlr::layer_surface_t*) data;
+    auto& layer_surface = *(wlr::layer_surface_v1_t*) data;
 
     LOGD("new layer surface: namespace {} layer {} anchor {} size {}x{} margin {},{},{},{}",
          layer_surface.namespace_, layer_surface.layer, layer_surface.layer,
@@ -253,7 +282,7 @@ namespace cloth {
       if (output) {
         layer_surface.output = output;
       } else {
-        wlr_layer_surface_close(&layer_surface);
+        wlr_layer_surface_v1_close(&layer_surface);
         return;
       }
     }
@@ -266,7 +295,7 @@ namespace cloth {
 
     // Temporarily set the layer's current state to client_pending
     // So that we can easily arrange it
-    wlr::layer_surface_state_t old_state = layer_surface.current;
+    wlr::layer_surface_v1_state_t old_state = layer_surface.current;
     layer_surface.current = layer_surface.client_pending;
 
     arrange_layers(*output);
@@ -280,7 +309,7 @@ namespace cloth {
     return children.push_back(std::move(popup));
   }
 
-  LayerSurface::LayerSurface(Output& p_output, wlr::layer_surface_t& p_layer_surface)
+  LayerSurface::LayerSurface(Output& p_output, wlr::layer_surface_v1_t& p_layer_surface)
     : output(p_output), layer_surface(p_layer_surface)
   {
     layer_surface.data = this;
@@ -293,6 +322,17 @@ namespace cloth {
     on_surface_commit = [this](void* data) {
       wlr::box_t old_geo = geo;
       arrange_layers(output);
+      // Cursor changes which happen as a consequence of resizing a layer
+      // surface are applied in arrange_layers. Because the resize happens
+      // before the underlying surface changes, it will only receive a cursor
+      // update if the new cursor position crosses the *old* sized surface in
+      // the *new* layer surface.
+      // Another cursor move event is needed when the surface actually
+      // changes.
+      if (layer_surface.surface->previous.width != layer_surface.surface->current.width ||
+          layer_surface.surface->previous.height != layer_surface.surface->current.height) {
+        update_cursors(output.desktop.server.input.seats);
+      }
       if (old_geo != geo) {
         output.context.damage_whole_layer(*this, old_geo);
       }
@@ -303,7 +343,7 @@ namespace cloth {
     on_output_destroy = [this](void* data) {
       layer_surface.output = nullptr;
       on_output_destroy.remove();
-      wlr_layer_surface_close(&layer_surface);
+      wlr_layer_surface_v1_close(&layer_surface);
     };
 
     on_destroy.add_to(layer_surface.events.destroy);

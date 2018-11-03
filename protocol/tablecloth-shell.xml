@@ -24,6 +24,7 @@
 	The current workspace state, such as current workspace and workspace
 	count, has changed.
       </description>
+      <arg name="output_name" type="string"/>
       <arg name="current" type="uint"/>
       <arg name="count" type="uint"/>
     </event>

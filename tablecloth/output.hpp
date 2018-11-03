@@ -38,6 +38,7 @@ namespace cloth {
     wl::Listener on_destroy;
     wl::Listener on_mode;
     wl::Listener on_transform;
+    wl::Listener on_present;
     wl::Listener on_damage_frame;
     wl::Listener on_damage_destroy;
 

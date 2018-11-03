@@ -40,7 +40,7 @@ namespace cloth::bar {
     std::thread dbus_thread;
 
     struct {
-      sigc::signal<void(int, int)> workspace_state;
+      sigc::signal<void(std::string, int, int)> workspace_state;
       sigc::signal<void(std::string)> focused_window_name;
     } signals;
 

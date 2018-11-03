@@ -26,6 +26,7 @@ namespace cloth {
     Output* output_at(double x, double y);
 
     util::ref_vec<View> visible_views();
+    Output& current_output();
     Workspace& current_workspace();
     Workspace& switch_to_workspace(int idx);
 
@@ -72,11 +73,14 @@ namespace cloth {
     wlr::idle_t* idle = nullptr;
     wlr::idle_inhibit_manager_v1_t* idle_inhibit = nullptr;
     wlr::input_inhibit_manager_t* input_inhibit = nullptr;
-    wlr::linux_dmabuf_v1_t* linux_dmabuf = nullptr;
-    wlr::layer_shell_t* layer_shell = nullptr;
+    wlr::layer_shell_v1_t* layer_shell = nullptr;
+    wlr::input_method_manager_v2_t* input_method = nullptr;
+    wlr::text_input_manager_v3_t* text_input = nullptr;
     wlr::virtual_keyboard_manager_v1_t* virtual_keyboard = nullptr;
     wlr::screencopy_manager_v1_t* screencopy = nullptr;
     wlr::tablet_manager_v2_t* tablet_v2 = nullptr;
+    wlr::pointer_constraints_v1_t* pointer_constraints = nullptr;
+    wlr::presentation_t* presentation = nullptr;
 
   protected:
     wl::Listener on_new_output;
@@ -90,8 +94,7 @@ namespace cloth {
     wl::Listener on_input_inhibit_activate;
     wl::Listener on_input_inhibit_deactivate;
     wl::Listener on_virtual_keyboard_new;
-
-    wl::listener_t test;
+    wl::Listener on_pointer_constraint;
 
 #ifdef WLR_HAS_XWAYLAND
   public:

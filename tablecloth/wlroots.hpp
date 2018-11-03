@@ -34,6 +34,8 @@
 // Rename fields which use reserved names
 #define class class_
 #define namespace namespace_
+#define delete delete_
+#define static
 // wlroots does not do this itself
 extern "C" {
 
@@ -58,26 +60,30 @@ extern "C" {
 #include <wlr/types/wlr_idle_inhibit_v1.h>
 #include <wlr/types/wlr_input_device.h>
 #include <wlr/types/wlr_input_inhibitor.h>
-#include <wlr/types/wlr_layer_shell.h>
-#include <wlr/types/wlr_linux_dmabuf_v1.h>
+#include <wlr/types/wlr_input_method_v2.h>
+#include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_list.h>
 #include <wlr/types/wlr_matrix.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_damage.h>
 #include <wlr/types/wlr_output_layout.h>
+#include <wlr/types/wlr_pointer_constraints_v1.h>
+#include <wlr/types/wlr_presentation_time.h>
 #include <wlr/types/wlr_primary_selection.h>
 #include <wlr/types/wlr_screencopy_v1.h>
 #include <wlr/types/wlr_screenshooter.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_server_decoration.h>
 #include <wlr/types/wlr_tablet_v2.h>
+#include <wlr/types/wlr_text_input_v3.h>
 #include <wlr/types/wlr_virtual_keyboard_v1.h>
 #include <wlr/types/wlr_wl_shell.h>
 #include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/types/wlr_xdg_decoration_v1.h>
-#include <wlr/types/wlr_xdg_output.h>
+#include <wlr/types/wlr_xdg_output_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/types/wlr_xdg_shell_v6.h>
+#include <wlr/util/log.h>
 #include <wlr/util/region.h>
 
 #ifdef WLR_HAS_XWAYLAND
@@ -88,6 +94,8 @@ extern "C" {
 // make sure to undefine these again
 #undef class
 #undef namespace
+#undef static
+#undef delete
 
 #include "util/bindings.hpp"
 
@@ -124,16 +132,18 @@ namespace cloth::wlr {
   using data_source_t = struct wlr_data_source;
   using device_t = struct wlr_device;
   using direction_t = enum wlr_direction;
-  using dmabuf_buffer_t = struct wlr_dmabuf_buffer;
+  using drag_drop_event_t = struct wlr_drag_drop_event;
   using drag_icon_t = struct wlr_drag_icon;
   using drag_motion_event_t = struct wlr_drag_motion_event;
   using drag_t = struct wlr_drag;
   using drm_backend_t = struct wlr_drm_backend;
   using drm_connector_t = struct wlr_drm_connector;
   using drm_crtc_props_t = union wlr_drm_crtc_props;
+  using drm_crtc_props_t = union wlr_drm_crtc_props;
   using drm_crtc_t = struct wlr_drm_crtc;
   using drm_interface_t = struct wlr_drm_interface;
   using drm_mode_t = struct wlr_drm_mode;
+  using drm_plane_props_t = union wlr_drm_plane_props;
   using drm_plane_t = struct wlr_drm_plane;
   using drm_renderer_t = struct wlr_drm_renderer;
   using drm_surface_t = struct wlr_drm_surface;
@@ -144,13 +154,13 @@ namespace cloth::wlr {
   using event_pointer_button_t = struct wlr_event_pointer_button;
   using event_pointer_motion_absolute_t = struct wlr_event_pointer_motion_absolute;
   using event_pointer_motion_t = struct wlr_event_pointer_motion;
-  using event_tablet_tool_axis_t = struct wlr_event_tablet_tool_axis;
-  using event_tablet_tool_tip_t = struct wlr_event_tablet_tool_tip;
-  using event_tablet_tool_button_t = struct wlr_event_tablet_tool_button;
-  using event_tablet_tool_proximity_t = struct wlr_event_tablet_tool_proximity;
+  using event_tablet_pad_button_t = struct wlr_event_tablet_pad_button;
   using event_tablet_pad_ring_t = struct wlr_event_tablet_pad_ring;
   using event_tablet_pad_strip_t = struct wlr_event_tablet_pad_strip;
-  using event_tablet_pad_button_t = struct wlr_event_tablet_pad_button;
+  using event_tablet_tool_axis_t = struct wlr_event_tablet_tool_axis;
+  using event_tablet_tool_button_t = struct wlr_event_tablet_tool_button;
+  using event_tablet_tool_proximity_t = struct wlr_event_tablet_tool_proximity;
+  using event_tablet_tool_tip_t = struct wlr_event_tablet_tool_tip;
   using event_touch_down_t = struct wlr_event_touch_down;
   using event_touch_motion_t = struct wlr_event_touch_motion;
   using event_touch_up_t = struct wlr_event_touch_up;
@@ -158,7 +168,7 @@ namespace cloth::wlr {
   using gamma_control_manager_t = struct wlr_gamma_control_manager;
   using gamma_control_manager_v1_t = struct wlr_gamma_control_manager_v1;
   using gamma_control_t = struct wlr_gamma_control;
-  using gamma_control_v1_t = struct wlr_gamma_control;
+  using gamma_control_v1_t = struct wlr_gamma_control_v1;
   using idle_inhibit_manager_v1_t = struct wlr_idle_inhibit_manager_v1;
   using idle_inhibitor_v1_t = struct wlr_idle_inhibitor_v1;
   using idle_timeout_t = struct wlr_idle_timeout;
@@ -166,14 +176,15 @@ namespace cloth::wlr {
   using input_device_impl_t = struct wlr_input_device_impl;
   using input_device_t = struct wlr_input_device;
   using input_inhibit_manager_t = struct wlr_input_inhibit_manager;
+  using input_method_v2_t = struct wlr_input_method_v2;
+  using input_method_manager_v2_t = struct wlr_input_method_manager_v2;
   using keyboard_impl_t = struct wlr_keyboard_impl;
   using keyboard_led_t = enum wlr_keyboard_led;
   using keyboard_t = struct wlr_keyboard;
   using key_state_t = enum wlr_key_state;
-  using layer_shell_t = struct wlr_layer_shell;
-  using layer_surface_state_t = struct wlr_layer_surface_state;
-  using layer_surface_t = struct wlr_layer_surface;
-  using linux_dmabuf_t = struct wlr_linux_dmabuf;
+  using layer_shell_v1_t = struct wlr_layer_shell_v1;
+  using layer_surface_v1_state_t = struct wlr_layer_surface_v1_state;
+  using layer_surface_v1_t = struct wlr_layer_surface_v1;
   using linux_dmabuf_v1_t = struct wlr_linux_dmabuf_v1;
   using list_t = struct wlr_list;
   using output_cursor_t = struct wlr_output_cursor;
@@ -185,8 +196,14 @@ namespace cloth::wlr {
   using output_layout_t = struct wlr_output_layout;
   using output_mode_t = struct wlr_output_mode;
   using output_t = struct wlr_output;
+  using pointer_constraint_v1_state_field_t = enum wlr_pointer_constraint_v1_state_field;
+  using pointer_constraint_v1_state_t = struct wlr_pointer_constraint_v1_state;
+  using pointer_constraints_v1_t = struct wlr_pointer_constraints_v1;
+  using pointer_constraint_v1_t = struct wlr_pointer_constraint_v1;
   using pointer_impl_t = struct wlr_pointer_impl;
   using pointer_t = struct wlr_pointer;
+  using presentation_t = struct wlr_presentation;
+  using presentation_event_t = struct wlr_presentation_event;
   using primary_selection_device_manager_t = struct wlr_primary_selection_device_manager;
   using renderer_impl_t = struct wlr_renderer_impl;
   using renderer_t = struct wlr_renderer;
@@ -198,6 +215,7 @@ namespace cloth::wlr {
   using seat_keyboard_grab_t = struct wlr_seat_keyboard_grab;
   using seat_keyboard_state_t = struct wlr_seat_keyboard_state;
   using seat_pointer_request_set_cursor_event_t = struct wlr_seat_pointer_request_set_cursor_event;
+  using seat_pointer_focus_change_event_t = struct wlr_seat_pointer_focus_change_event;
   using seat_pointer_state_t = struct wlr_seat_pointer_state;
   using seat_touch_grab_t = struct wlr_seat_touch_grab;
   using seat_t = struct wlr_seat;
@@ -225,6 +243,8 @@ namespace cloth::wlr {
   using tablet_v2_tablet_pad_t = struct wlr_tablet_v2_tablet_pad;
   using tablet_v2_tablet_tool_t = struct wlr_tablet_v2_tablet_tool;
   using tablet_v2_tablet_t = struct wlr_tablet_v2_tablet;
+  using text_input_v3_t = struct wlr_text_input_v3;
+  using text_input_manager_v3_t = struct wlr_text_input_manager_v3;
   using texture_impl_t = struct wlr_texture_impl;
   using texture_t = struct wlr_texture;
   using touch_impl_t = struct wlr_touch_impl;
@@ -250,6 +270,7 @@ namespace cloth::wlr {
   using xdg_decoration_manager_v1_t = struct wlr_xdg_decoration_manager_v1;
   using xdg_output_manager_t = struct wlr_xdg_output_manager;
   using xdg_output_t = struct wlr_xdg_output;
+  using xdg_output_v1_t = struct wlr_xdg_output_v1;
   using xdg_popup_grab_t = struct wlr_xdg_popup_grab;
   using xdg_popup_grab_v6_t = struct wlr_xdg_popup_grab_v6;
   using xdg_popup_t = struct wlr_xdg_popup;
@@ -276,8 +297,7 @@ namespace cloth::wlr {
   using xdg_toplevel_v6_move_event_t = struct wlr_xdg_toplevel_v6_move_event;
   using xdg_toplevel_v6_resize_event_t = struct wlr_xdg_toplevel_v6_resize_event;
   using xdg_toplevel_v6_set_fullscreen_event_t = struct wlr_xdg_toplevel_v6_set_fullscreen_event;
-  using xdg_toplevel_v6_show_window_menu_event_t =
-    struct wlr_xdg_toplevel_v6_show_window_menu_event;
+  using xdg_toplevel_v6_show_window_menu_event_t = struct wlr_xdg_toplevel_v6_show_window_menu_event;
   using xdg_toplevel_v6_state_t = struct wlr_xdg_toplevel_v6_state;
   using xdg_toplevel_v6_t = struct wlr_xdg_toplevel_v6;
   using xwm_t = struct wlr_xwm;
@@ -293,8 +313,6 @@ namespace cloth::wlr {
   using xwayland_surface_t = struct wlr_xwayland_surface;
   using xwayland_t = struct wlr_xwayland;
 #endif
-
-  using Listener[[deprecated("Use wl::Listener instead")]] = wl::Listener;
 
   /// Linux input event buttons
   enum struct Button {
@@ -379,8 +397,10 @@ namespace cloth::wlr {
     gear_up = BTN_GEAR_UP,
   };
 
-  inline bool box_contains(box_t lhs, box_t rhs) {
-    return lhs.x <= rhs.x && lhs.y <= rhs.y && lhs.x + lhs.width >= rhs.x + rhs.width && lhs.y + lhs.height >= rhs.y + rhs.height;
+  inline bool box_contains(box_t lhs, box_t rhs)
+  {
+    return lhs.x <= rhs.x && lhs.y <= rhs.y && lhs.x + lhs.width >= rhs.x + rhs.width &&
+           lhs.y + lhs.height >= rhs.y + rhs.height;
   }
 
 } // namespace cloth::wlr

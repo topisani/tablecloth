@@ -16,13 +16,18 @@ namespace cloth {
     Cursor(Seat& seat, wlr::cursor_t* cursor) noexcept;
     ~Cursor() noexcept;
 
+    void update_focus();
     void update_position(uint32_t time);
     void set_visible(bool);
+    void constrain(wlr::pointer_constraint_v1_t* constraint, double sx, double sy);
 
     // Member data
 
     Seat& seat;
     wlr::cursor_t* wlr_cursor = nullptr;
+
+    wlr::pointer_constraint_v1_t* active_constraint = nullptr;
+    pixman_region32_t confine;
 
     Mode mode;
 
@@ -39,6 +44,7 @@ namespace cloth {
     uint32_t resize_edges;
 
     SeatView* pointer_view = nullptr;
+    wlr::surface_t *wlr_surface;
 
     wl::Listener on_motion;
     wl::Listener on_motion_absolute;
@@ -56,8 +62,11 @@ namespace cloth {
 
     wl::Listener on_request_set_cursor;
 
+    wl::Listener on_focus_change;
+    wl::Listener on_constraint_commit;
+
   private:
-    void passthrough_cursor(uint32_t time);
+    void passthrough_cursor(int64_t time);
     void press_button(wlr::input_device_t& device,
                       uint32_t time,
                       wlr::Button button,
