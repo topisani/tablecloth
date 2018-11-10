@@ -14,15 +14,18 @@ namespace cloth::bar {
       if (interface == workspaces.interface_name) {
         registry.bind(name, workspaces, version);
         workspaces.on_state() = [&](std::string output_name, unsigned current, unsigned count) {
+          cloth_debug("Changed state on output {}", output_name);
           signals.workspace_state.emit(std::move(output_name), current, count);
         };
       } else if (interface == window_manager.interface_name) {
         registry.bind(name, window_manager, version);
-        window_manager.on_focused_window_name() = [&](const std::string& name, unsigned ws) {
-          signals.focused_window_name.emit(name);
+        window_manager.on_focused_window_name() = [&](const std::string& name, unsigned workspace) {
+          signals.focused_window_name.emit(name, workspace);
         };
       } else if (interface == layer_shell.interface_name) {
         registry.bind(name, layer_shell, version);
+      } else if (interface == output_manager.interface_name) {
+        registry.bind(name, output_manager, version);
       } else if (interface == wl::output_t::interface_name) {
         auto output = std::make_unique<wl::output_t>();
         registry.bind(name, *output, version);
@@ -47,6 +50,7 @@ namespace cloth::bar {
   {
     auto cli = make_cli();
     auto result = cli.parse(clara::Args(argc, argv));
+    wlr_log_init(WLR_DEBUG, nullptr);
 
     if (!result) {
       cloth_error("Error in command line: {}", result.errorMessage());

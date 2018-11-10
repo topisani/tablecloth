@@ -79,7 +79,7 @@ namespace cloth {
     for (auto& output : server.desktop.outputs) {
       for (auto* resource : bound_clients) {
         workspace_manager_send_state(resource, output.wlr_output.name,
-                                     server.desktop.current_workspace().index,
+                                     output.workspace->index,
                                      Desktop::workspace_count);
       }
     }

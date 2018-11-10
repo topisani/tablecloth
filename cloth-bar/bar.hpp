@@ -21,7 +21,10 @@ namespace cloth::bar {
     wl::surface_t surface;
     wl::zwlr_layer_surface_v1_t layer_surface;
     std::unique_ptr<wl::output_t> output;
+    wl::zxdg_output_v1_t xdg_output;
+    std::string output_name;
     bool visible = true;
+    int current_workspace = 0;
 
     auto set_width(int) -> void;
 

@@ -377,7 +377,7 @@ namespace cloth::util {
     using std::begin;
     using std::end;
     return std::replace_copy(begin(cont), end(cont), std::forward<OutputIterator>(first),
-                             std::forward<T>(old_value), std::forward<T2>(old_value));
+                             std::forward<T>(old_value), std::forward<T2>(new_value));
   }
 
   template<typename Cont, typename OutputIterator, typename UnaryPredicate, typename T>

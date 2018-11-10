@@ -102,27 +102,6 @@ namespace cloth {
     }
   }
 
-  struct PresentationData {
-    render::LayoutData layout;
-    Output& output;
-    wlr::presentation_event_t* event;
-  };
-
-  // TODO:
-  // static void surface_send_presented(struct wlr_surface* surface, int sx, int sy, void* _data)
-  // {
-  //   auto& data = *(PresentationData*) _data;
-  //   auto& output = data.output;
-  //   float rotation = data.layout.rotation;
-  //   double lx, ly;
-  //   get_layout_position(data.layout, &lx, &ly, surface, sx, sy);
-  //   if (!surface_intersect_output(surface, output->desktop->layout, output->wlr_output, lx, ly,
-  //                                 rotation, NULL)) {
-  //     return;
-  //   }
-  //   wlr_presentation_send_surface_presented(output->desktop->presentation, surface, data->event);
-  // }
-
   Output::Output(Desktop& p_desktop, Workspace& ws, wlr::output_t& wlr) noexcept
     : desktop(p_desktop), workspace(&ws), wlr_output(wlr), last_frame(chrono::clock::now())
   {
@@ -148,23 +127,8 @@ namespace cloth {
     on_damage_destroy = [this] { util::erase_this(desktop.outputs, this); };
 
     on_present.add_to(wlr_output.events.present);
-    on_present = [] {
-      // TODO:
-      // struct wlr_output_event_present* output_event = data;
-      // struct wlr_presentation_event event = {
-      //   .output = output->wlr_output,
-      //   .tv_sec = (uint64_t) output_event->when->tv_sec,
-      //   .tv_nsec = (uint32_t) output_event->when->tv_nsec,
-      //   .refresh = (uint32_t) output_event->refresh,
-      //   .seq = (uint64_t) output_event->seq,
-      //   .flags = output_event->flags,
-      // };
-      // struct presentation_data presentation_data = {
-      //   .output = output,
-      //   .event = &event,
-      // };
-      // output_for_each_surface(output, surface_send_presented, &presentation_data.layout,
-      //                         &presentation_data);
+    on_present = [this](void* data) {
+      context.handle_present(*(wlr::output_event_present_t*) data);
     };
 
     Config::Output* output_config = desktop.config.get_output(wlr_output);

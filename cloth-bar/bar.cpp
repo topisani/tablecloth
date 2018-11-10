@@ -17,9 +17,16 @@
 namespace cloth::bar {
 
   Bar::Bar(Client& client, std::unique_ptr<wl::output_t>&& p_output)
-    : client(client), window{Gtk::WindowType::WINDOW_TOPLEVEL}, output(std::move(p_output))
+    : client(client),
+      window{Gtk::WindowType::WINDOW_TOPLEVEL},
+      output(std::move(p_output)),
+      xdg_output(client.output_manager.get_xdg_output(*output))
   {
-    output->on_mode() = [this](wl::output_mode, int32_t w, int32_t h, int32_t refresh) {
+    xdg_output.on_name() = [this](std::string name) { 
+      cloth_info("Got output name {}", name);
+      output_name = std::move(name); 
+      };
+    output->on_mode() = [this](wl::output_mode, int32_t w, int32_t /*h*/, int32_t /*refresh*/) {
       cloth_info("Bar width configured: {}", w);
       set_width(w);
     };
@@ -41,7 +48,7 @@ namespace cloth::bar {
     layer_surface.on_configure() = [&](uint32_t serial, uint32_t width, uint32_t height) {
       window.show_all();
       layer_surface.ack_configure(serial);
-      if (client.height != height) {
+      if (client.height != (int) height) {
         height = client.height;
         cloth_debug("New Height: {}", height);
         layer_surface.set_size(width, height);
@@ -89,12 +96,15 @@ namespace cloth::bar {
     {
       box.get_style_context()->add_class("workspace-selector");
       bar.client.signals.workspace_state.connect(
-        [&](std::string output_name, int current, int count) { update(current, count); });
+        [this](std::string output_name, int current, int count) {
+          if (output_name == this->bar.output_name) update(current, count);
+        });
     }
 
     auto update(int current, int count) -> void
     {
-      if (count != buttons.size()) {
+      bar.current_workspace = current;
+      if (count != (int) buttons.size()) {
         buttons.clear();
         for (int i = 0; i < count; i++) {
           auto& button = buttons.emplace_back(std::to_string(i + 1));
@@ -165,7 +175,8 @@ namespace cloth::bar {
 
     auto& focused_window = *Gtk::manage(new Gtk::Button());
     focused_window.get_style_context()->add_class("focused-window-title");
-    client.signals.focused_window_name.connect([&focused_window](std::string focused_window_name) {
+    client.signals.focused_window_name.connect([&](std::string focused_window_name, int workspace) {
+      if (workspace != current_workspace) return;
       if (focused_window_name.size() > 70) {
         focused_window_name.erase(67);
         focused_window_name += "...";

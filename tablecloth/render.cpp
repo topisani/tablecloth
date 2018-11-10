@@ -29,12 +29,12 @@ namespace cloth::render {
    * the child position is (*sx, *sy) and its size is (sw, sh).
    */
   auto rotate_child_position(double& sx,
-                                    double& sy,
-                                    double sw,
-                                    double sh,
-                                    double pw,
-                                    double ph,
-                                    float rotation) -> void
+                             double& sy,
+                             double sw,
+                             double sh,
+                             double pw,
+                             double ph,
+                             float rotation) -> void
   {
     if (rotation != 0.0) {
       // Coordinates relative to the center of the subsurface
@@ -48,11 +48,11 @@ namespace cloth::render {
   }
 
   auto get_layout_position(const LayoutData& data,
-                                  double& lx,
-                                  double& ly,
-                                  const wlr::surface_t& surface,
-                                  int sx,
-                                  int sy) -> void
+                           double& lx,
+                           double& ly,
+                           const wlr::surface_t& surface,
+                           int sx,
+                           int sy) -> void
   {
     double _sx = sx, _sy = sy;
     rotate_child_position(_sx, _sy, surface.current.width, surface.current.height, data.width,
@@ -88,12 +88,12 @@ namespace cloth::render {
    * coordinates.
    */
   auto surface_intersect_output(wlr::surface_t& surface,
-                                       wlr::output_layout_t& output_layout,
-                                       wlr::output_t& wlr_output,
-                                       double lx,
-                                       double ly,
-                                       float rotation,
-                                       wlr::box_t* box) -> bool
+                                wlr::output_layout_t& output_layout,
+                                wlr::output_t& wlr_output,
+                                double lx,
+                                double ly,
+                                float rotation,
+                                wlr::box_t* box) -> bool
   {
     double ox = lx, oy = ly;
     wlr_output_layout_output_coords(&output_layout, &wlr_output, &ox, &oy);
@@ -196,8 +196,8 @@ namespace cloth::render {
 
     wlr_output_layout_output_coords(output.desktop.layout, &output.wlr_output, &lx, &ly);
 
-    wlr::box_t box = {.x = int (lx * output.wlr_output.scale),
-                      .y = int (ly * output.wlr_output.scale),
+    wlr::box_t box = {.x = int(lx * output.wlr_output.scale),
+                      .y = int(ly * output.wlr_output.scale),
                       .width = int(surface->current.width * data.x_scale),
                       .height = int(surface->current.height * data.y_scale)};
 
@@ -243,7 +243,45 @@ namespace cloth::render {
     wlr_surface_send_frame_done(surface, &when);
   }
 
+  struct PresentationData {
+    render::LayoutData layout;
+    Output& output;
+    wlr::presentation_event_t* event;
+  };
 
+  // So fucking hacky, im sorry
+  thread_local PresentationData* presentation_data = nullptr;
+
+  static void surface_send_presented(wlr::surface_t* surface, int sx, int sy, void*)
+  {
+    auto& data = *presentation_data;
+    float rotation = data.layout.rotation;
+    double lx, ly;
+    get_layout_position(data.layout, lx, ly, *surface, sx, sy);
+    if (!surface_intersect_output(*surface, *data.output.desktop.layout, data.output.wlr_output, lx, ly,
+                                  rotation, nullptr)) {
+      return;
+    }
+    wlr_presentation_send_surface_presented(data.output.desktop.presentation, surface, data.event);
+  }
+
+  auto Context::handle_present(wlr::output_event_present_t& output_event) -> void
+  {
+    wlr::presentation_event_t event = {
+      .output = &output.wlr_output,
+      .tv_sec = (uint64_t) output_event.when->tv_sec,
+      .tv_nsec = (uint32_t) output_event.when->tv_nsec,
+      .refresh = (uint32_t) output_event.refresh,
+      .seq = (uint64_t) output_event.seq,
+      .flags = output_event.flags,
+    };
+    PresentationData local = {
+      .output = output,
+      .event = &event,
+    };
+    presentation_data = &local;
+    output_for_each_surface(surface_send_presented);
+  }
 
   auto Context::render(View& view, RenderData& data) -> void
   {
@@ -268,7 +306,9 @@ namespace cloth::render {
                          }};
       for_each_surface(*layer_surface.layer_surface.surface, render_surface, data);
 
-      if (layer_surface.has_shadow) draw_shadow(data.layout, 0.f, 0.4, layer_surface.shadow_radius, layer_surface.shadow_offset);
+      if (layer_surface.has_shadow)
+        draw_shadow(data.layout, 0.f, 0.4, layer_surface.shadow_radius,
+                    layer_surface.shadow_offset);
 
       SurfaceRenderData surfdat = {*this, data};
       wlr_layer_surface_v1_for_each_surface(&layer_surface.layer_surface, render_surface, &surfdat);
@@ -301,7 +341,8 @@ namespace cloth::render {
       double view_y = (double) (output_box->height - view_box.height) / 2 + output_box->y;
       view.move(view_x, view_y);
 
-      if (has_standalone_surface(view) && output.layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY].empty()) {
+      if (has_standalone_surface(view) &&
+          output.layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY].empty()) {
         wlr_output_set_fullscreen_surface(&output.wlr_output, view.wlr_surface);
       } else {
         wlr_output_set_fullscreen_surface(&output.wlr_output, nullptr);
@@ -326,7 +367,7 @@ namespace cloth::render {
       // otherwise Output isn't damaged but needs buffer swap
       if (pixman_region32_not_empty(&pixman_damage)) {
         if (output.desktop.server.config.debug_damage_tracking) {
-          float color[] = { 1, 1, 0, 1 };
+          float color[] = {1, 1, 0, 1};
           wlr_renderer_clear(renderer, color);
         }
 
@@ -373,7 +414,7 @@ namespace cloth::render {
             }
 #endif
           }
-        } 
+        }
         // Render top layer above shell views
         render(output.layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP]);
 
@@ -514,9 +555,9 @@ namespace cloth::render {
   }
 
   auto Context::damage_whole_local_surface(wlr::surface_t& surface,
-                                                 double ox,
-                                                 double oy,
-                                                 float rotation) -> void
+                                           double ox,
+                                           double oy,
+                                           float rotation) -> void
   {
     wlr::output_layout_output_t* layout =
       wlr_output_layout_get(output.desktop.layout, &output.wlr_output);
@@ -540,12 +581,12 @@ namespace cloth::render {
     if (layer.has_shadow) {
       wlr::box_t shadow_box = geo;
       shadow_box.x += layer.shadow_offset - layer.shadow_radius / 2.f + layout->x;
-      shadow_box.y += layer.shadow_offset - layer.shadow_radius / 2.f + layout->y;;
+      shadow_box.y += layer.shadow_offset - layer.shadow_radius / 2.f + layout->y;
+      ;
       shadow_box.width += layer.shadow_radius;
       shadow_box.height += layer.shadow_radius;
       wlr_output_damage_add_box(damage, &shadow_box);
     }
-
   }
 
   auto Context::damage_whole_view(View& view) -> void
@@ -609,9 +650,9 @@ namespace cloth::render {
   }
 
   auto Context::damage_from_local_surface(wlr::surface_t& surface,
-                                                double ox,
-                                                double oy,
-                                                float rotation) -> void
+                                          double ox,
+                                          double oy,
+                                          float rotation) -> void
   {
     wlr::output_layout_output_t* layout =
       wlr_output_layout_get(output.desktop.layout, &output.wlr_output);
@@ -636,9 +677,66 @@ namespace cloth::render {
   //////////////////////////////////////////
 
 
+  auto Context::output_for_each_surface(wlr_surface_iterator_func_t iterator) -> void
+  {
+    auto& wlr_output = output.wlr_output;
+    auto& desktop = output.desktop;
+
+    const wlr::box_t output_box = *wlr_output_layout_get_box(desktop.layout, &wlr_output);
+
+    if (fullscreen_view) {
+      auto& view = *fullscreen_view;
+      RenderData data = {.layout =
+                           {
+                             .x = 0,
+                             .y = 0,
+                             .width = (double) output.wlr_output.width,
+                             .height = (double) output.wlr_output.height,
+                           },
+                         .alpha = 1.f};
+
+      if (output.wlr_output.fullscreen_surface == view.wlr_surface) {
+        // The output will render the fullscreen view
+      } else {
+        if (view.wlr_surface != nullptr) {
+          for_each_surface(view, iterator, data);
+        }
+
+        // During normal rendering the xwayland window tree isn't traversed
+        // because all windows are rendered. Here we only want to render
+        // the fullscreen window's children so we have to traverse the tree.
+#ifdef WLR_HAS_XWAYLAND
+        if (auto* xwayland_surface = dynamic_cast<XwaylandSurface*>(&view); xwayland_surface) {
+          for_each_surface(*xwayland_surface->xwayland_surface, iterator, data);
+        }
+#endif
+      }
+    } else {
+      for (auto& vd : util::view::reverse(views)) {
+        for_each_surface(vd.view, iterator, vd.data);
+      }
+      // Render drag icons
+      RenderData data{.alpha = 1.f};
+      for_each_drag_icon(output.desktop.server.input, iterator, data);
+    }
+
+    for (auto& layer : output.layers) {
+      for (auto& layer_surface : layer) {
+        RenderData data = {.layout = {
+                             .x = layer_surface.geo.x + (double) output_box.x,
+                             .y = layer_surface.geo.y + (double) output_box.y,
+                             .width = (double) layer_surface.layer_surface.surface->current.width,
+                             .height = (double) layer_surface.layer_surface.surface->current.height,
+                           }};
+        for_each_surface(*layer_surface.layer_surface.surface, iterator, data);
+      }
+    }
+  }
+
+
   auto Context::for_each_surface(wlr::surface_t& surface,
-                                       wlr_surface_iterator_func_t iterator,
-                                       const RenderData& data) -> void
+                                 wlr_surface_iterator_func_t iterator,
+                                 const RenderData& data) -> void
   {
     SurfaceRenderData cd = {*this, data,
                             .x_scale = data.layout.width / double(surface.current.width),
@@ -647,11 +745,12 @@ namespace cloth::render {
   }
 
   auto Context::for_each_surface(View& view,
-                                       wlr_surface_iterator_func_t iterator,
-                                       const RenderData& data) -> void
+                                 wlr_surface_iterator_func_t iterator,
+                                 const RenderData& data) -> void
   {
     if (!view.wlr_surface) {
-      // cloth_error("Null surface for view title='{}', type='{}'", view.get_name(), (int) view.type());
+      // cloth_error("Null surface for view title='{}', type='{}'", view.get_name(), (int)
+      // view.type());
       return;
     }
     SurfaceRenderData cd = {*this, data, .x_scale = data.layout.width / double(view.width),
@@ -672,8 +771,8 @@ namespace cloth::render {
 #ifdef WLR_HAS_XWAYLAND
 
   auto Context::for_each_surface(wlr::xwayland_surface_t& surface,
-                                       wlr_surface_iterator_func_t iterator,
-                                       RenderData data) -> void
+                                 wlr_surface_iterator_func_t iterator,
+                                 RenderData data) -> void
   {
     wlr::xwayland_surface_t* child;
     wl_list_for_each(child, &surface.children, parent_link)
@@ -693,8 +792,8 @@ namespace cloth::render {
 #endif
 
   auto Context::for_each_drag_icon(Input& input,
-                                         wlr_surface_iterator_func_t iterator,
-                                         RenderData data) -> void
+                                   wlr_surface_iterator_func_t iterator,
+                                   RenderData data) -> void
   {
     for (auto& seat : input.seats) {
       for (auto& drag_icon : seat.drag_icons) {
@@ -710,4 +809,4 @@ namespace cloth::render {
   }
 
 
-} // namespace cloth
+} // namespace cloth::render

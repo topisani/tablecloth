@@ -90,7 +90,7 @@ namespace cloth {
       device.on_output_transform.add_to(output->events.transform);
       device.on_output_transform = [&device, output](void* data) {
         cloth_debug("Output transform for device {}. Libinput: {}", device.wlr_device.name,
-             wlr_input_device_is_libinput(&device.wlr_device));
+                    wlr_input_device_is_libinput(&device.wlr_device));
         if (wlr_input_device_is_libinput(&device.wlr_device)) {
           auto* libinput_handle = wlr_libinput_get_device_handle(&device.wlr_device);
           // libinput_device_config_calibration_set_matrix(libinput_handle,
@@ -357,8 +357,8 @@ namespace cloth {
     for (auto& output : input.server.desktop.outputs) {
       float scale = output.wlr_output.scale;
       if (wlr_xcursor_manager_load(cursor.xcursor_manager, scale)) {
-        cloth_error("Cannot load xcursor theme for output '{}' with scale {}", output.wlr_output.name,
-             scale);
+        cloth_error("Cannot load xcursor theme for output '{}' with scale {}",
+                    output.wlr_output.name, scale);
       }
     }
 

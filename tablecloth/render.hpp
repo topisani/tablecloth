@@ -78,6 +78,8 @@ namespace cloth {
 
       auto reset() -> void;
 
+      auto handle_present(wlr::output_event_present_t& event) -> void;
+
       // DATA //
 
       Output& output;
@@ -100,6 +102,8 @@ namespace cloth {
 
       auto damage_done() -> void;
       auto layers_send_done() -> void;
+
+      auto output_for_each_surface(wlr_surface_iterator_func_t iterator) -> void;
 
       auto for_each_surface(wlr::surface_t& surface,
                             wlr_surface_iterator_func_t iterator,

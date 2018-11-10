@@ -189,6 +189,7 @@ namespace cloth::wlr {
   using list_t = struct wlr_list;
   using output_cursor_t = struct wlr_output_cursor;
   using output_damage_t = struct wlr_output_damage;
+  using output_event_present_t = struct wlr_output_event_present;
   using output_impl_t = struct wlr_output_impl;
   using output_layout_output_state_t = struct wlr_output_layout_output_state;
   using output_layout_output_t = struct wlr_output_layout_output;

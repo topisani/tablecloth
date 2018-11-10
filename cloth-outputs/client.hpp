@@ -12,37 +12,58 @@
 
 #include "gdkwayland.hpp"
 
-#include "bar.hpp"
-
-#include <dbus-c++/dbus.h>
-
-#include <widgets/status-icons.hpp>
-
-namespace cloth::bar {
+namespace cloth::outputs {
 
   namespace wl = wayland;
+  struct Client;
+
+  struct Position {
+    int x = 0;
+    int y = 0;
+  };
+
+  struct Size {
+    int width = 0;
+    int height = 0;
+  };
+
+  struct Output {
+
+    Output(Client& client, std::unique_ptr<wl::output_t>&& output);
+
+    Client& client;
+    std::unique_ptr<wl::output_t> output;
+    wl::zxdg_output_v1_t xdg_output;
+
+    Position logical_position;
+    Size logical_size;
+    std::string name;
+    std::string description;
+    bool done = false;
+
+    operator Gtk::Widget&();
+
+  private:
+    Gtk::ListBoxRow lbr;
+  };
 
   struct Client {
     int height = 26;
     bool show_help = false;
-    std::string css_file = "./cloth-bar/resources/style.css";
+    std::string css_file = "./cloth-outputs/resources/style.css";
 
     Gtk::Main gtk_main;
 
     Glib::RefPtr<Gdk::Display> gdk_display;
     wl::display_t display;
     wl::registry_t registry;
-    wl::workspace_manager_t workspaces;
-    wl::cloth_window_manager_t window_manager;
-    wl::zwlr_layer_shell_v1_t layer_shell;
     wl::zxdg_output_manager_v1_t output_manager;
-    util::ptr_vec<Bar> bars;
-    DBus::BusDispatcher dispatcher;
-    std::thread dbus_thread;
+    util::ptr_vec<Output> outputs;
+
+    Gtk::Window window;
 
     struct {
-      sigc::signal<void(std::string, int, int)> workspace_state;
-      sigc::signal<void(std::string, int workspace)> focused_window_name;
+      sigc::signal<void()> output_list_updated;
     } signals;
 
     Client(int argc, char* argv[])
@@ -53,9 +74,7 @@ namespace cloth::bar {
 
     auto bind_interfaces();
 
-    auto dbus_main() -> void;
-
-    auto setup_css();
+    auto setup_gui() -> void;
 
     auto make_cli() 
     {
