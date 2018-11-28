@@ -457,6 +457,7 @@ namespace cloth {
       client = wl_resource_get_client(surface->resource);
     }
     if (surface && !seat.allow_input(*surface->resource)) {
+      cloth_debug("Input disallowed for surface");
       return;
     }
 
@@ -579,6 +580,11 @@ namespace cloth {
     View* view;
     wlr::surface_t* surface = desktop.surface_at(lx, ly, sx, sy, view);
 
+    if (!is_touch) {
+      cloth_debug("Pressed button");
+      wlr_seat_pointer_notify_button(seat.wlr_seat, time, util::enum_cast(button), state);
+    }
+
     if (state == WLR_BUTTON_PRESSED && view && seat.has_meta_pressed()) {
       view->workspace->set_focused_view(view);
 
@@ -618,7 +624,7 @@ namespace cloth {
         }
         break;
       case WLR_BUTTON_PRESSED:
-        if (view) {
+        if (view && surface == view->wlr_surface) {
           view->workspace->set_focused_view(view);
         }
         if (surface && wlr_surface_is_layer_surface(surface)) {
@@ -631,9 +637,6 @@ namespace cloth {
       }
     }
 
-    if (!is_touch) {
-      wlr_seat_pointer_notify_button(seat.wlr_seat, time, util::enum_cast(button), state);
-    }
   }
 
   void Cursor::constrain(wlr::pointer_constraint_v1_t* constraint, double sx, double sy)

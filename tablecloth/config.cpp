@@ -6,6 +6,7 @@
 #include <sys/param.h>
 #include <unistd.h>
 #include <cstring>
+#include <functional>
 
 #include "util/algorithm.hpp"
 #include "util/exception.hpp"
@@ -152,29 +153,37 @@ namespace cloth {
       return true;
     }
 
-    void add_binding_config(Config& config, std::string_view combination, std::string_view command)
+    Config::KeyCombo parse_key_combo(ArgList& args)
     {
-      Config::Binding bc;
-
-      auto symnames = std::string(combination);
+      Config::KeyCombo res;
+      auto symnames = std::string(args.next());
       char* symname = strtok(symnames.data(), "+");
       while (symname) {
         uint32_t modifier = parse_modifier(symname);
         if (modifier != 0) {
-          bc.modifiers |= modifier;
+          res.modifiers |= modifier;
         } else {
           xkb_keysym_t sym = xkb_keysym_from_name(symname, XKB_KEYSYM_NO_FLAGS);
           if (sym == XKB_KEY_NoSymbol) {
-            cloth_error("got unknown key binding symbol: {}", symname);
-            return;
+            throw util::exception("got unknown key binding symbol: {}", symname);
           }
-          bc.keysyms.push_back(sym);
+          res.keys.push_back(sym);
         }
         symname = strtok(nullptr, "+");
       }
+      return res;
+    }
 
-      bc.command = command;
-      config.bindings.push_back(std::move(bc));
+    Config::Binding parse_binding(ArgList& args)
+    {
+      return Config::Binding{parse_key_combo(args), std::string(args.remaining())};
+    } // namespace
+
+    void add_binding_config(Config& config, std::string_view combination, std::string_view command)
+    {
+      std::string tmp = fmt::format("{} {}", combination, command);
+      ArgList args = ArgList(tmp);
+      config.bindings.push_back(parse_binding(args));
     }
 
     void config_handle_cursor(Config& config,
@@ -330,7 +339,7 @@ namespace cloth {
             assert("Hz" == end);
           }
           cloth_debug("Configured output {} with mode {}x{}@{}", found->name, found->mode.width,
-               found->mode.height, found->mode.refresh_rate);
+                      found->mode.height, found->mode.refresh_rate);
         } else if (name == "modeline") {
           Config::OutputMode mode;
           if (parse_modeline(val_str.c_str(), &mode.info)) {
@@ -480,6 +489,75 @@ namespace cloth {
     auto found = util::find_if(cursors, [&](auto& el) { return el.seat == name; });
     if (found != cursors.end()) return &*found;
     return nullptr;
+  }
+
+  static void run_bind(Config& config, ArgList args)
+  {
+    config.bindings.push_back(parse_binding(args));
+  }
+
+  static void run_unbind(Config& config, ArgList args)
+  {
+    config.bindings.erase(util::remove_if(config.bindings, [combo = parse_key_combo(args)] (auto& binding) { return binding.combo == combo; }), config.bindings.end());
+  }
+
+  struct Command {
+    std::string_view name;
+    std::function<void(Config&, ArgList)> run;
+  };
+
+  std::array<Command, 2> commands = {{{"bind", run_bind}, {"unbind", run_unbind}}};
+
+  auto Config::run_command(std::string_view command) -> void
+  {
+    auto args = ArgList(command);
+    auto name = args.next();
+    args = ArgList(args.remaining());
+    auto iter = util::find_if(commands, [&](auto& cmd) { return cmd.name == name; });
+    if (iter != commands.end()) {
+      iter->run(*this, args);
+    }
+  }
+
+  bool is_whitespace(char c)
+  {
+    return c == ' ' || c == '\t';
+  }
+
+  auto ArgList::peek() -> std::string_view
+  {
+    auto first = _last;
+    while (first != _str.end() && is_whitespace(*first)) {
+      ++first;
+    }
+    auto last = first;
+    while (last != _str.end() && !is_whitespace(*last)) {
+      ++last;
+    }
+    return std::string_view(&*first, last - first);
+  }
+
+  auto ArgList::next() -> std::string_view
+  {
+    auto next = peek();
+    _first = next.begin();
+    _last = next.end();
+    return current();
+  }
+
+  auto ArgList::current() -> std::string_view
+  {
+    return std::string_view(&*_first, _last - _first);
+  }
+
+  auto ArgList::data() -> std::string_view
+  {
+    return _str;
+  }
+
+  auto ArgList::remaining() -> std::string_view
+  {
+    return std::string_view(&*_last, _str.end() - _last);
   }
 
 } // namespace cloth

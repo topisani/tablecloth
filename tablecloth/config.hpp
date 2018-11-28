@@ -6,7 +6,24 @@
 #include <xf86drmMode.h>
 #include "wlroots.hpp"
 
+#include "util/algorithm.hpp"
+
 namespace cloth {
+
+  struct ArgList {
+    explicit ArgList(std::string_view str) : _str(str), _first(str.begin()), _last(str.begin()) {}
+
+    auto peek() -> std::string_view;
+    auto next() -> std::string_view;
+    auto current() -> std::string_view;
+    auto data() -> std::string_view;
+    auto remaining() -> std::string_view;
+
+  private:
+    std::string_view _str;
+    std::string_view::iterator _first;
+    std::string_view::iterator _last;
+  };
 
   struct Config {
 
@@ -38,9 +55,13 @@ namespace cloth {
       wlr::box_t mapped_box;
     };
 
-    struct Binding {
+    struct KeyCombo {
       uint32_t modifiers = 0;
-      std::vector<xkb_keysym_t> keysyms;
+      std::vector<xkb_keysym_t> keys;
+    };
+
+    struct Binding {
+      KeyCombo combo;
       std::string command;
     };
 
@@ -90,6 +111,8 @@ namespace cloth {
     /// NULL. A NULL seat_name returns the default config for cursors.
     Config::Cursor* get_cursor(std::string_view seat_name = default_seat_name) noexcept;
 
+    auto run_command(std::string_view command) -> void;
+
     bool xwayland = true;
     bool xwayland_lazy = false;
 
@@ -103,5 +126,9 @@ namespace cloth {
     std::string startup_cmd;
     bool debug_damage_tracking = false;
   };
+
+  inline bool operator==(const Config::KeyCombo& lhs, const Config::KeyCombo& rhs) {
+    return lhs.modifiers == rhs.modifiers && std::equal(lhs.keys.begin(), lhs.keys.end(), rhs.keys.begin(), rhs.keys.end());
+  }
 
 } // namespace cloth

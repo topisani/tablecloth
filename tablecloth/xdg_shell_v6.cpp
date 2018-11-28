@@ -316,10 +316,10 @@ namespace cloth {
     wlr_xdg_surface_v6_ping(&surface);
 
     // TODO: get the correct output instead
-    auto& workspace = outputs.front().workspace;
-    auto view_ptr = std::make_unique<XdgSurfaceV6>(*workspace, &surface);
+    auto& workspace = current_workspace();
+    auto view_ptr = std::make_unique<XdgSurfaceV6>(workspace, &surface);
     auto& view = *view_ptr;
-    workspace->add_view(std::move(view_ptr));
+    workspace.add_view(std::move(view_ptr));
 
     if (surface.toplevel->client_pending.maximized) {
       view.maximize(true);

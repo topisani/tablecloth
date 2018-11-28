@@ -258,8 +258,8 @@ namespace cloth::render {
     float rotation = data.layout.rotation;
     double lx, ly;
     get_layout_position(data.layout, lx, ly, *surface, sx, sy);
-    if (!surface_intersect_output(*surface, *data.output.desktop.layout, data.output.wlr_output, lx, ly,
-                                  rotation, nullptr)) {
+    if (!surface_intersect_output(*surface, *data.output.desktop.layout, data.output.wlr_output, lx,
+                                  ly, rotation, nullptr)) {
       return;
     }
     wlr_presentation_send_surface_presented(data.output.desktop.presentation, surface, data.event);
@@ -280,7 +280,8 @@ namespace cloth::render {
       .event = &event,
     };
     presentation_data = &local;
-    output_for_each_surface(surface_send_presented);
+    // TODO:  this needs to run on the render thread.
+    // output_for_each_surface(surface_send_presented);
   }
 
   auto Context::render(View& view, RenderData& data) -> void
@@ -597,8 +598,10 @@ namespace cloth::render {
 
     damage_whole_decoration(view);
 
-    RenderData data{.layout = {.x = view.x, .y = view.y}};
-    for_each_surface(view, damage_whole_surface, data);
+    auto found = util::find_if(views, [&] (ViewAndData& vd) { return &vd.view == &view; });
+    if (found != views.end()) {
+      for_each_surface(view, damage_whole_surface, found->data);
+    }
   }
 
   auto Context::damage_whole_drag_icon(DragIcon& icon) -> void
@@ -666,8 +669,10 @@ namespace cloth::render {
       return;
     }
 
-    RenderData data = {.layout = {.x = view.x, .y = view.y}};
-    for_each_surface(view, damage_from_surface, data);
+    auto found = util::find_if(views, [&] (ViewAndData& vd) { return &vd.view == &view; });
+    if (found != views.end()) {
+      for_each_surface(view, damage_from_surface, found->data);
+    }
   }
 
 
@@ -712,7 +717,7 @@ namespace cloth::render {
 #endif
       }
     } else {
-      for (auto& vd : util::view::reverse(views)) {
+      for (auto& vd : views) {
         for_each_surface(vd.view, iterator, vd.data);
       }
       // Render drag icons
@@ -749,8 +754,8 @@ namespace cloth::render {
                                  const RenderData& data) -> void
   {
     if (!view.wlr_surface) {
-      // cloth_error("Null surface for view title='{}', type='{}'", view.get_name(), (int)
-      // view.type());
+      cloth_error("Null surface for view title='{}', type='{}'", view.get_name(),
+                  (int) view.type());
       return;
     }
     SurfaceRenderData cd = {*this, data, .x_scale = data.layout.width / double(view.width),

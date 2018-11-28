@@ -37,6 +37,7 @@ namespace cloth::outputs {
 
     Position logical_position;
     Size logical_size;
+    int scale = 0;
     std::string name;
     std::string description;
     bool done = false;

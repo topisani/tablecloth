@@ -246,7 +246,7 @@ namespace cloth {
          util::nonull(surface.class_), util::nonull(surface.instance));
     wlr_xwayland_surface_ping(&surface);
 
-    auto& output = outputs.front();
+    auto& output = current_output();
     auto view_ptr = std::make_unique<XwaylandSurface>(*output.workspace, &surface);
     output.workspace->add_view(std::move(view_ptr));
   }

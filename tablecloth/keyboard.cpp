@@ -143,12 +143,12 @@ namespace cloth {
     size_t n = pressed_keysyms_length(pressed_keysyms);
     auto& bindings = seat.input.server.config.bindings;
     for (auto& binding : bindings) {
-      if (modifiers ^ binding.modifiers || n != binding.keysyms.size()) {
+      if (modifiers ^ binding.combo.modifiers || n != binding.combo.keys.size()) {
         continue;
       }
 
       bool ok = true;
-      for (auto sym : binding.keysyms) {
+      for (auto sym : binding.combo.keys) {
         ssize_t j = pressed_keysyms_index(pressed_keysyms, sym);
         if (j < 0) {
           ok = false;

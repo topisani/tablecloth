@@ -14,6 +14,7 @@ namespace cloth::outputs {
       output(std::move(p_output)),
       xdg_output(client.output_manager.get_xdg_output(*output))
   {
+    output->on_scale() = [this] (int scale) { self.scale = scale; };
     xdg_output.on_name() = [this](std::string name) { self.name = name; };
     xdg_output.on_logical_position() = [this](int x, int y) { self.logical_position = {x, y}; };
     xdg_output.on_logical_size() = [this](int w, int h) { self.logical_size = {w, h}; };
@@ -27,8 +28,8 @@ namespace cloth::outputs {
       title.set_markup(fmt::format("<big>{}</big>", name));
       box.add(title);
       box.add(*Gtk::manage(
-        new Gtk::Label(fmt::format("{}x{}+{}+{}", logical_size.width, logical_size.height,
-                                   logical_position.x, logical_position.y), Gtk::ALIGN_START)));
+        new Gtk::Label(fmt::format("{}x{}+{}+{} * {}", logical_size.width, logical_size.height,
+                                   logical_position.x, logical_position.y, scale), Gtk::ALIGN_START)));
       box.add(*Gtk::manage(new Gtk::Label(description, Gtk::ALIGN_START)));
       box.show_all();
       lbr.add(box);
