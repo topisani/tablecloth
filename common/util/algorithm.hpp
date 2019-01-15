@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <cstring>
+#include <vector>
 
 namespace cloth::util {
 

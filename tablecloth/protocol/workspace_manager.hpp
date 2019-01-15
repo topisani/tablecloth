@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include <wayland-server.h>
 
 #include "wlroots.hpp"
