@@ -174,7 +174,7 @@ void main()
       box.width += radius;
 
       wlr::box_t rotated;
-      wlr_box_rotated_bounds(&box, rotation, &rotated);
+      wlr_box_rotated_bounds(&rotated, &box, rotation);
 
       pixman_region32_t damage;
       pixman_region32_init(&damage);
@@ -257,7 +257,7 @@ void main()
       if (!view.deco.is_visible()) return;
 
       wlr::box_t rotated;
-      wlr_box_rotated_bounds(&box, view.rotation, &rotated);
+      wlr_box_rotated_bounds(&rotated, &box, view.rotation);
 
       pixman_region32_t damage;
       pixman_region32_init(&damage);
@@ -305,7 +305,7 @@ void main()
       box.height += radius;
       box.width += radius;
 
-      wlr_box_rotated_bounds(&box, view.rotation, &box);
+      wlr_box_rotated_bounds(&box, &box, view.rotation);
 
       wlr_output_damage_add_box(damage, &box);
     }

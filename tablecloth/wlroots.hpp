@@ -69,7 +69,7 @@ extern "C" {
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_pointer_constraints_v1.h>
 #include <wlr/types/wlr_presentation_time.h>
-#include <wlr/types/wlr_primary_selection.h>
+#include <wlr/types/wlr_gtk_primary_selection.h>
 #include <wlr/types/wlr_screencopy_v1.h>
 #include <wlr/types/wlr_screenshooter.h>
 #include <wlr/types/wlr_seat.h>
@@ -205,7 +205,7 @@ namespace cloth::wlr {
   using pointer_t = struct wlr_pointer;
   using presentation_t = struct wlr_presentation;
   using presentation_event_t = struct wlr_presentation_event;
-  using primary_selection_device_manager_t = struct wlr_primary_selection_device_manager;
+  using primary_selection_device_manager_t = struct wlr_gtk_primary_selection_device_manager;
   using renderer_impl_t = struct wlr_renderer_impl;
   using renderer_t = struct wlr_renderer;
   using screencopy_frame_v1_t = struct wlr_screencopy_frame_v1;

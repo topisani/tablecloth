@@ -231,7 +231,7 @@ namespace cloth {
     };
 
     primary_selection_device_manager =
-      wlr_primary_selection_device_manager_create(server.wl_display);
+      wlr_gtk_primary_selection_device_manager_create(server.wl_display);
     idle = wlr_idle_create(server.wl_display);
     idle_inhibit = wlr_idle_inhibit_v1_create(server.wl_display);
 

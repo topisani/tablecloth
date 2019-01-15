@@ -114,7 +114,7 @@ namespace cloth::render {
       .width = surface.current.width,
       .height = surface.current.height,
     };
-    wlr_box_rotated_bounds(&layout_box, rotation, &layout_box);
+    wlr_box_rotated_bounds(&layout_box, &layout_box, rotation);
     return wlr_output_layout_intersects(&output_layout, &wlr_output, &layout_box);
   }
 
@@ -156,7 +156,7 @@ namespace cloth::render {
     wlr_output_transformed_resolution(&output.wlr_output, &ow, &oh);
 
     auto transform = wlr_output_transform_invert(output.wlr_output.transform);
-    wlr_box_transform(&box, transform, ow, oh, &box);
+    wlr_box_transform(&box, &box, transform, ow, oh);
 
     wlr_renderer_scissor(renderer, &box);
   }
@@ -202,7 +202,7 @@ namespace cloth::render {
                       .height = int(surface->current.height * data.y_scale)};
 
     wlr::box_t rotated;
-    wlr_box_rotated_bounds(&box, rotation, &rotated);
+    wlr_box_rotated_bounds(&rotated, &box, rotation);
 
     pixman_region32_t damage;
     pixman_region32_init(&damage);
@@ -342,17 +342,8 @@ namespace cloth::render {
       double view_y = (double) (output_box->height - view_box.height) / 2 + output_box->y;
       view.move(view_x, view_y);
 
-      if (has_standalone_surface(view) &&
-          output.layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY].empty()) {
-        wlr_output_set_fullscreen_surface(&output.wlr_output, view.wlr_surface);
-      } else {
-        wlr_output_set_fullscreen_surface(&output.wlr_output, nullptr);
-      }
-
       // Fullscreen views are rendered on a black background
       clear_color = {0.f, 0.f, 0.f, 1.f};
-    } else {
-      wlr_output_set_fullscreen_surface(&output.wlr_output, nullptr);
     }
 
     bool needs_swap;
@@ -399,22 +390,18 @@ namespace cloth::render {
                                },
                              .alpha = 1.f};
 
-          if (output.wlr_output.fullscreen_surface == view.wlr_surface) {
-            // The output will render the fullscreen view
-          } else {
-            if (view.wlr_surface != nullptr) {
-              for_each_surface(view, render_surface, data);
-            }
-
-            // During normal rendering the xwayland window tree isn't traversed
-            // because all windows are rendered. Here we only want to render
-            // the fullscreen window's children so we have to traverse the tree.
-#ifdef WLR_HAS_XWAYLAND
-            if (auto* xwayland_surface = dynamic_cast<XwaylandSurface*>(&view); xwayland_surface) {
-              for_each_surface(*xwayland_surface->xwayland_surface, render_surface, data);
-            }
-#endif
+          if (view.wlr_surface != nullptr) {
+            for_each_surface(view, render_surface, data);
           }
+
+          // During normal rendering the xwayland window tree isn't traversed
+          // because all windows are rendered. Here we only want to render
+          // the fullscreen window's children so we have to traverse the tree.
+#ifdef WLR_HAS_XWAYLAND
+          if (auto* xwayland_surface = dynamic_cast<XwaylandSurface*>(&view); xwayland_surface) {
+            for_each_surface(*xwayland_surface->xwayland_surface, render_surface, data);
+          }
+#endif
         }
         // Render top layer above shell views
         render(output.layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP]);
@@ -455,10 +442,6 @@ namespace cloth::render {
     // Send frame done events to all surfaces
     if (fullscreen_view) {
       auto& view = *fullscreen_view;
-      if (output.wlr_output.fullscreen_surface == view.wlr_surface) {
-        // The surface is managed by the output.wlr_output
-        return;
-      }
 
       RenderData data = {.layout =
                            {
@@ -550,7 +533,7 @@ namespace cloth::render {
       return;
     }
 
-    wlr_box_rotated_bounds(&box, rotation, &box);
+    wlr_box_rotated_bounds(&box, &box, rotation);
 
     wlr_output_damage_add_box(context.damage, &box);
   }
@@ -700,22 +683,18 @@ namespace cloth::render {
                            },
                          .alpha = 1.f};
 
-      if (output.wlr_output.fullscreen_surface == view.wlr_surface) {
-        // The output will render the fullscreen view
-      } else {
-        if (view.wlr_surface != nullptr) {
-          for_each_surface(view, iterator, data);
-        }
-
-        // During normal rendering the xwayland window tree isn't traversed
-        // because all windows are rendered. Here we only want to render
-        // the fullscreen window's children so we have to traverse the tree.
-#ifdef WLR_HAS_XWAYLAND
-        if (auto* xwayland_surface = dynamic_cast<XwaylandSurface*>(&view); xwayland_surface) {
-          for_each_surface(*xwayland_surface->xwayland_surface, iterator, data);
-        }
-#endif
+      if (view.wlr_surface != nullptr) {
+        for_each_surface(view, iterator, data);
       }
+
+      // During normal rendering the xwayland window tree isn't traversed
+      // because all windows are rendered. Here we only want to render
+      // the fullscreen window's children so we have to traverse the tree.
+#ifdef WLR_HAS_XWAYLAND
+      if (auto* xwayland_surface = dynamic_cast<XwaylandSurface*>(&view); xwayland_surface) {
+        for_each_surface(*xwayland_surface->xwayland_surface, iterator, data);
+      }
+#endif
     } else {
       for (auto& vd : views) {
         for_each_surface(vd.view, iterator, vd.data);

@@ -26,7 +26,7 @@ libinput = dependency('libinput')
 
 wayland_protocols = dependency('wayland-protocols')
 wlroots = dependency('wlroots', fallback: ['wlroots', 'wlroots'])
-wlr_protos = dependency('wlr_protos', fallback: ['wlroots', 'wlr_protos'])
+wlr_protos = dependency('wlroots', fallback: ['wlroots', 'wlr_protos'])
 fmt = dependency('fmt', fallback: ['fmtlib', 'fmt_dep'])
 gtk = dependency('gtk+-3.0')
 gtkmm = dependency('gtkmm-3.0')
