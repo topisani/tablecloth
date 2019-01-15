@@ -4,13 +4,12 @@ cpp = meson.get_compiler('cpp')
 cpp_args = []
 cpp_link_args = []
 
-if false # libc++
+if cpp.get_id() == 'clang'
     cpp_args += ['-stdlib=libc++']
-    cpp_link_args += ['-stdlib=libc++', '-lc++abi']
+    cpp_link_args += ['-stdlib=libc++'] # '-lc++abi' -- for linux?
 
     cpp_link_args += ['-lc++fs']
-else
-    # TODO: For std::filesystem in libstdc++. Still unstable? Or why is it not in libstdc++ proper yet?
+elif cpp.get_id() == 'gcc'
     cpp_link_args += ['-lstdc++fs']
 endif
 
