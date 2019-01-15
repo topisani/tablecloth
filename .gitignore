@@ -33,3 +33,6 @@
 /build
 .gdb_history
 build-dbg
+
+# Command History
+.gdb_history
