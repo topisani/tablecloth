@@ -237,7 +237,7 @@ void main()
 
     auto Context::render_decorations(View& view, RenderData& data) -> void
     {
-      if (view.maximized || view.wlr_surface == nullptr) {
+      if (view.maximized || view.wlr_surface == nullptr || !view.deco.is_visible()) {
         return;
       }
 
@@ -253,8 +253,6 @@ void main()
       box.height *= y_scale;
 
       draw_shadow(box, view.rotation, 0.5 * data.alpha, view.deco.shadow_radius(), view.deco.shadow_offset());
-
-      if (!view.deco.is_visible()) return;
 
       wlr::box_t rotated;
       wlr_box_rotated_bounds(&rotated, &box, view.rotation);
