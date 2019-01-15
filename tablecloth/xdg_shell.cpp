@@ -180,9 +180,9 @@ namespace cloth {
     wlr::xdg_popup_t* popup = nullptr;
     wl_list_for_each(popup, &xdg_surface->popups, link)
     {
-      wlr_xdg_surface_send_close(popup->base);
+      wlr_xdg_popup_destroy(popup->base);
     }
-    wlr_xdg_surface_send_close(xdg_surface);
+    wlr_xdg_toplevel_send_close(xdg_surface);
   }
 
   XdgPopup& XdgSurface::create_popup(wlr::xdg_popup_t& wlr_popup)
