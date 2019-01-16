@@ -413,6 +413,7 @@ namespace cloth::render {
         render(output.layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY]);
       }
 
+      wlr_output_render_software_cursors(&output.wlr_output, &pixman_damage);
       wlr_renderer_scissor(renderer, nullptr);
       wlr_renderer_end(renderer);
 
