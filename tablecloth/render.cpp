@@ -620,10 +620,9 @@ namespace cloth::render {
 
     pixman_region32_t damage;
     pixman_region32_init(&damage);
-    pixman_region32_copy(&damage, &surface->buffer_damage);
-    wlr_region_transform(&damage, &damage, transform, surface->current.buffer_width,
-                         surface->current.buffer_height);
-    wlr_region_scale(&damage, &damage, wlr_output.scale / (float) surface->current.scale);
+    wlr_surface_get_effective_damage(surface, &damage);
+
+    wlr_region_scale(&damage, &damage, wlr_output.scale);
     if (std::ceil(wlr_output.scale) > surface->current.scale) {
       // When scaling up a surface, it'll become blurry so we need to
       // expand the damage region
