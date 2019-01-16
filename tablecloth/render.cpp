@@ -61,27 +61,6 @@ namespace cloth::render {
     ly = data.y + _sy;
   }
 
-  auto has_standalone_surface(View& view) -> bool
-  {
-    if (!wl_list_empty(&view.wlr_surface->subsurfaces)) {
-      return false;
-    }
-
-    if (auto* xdg_surface_v6 = dynamic_cast<XdgSurfaceV6*>(&view); xdg_surface_v6) {
-      return wl_list_empty(&xdg_surface_v6->xdg_surface->popups);
-    } else if (auto* xdg_surface = dynamic_cast<XdgSurface*>(&view); xdg_surface) {
-      return wl_list_empty(&xdg_surface->xdg_surface->popups);
-    } else if (auto* wl_shell_surface = dynamic_cast<WlShellSurface*>(&view); wl_shell_surface) {
-      return wl_list_empty(&wl_shell_surface->wl_shell_surface->popups);
-    } else
-#ifdef WLR_HAS_XWAYLAND
-      if (auto* wlr_surface = dynamic_cast<XwaylandSurface*>(&view); wlr_surface) {
-      return wl_list_empty(&wlr_surface->xwayland_surface->children);
-    }
-#endif
-    return true;
-  }
-
   /**
    * Checks whether a surface at (lx, ly) intersects an output. If `box` is not
    * nullptr, it populates it with the surface box in the output, in output-local

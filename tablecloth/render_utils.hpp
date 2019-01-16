@@ -51,8 +51,6 @@ namespace cloth::render {
                            int sx,
                            int sy) -> void;
 
-  auto has_standalone_surface(View& view) -> bool;
-
   /**
    * Checks whether a surface at (lx, ly) intersects an output. If `box` is not
    * nullptr, it populates it with the surface box in the output, in output-local
