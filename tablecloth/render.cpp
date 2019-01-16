@@ -198,8 +198,8 @@ namespace cloth::render {
 
     wlr::box_t box = {.x = int(lx * output.wlr_output.scale),
                       .y = int(ly * output.wlr_output.scale),
-                      .width = int(surface->current.width * data.x_scale),
-                      .height = int(surface->current.height * data.y_scale)};
+                      .width = int(surface->current.width * output.wlr_output.scale * data.x_scale),
+                      .height = int(surface->current.height * output.wlr_output.scale * data.y_scale)};
 
     wlr::box_t rotated;
     wlr_box_rotated_bounds(&rotated, &box, rotation);
