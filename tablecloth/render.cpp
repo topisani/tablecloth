@@ -417,11 +417,16 @@ namespace cloth::render {
       wlr_renderer_scissor(renderer, nullptr);
       wlr_renderer_end(renderer);
 
+      int width, height;
+      wlr_output_transformed_resolution(&output.wlr_output, &width, &height);
+
       if (output.desktop.server.config.debug_damage_tracking) {
-        int width, height;
-        wlr_output_transformed_resolution(&output.wlr_output, &width, &height);
         pixman_region32_union_rect(&pixman_damage, &pixman_damage, 0, 0, width, height);
       }
+
+      enum wl_output_transform transform =
+              wlr_output_transform_invert(output.wlr_output.transform);
+      wlr_region_transform(&pixman_damage, &pixman_damage, transform, width, height);
 
       // PREV: update now?
       struct timespec now_ts = chrono::to_timespec(when);
