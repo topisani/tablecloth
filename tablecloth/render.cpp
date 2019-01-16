@@ -616,7 +616,7 @@ namespace cloth::render {
     int center_x = box.x + box.width / 2;
     int center_y = box.y + box.height / 2;
 
-    enum wl_output_transform transform = wlr_output_transform_invert(surface->current.transform);
+    enum wl_output_transform transform = surface->current.transform;
 
     pixman_region32_t damage;
     pixman_region32_init(&damage);
