@@ -1,4 +1,4 @@
-My wayland/sway GUI tools, written in moder c++
+My wayland/sway GUI tools, written in modern c++
 
 I don't have any plans to make theese configurable, but i do plan to keep it fairly easilly forkable, so they can be used as starting points for other people's customizations.
 
