@@ -6,7 +6,7 @@ Contributions welcome! - have fun
 
 # cloth-notifications
 
-[!](https://i.ibb.co/PsLPZm7/image.png)
+![](https://i.ibb.co/PsLPZm7/image.png)
 
  - Support for icons, actions, urgencies, and replacing notifications
  - compatible with sway, and anything else that supports the layer_shell protocol
