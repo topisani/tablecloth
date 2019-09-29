@@ -12,7 +12,6 @@ protocols = [
 	[wlr_protocol_dir, 'wlr-export-dmabuf-unstable-v1.xml'],
 	[wlr_protocol_dir, 'wlr-input-inhibitor-unstable-v1.xml'],
 	[wlr_protocol_dir, 'wlr-layer-shell-unstable-v1.xml'],
-	[cloth_protocol_dir, 'tablecloth-shell.xml'],
 ]
 
 xml_files = []

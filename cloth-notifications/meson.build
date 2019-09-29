@@ -7,7 +7,6 @@ protocols = [
 	[wp_protocol_dir, 'unstable/xdg-shell/xdg-shell-unstable-v6.xml'],
 	[wp_protocol_dir, 'stable/xdg-shell/xdg-shell.xml'],
 	[wlr_protocol_dir, 'wlr-layer-shell-unstable-v1.xml'],
-	[cloth_protocol_dir, 'tablecloth-shell.xml'],
 ]
 
 xml_files = []
