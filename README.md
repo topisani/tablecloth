@@ -15,7 +15,7 @@ Contributions welcome! - have fun
 
 # cloth-lock
 
-![](https://i.ibb.co/VLbxcJM/image.png)
+![](https://i.ibb.co/7SBQdjr/image.png)
 
  - Extremely simple lock screen
  - uses PAM for authentication
