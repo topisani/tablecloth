@@ -21,3 +21,12 @@ Contributions welcome! - have fun
  - uses PAM for authentication
  - multi-monitor support
  - background image can be set (using css)
+
+# cloth-outputs
+WIP arandr-style GUI for sway output configuration. Could easilly be adapted for output configuration in most other wlroots compositors.
+### Works:
+ - repositioning with drag'n'drop snapping gui
+ - right click to toggle
+### Planned features:
+ - export layout to script
+ - set resolution
