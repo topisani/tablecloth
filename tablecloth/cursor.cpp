@@ -429,7 +429,7 @@ namespace cloth {
     };
   }
 
-  Cursor::~Cursor() noexcept
+Cursor::~Cursor() noexcept
   {
     // TODO
   }
@@ -580,11 +580,6 @@ namespace cloth {
     View* view;
     wlr::surface_t* surface = desktop.surface_at(lx, ly, sx, sy, view);
 
-    if (!is_touch) {
-      cloth_debug("Pressed button");
-      wlr_seat_pointer_notify_button(seat.wlr_seat, time, util::enum_cast(button), state);
-    }
-
     if (state == WLR_BUTTON_PRESSED && view && seat.has_meta_pressed()) {
       view->workspace->set_focused_view(view);
 
@@ -617,14 +612,8 @@ namespace cloth {
         mode = Mode::Passthrough;
       }
 
-      switch (state) {
-      case WLR_BUTTON_RELEASED:
-        if (!is_touch) {
-          update_position(time);
-        }
-        break;
-      case WLR_BUTTON_PRESSED:
-        if (view && surface == view->wlr_surface) {
+      if (state == WLR_BUTTON_PRESSED) {
+        if (view && surface == view->wlr_surface && view->workspace->focused_view() != view) {
           view->workspace->set_focused_view(view);
         }
         if (surface && wlr_surface_is_layer_surface(surface)) {
@@ -633,8 +622,11 @@ namespace cloth {
             seat.set_focus_layer(layer);
           }
         }
-        break;
       }
+    }
+
+    if (!is_touch) {
+       wlr_seat_pointer_notify_button(seat.wlr_seat, time, util::enum_cast(button), state);
     }
 
   }

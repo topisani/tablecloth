@@ -11,8 +11,9 @@ nope {
 }
 
 window {
-    background: black;
-    opacity: 1.0;
+    background-image: url('/home/topisani/.config/wallpaper.jpg');
+    background-position: center;
+    background-size: contain;
     border: none;
     color: white;
 }
@@ -20,4 +21,7 @@ window {
 .clock-widget {
     padding: 0px 10px;
     min-height: 0px;
+    font-size: 10em;
+    padding-bottom: 50px;
+    color: black;
 }

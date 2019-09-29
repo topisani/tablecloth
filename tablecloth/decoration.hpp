@@ -38,6 +38,7 @@ namespace cloth {
     }
     auto shadow_offset() -> float;
     auto shadow_radius() -> float;
+    auto color() const -> std::array<float, 4>;
 
     View& view;
 
@@ -47,6 +48,7 @@ namespace cloth {
     bool _visible = false;
     float _shadow_offset = 4;
     float _shadow_radius = 20;
+    std::array<float, 4> _color = {0, 0, 0, 0};
   };
 
 } // namespace cloth

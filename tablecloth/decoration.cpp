@@ -92,6 +92,14 @@ namespace cloth {
     return _shadow_radius * (view.active ? 2 : 1);
   }
 
+  auto Decoration::color() const -> std::array<float, 4>
+  {
+    if (view.active)
+      return {0x00 / 255.f, 0x59 / 255.f, 0x73 / 255.f, 1.f};
+    else
+      return {0.2, 0.2, 0.23, 1.f};
+  }
+
   // Rendering
 
   namespace render {
@@ -252,7 +260,8 @@ void main()
       box.width *= x_scale;
       box.height *= y_scale;
 
-      draw_shadow(box, view.rotation, 0.5 * data.alpha, view.deco.shadow_radius(), view.deco.shadow_offset());
+      draw_shadow(box, view.rotation, 0.5 * data.alpha, view.deco.shadow_radius(),
+                  view.deco.shadow_offset());
 
       if (!view.deco.is_visible()) return;
 
@@ -269,17 +278,12 @@ void main()
         float matrix[9];
         wlr_matrix_project_box(matrix, &box, WL_OUTPUT_TRANSFORM_NORMAL, view.rotation,
                                output.wlr_output.transform_matrix);
-        std::array<float, 4> color;
-        if (view.active)
-          color = {0x00 / 255.f, 0x59 / 255.f, 0x73 / 255.f, data.alpha};
-        else
-          color = {0.2, 0.2, 0.23, data.alpha};
-
         int nrects;
         pixman_box32_t* rects = pixman_region32_rectangles(&damage, &nrects);
         for (int i = 0; i < nrects; ++i) {
           scissor_output(output, &rects[i]);
-
+          auto color = view.deco.color();
+          color[3] *= data.alpha;
           wlr_render_quad_with_matrix(renderer, color.data(), matrix);
         }
       }

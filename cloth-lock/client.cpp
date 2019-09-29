@@ -17,7 +17,7 @@ namespace cloth::lock {
       } else if (interface == wl::output_t::interface_name) {
         auto output = std::make_unique<wl::output_t>();
         registry.bind(name, *output, version);
-        lock_screens.emplace_back(*this, std::move(output));
+        lock_screens.emplace_back(*this, std::move(output), lock_screens.empty());
       }
     };
     display.roundtrip();

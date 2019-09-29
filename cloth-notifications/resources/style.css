@@ -7,13 +7,19 @@
 
 window {
     background: #1472b3;
-    opacity: 0.75;
-    border: none;
+    opacity: 1;
+    border: solid 2px #111;
     color: white;
+}
+
+window.urgency-low {
+    background: #111;
+    border: solid 2px #1472b3;
 }
 
 window.urgency-critical {
     background: #d92817;
+    border: solid 2px #EEE;
 }
 
 image.icon {

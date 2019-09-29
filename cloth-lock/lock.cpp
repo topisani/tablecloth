@@ -5,8 +5,6 @@
 
 #include "client.hpp"
 
-#include "util/chrono.hpp"
-#include "util/exception.hpp"
 #include "util/logging.hpp"
 
 #include <security/pam_appl.h>
@@ -16,8 +14,11 @@
 
 namespace cloth::lock {
 
-  LockScreen::LockScreen(Client& client, std::unique_ptr<wl::output_t>&& p_output)
-    : client(client), window{Gtk::WindowType::WINDOW_TOPLEVEL}, output(std::move(p_output))
+  LockScreen::LockScreen(Client& client, std::unique_ptr<wl::output_t>&& p_output, bool show_widget)
+    : client(client),
+      window{Gtk::WindowType::WINDOW_TOPLEVEL},
+      output(std::move(p_output)),
+      show_login_widgets(show_widget)
   {
     output->on_mode() = [this](wl::output_mode, int32_t w, int32_t h, int32_t refresh) {
       cloth_info("LockScreen width configured: {}", w);
@@ -38,7 +39,7 @@ namespace cloth::lock {
       wl::zwlr_layer_surface_v1_anchor::left | wl::zwlr_layer_surface_v1_anchor::top |
       wl::zwlr_layer_surface_v1_anchor::right | wl::zwlr_layer_surface_v1_anchor::bottom);
     layer_surface.set_size(width, height);
-    layer_surface.set_keyboard_interactivity(1);
+    if (show_widget) layer_surface.set_keyboard_interactivity(1);
     layer_surface.on_configure() = [&](uint32_t serial, uint32_t width, uint32_t height) {
       window.show_all();
       layer_surface.ack_configure(serial);
@@ -78,29 +79,6 @@ namespace cloth::lock {
     layer_surface.set_size(width, height);
     surface.commit();
   }
-
-  struct ClockWidget {
-    ClockWidget()
-    {
-      label.get_style_context()->add_class("clock-widget");
-      thread = [this] {
-        using namespace chrono;
-        auto now = clock::now();
-        auto t = std::time(nullptr);
-        auto localtime = std::localtime(&t);
-        label.set_text(fmt::format("{:02}:{:02}", localtime->tm_hour, localtime->tm_min));
-        thread.sleep_until(floor<minutes>(now + minutes(1)));
-      };
-    };
-
-    operator Gtk::Widget&()
-    {
-      return label;
-    }
-
-    Gtk::Label label;
-    util::SleeperThread thread;
-  };
 
   // function used to get user input
   static auto check_login(const std::string& user, const std::string& password) -> bool
@@ -163,18 +141,21 @@ namespace cloth::lock {
   auto LockScreen::setup_widgets() -> void
   {
     box = Gtk::Box(Gtk::ORIENTATION_VERTICAL);
+    box.add(clock_widget);
 
-    user_prompt.set_text(getenv("USER"));
-    box.add(user_prompt);
-    box.add(password_prompt);
-    box.set_focus_child(password_prompt);
-
-    login_button = Gtk::Button("Log in");
-    box.add(login_button);
-    login_button.signal_clicked().connect([this] { submit(); });
-    password_prompt.signal_activate().connect([this] { submit(); });
-    password_prompt.set_visibility(false);
-
+    if (show_login_widgets) {
+      login_box = Gtk::Box(Gtk::ORIENTATION_VERTICAL);
+      user_prompt.set_text(getenv("USER"));
+      login_box.add(user_prompt);
+      login_box.add(password_prompt);
+      login_box.set_focus_child(password_prompt);
+      login_button = Gtk::Button("Log in");
+      login_box.add(login_button);
+      login_button.signal_clicked().connect([this] { submit(); });
+      password_prompt.signal_activate().connect([this] { submit(); });
+      password_prompt.set_visibility(false);
+      box.add(login_box);
+    }
     vbox = Gtk::Box(Gtk::ORIENTATION_VERTICAL);
     hbox = Gtk::Box(Gtk::ORIENTATION_HORIZONTAL);
     vbox.pack_start(hbox, true, false);

@@ -47,6 +47,10 @@ namespace cloth::notifications {
     NotificationServer& server;
     const unsigned id;
 
+    int height = 0;
+
+    void update_padding();
+
     Glib::RefPtr<Gdk::Pixbuf> pixbuf;
     Gtk::Window window;
     Gtk::Image image;
@@ -84,6 +88,8 @@ namespace cloth::notifications {
       -> void override;
 
     Client& client;
+
+    auto get_padding(Notification&) -> int;
 
     util::ptr_vec<Notification> notifications;
 

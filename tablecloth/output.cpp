@@ -37,7 +37,7 @@ namespace cloth {
     if (ws_alpha <= 1.f) ws_alpha += 0.1;
     if (ws_alpha > 1.f) ws_alpha = 1.f;
 
-    if (prev_workspace == workspace && workspace->fullscreen_view) {
+    if (false && prev_workspace == workspace && workspace->fullscreen_view) {
       context.fullscreen_view = workspace->fullscreen_view;
     } else {
       float prev_ws_alpha = 1.f - ws_alpha;
@@ -112,7 +112,11 @@ namespace cloth {
                 wlr_output.phys_width, wlr_output.phys_height);
 
     on_destroy.add_to(wlr_output.events.destroy);
-    on_destroy = [this] { util::erase_this(desktop.outputs, this); };
+    on_destroy = [this] { 
+      auto keep_alive = util::erase_this(desktop.outputs, this);
+      // TODO: Does this help?
+      std::this_thread::sleep_for(chrono::seconds(1));
+    };
 
     on_mode.add_to(wlr_output.events.mode);
     on_mode = [this] { arrange_layers(*this); };
