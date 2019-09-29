@@ -13,3 +13,11 @@ Contributions welcome! - have fun
  - written in C++, drawn using GTK
  - Very little code, so should be easy to extend/modify to your liking.
 
+# cloth-lock
+
+![](https://i.ibb.co/VLbxcJM/image.png)
+
+ - Extremely simple lock screen
+ - uses PAM for authentication
+ - multi-monitor support
+ - background image can be set (using css)
