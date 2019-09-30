@@ -24,9 +24,12 @@ Contributions welcome! - have fun
 
 # cloth-outputs
 WIP arandr-style GUI for sway output configuration. Could easilly be adapted for output configuration in most other wlroots compositors.
+
 ### Works:
  - repositioning with drag'n'drop snapping gui
- - right click to toggle
+ - set resolution
+ - set transform
+
 ### Planned features:
  - export layout to script
- - set resolution
+ - set scale

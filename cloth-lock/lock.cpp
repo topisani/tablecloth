@@ -89,8 +89,8 @@ namespace cloth::lock {
                                                   *resp = reply;
                                                   return PAM_SUCCESS;
                                                 },
-                                                NULL}; // namespace cloth::lock
-    pam_handle_t* local_auth_handle = NULL;            // this gets set by pam_start
+                                                NULL};
+    pam_handle_t* local_auth_handle = NULL; // this gets set by pam_start
 
 
     reply = (struct pam_response*) malloc(sizeof(struct pam_response));

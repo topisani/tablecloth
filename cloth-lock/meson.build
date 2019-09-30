@@ -8,7 +8,6 @@ protocols = [
 	[wp_protocol_dir, 'stable/xdg-shell/xdg-shell.xml'],
 	[wp_protocol_dir, 'unstable/idle-inhibit/idle-inhibit-unstable-v1.xml'],
 	[wlr_protocol_dir, 'idle.xml'],
-	[wlr_protocol_dir, 'screenshooter.xml'],
 	[wlr_protocol_dir, 'wlr-export-dmabuf-unstable-v1.xml'],
 	[wlr_protocol_dir, 'wlr-input-inhibitor-unstable-v1.xml'],
 	[wlr_protocol_dir, 'wlr-layer-shell-unstable-v1.xml'],

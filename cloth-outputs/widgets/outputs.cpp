@@ -31,9 +31,14 @@ namespace cloth::outputs::widgets {
   void Outputs::draw_output_box(const Cairo::RefPtr<Cairo::Context>& cr, Output& o)
   {
     auto box = output_box(o);
-    cr->set_line_width(5);
+    cr->set_line_width(3);
     cr->rectangle(box.x, box.y, box.width, box.height);
-    cr->set_source_rgb(0.5, 0.5, 0.5);
+    if (&o == current)
+      cr->set_source_rgb(0.9, 0.9, 0.9);
+    else
+      cr->set_source_rgb(0.7, 0.7, 0.7);
+    cr->fill_preserve();
+    cr->set_source_rgb(0.2, 0.2, 0.2);
     cr->stroke();
 
     auto layout = create_pango_layout(fmt::format("{}\n{}x{}+{}+{}", o.name, o.logical_size.width,
@@ -50,13 +55,15 @@ namespace cloth::outputs::widgets {
   {
     auto output = output_at({event->x, event->y});
     if (output == nullptr) return true;
+    current = output;
     if (event->button == 1) {
       auto box = output_box(*output);
       drag.output = output;
       drag.grab_coords = {event->x - box.x, event->y - box.y};
       queue_draw();
     } else if (event->button == 3) {
-      output->toggle();
+      auto menu = menu_for(*output);
+      menu->popup(event->button, event->time);
     }
     return true;
   }
@@ -65,7 +72,8 @@ namespace cloth::outputs::widgets {
   {
     if (drag.output == nullptr) return false;
     auto coords = current_drag_coords();
-    drag.output->set_position({int(coords.x / xscale), int(coords.y / yscale)});
+    drag.output->set_position(
+      {int(std::round(coords.x / xscale)), int(std::round(coords.y / yscale))});
     drag.output = nullptr;
     queue_draw();
     return true;
@@ -102,6 +110,9 @@ namespace cloth::outputs::widgets {
     auto res = Coords{curs_x - drag.grab_coords.x, curs_y - drag.grab_coords.y};
     if (drag.output == nullptr) return res;
 
+    res.x = std::max(res.x, 0.0);
+    res.y = std::max(res.y, 0.0);
+
     // Snap
     constexpr auto snap = 10;
 
@@ -124,5 +135,49 @@ namespace cloth::outputs::widgets {
     }
 
     return res;
+  }
+
+  Gtk::Menu* resolution_menu_for(Output& o)
+  {
+    auto menu = Gtk::make_managed<Gtk::Menu>();
+    for (auto& m : o.avaliable_modes) {
+      auto item = Gtk::make_managed<Gtk::RadioMenuItem>();
+      auto preferred = m.preferred ? " - preferred" : "";
+      item->set_active(m.current);
+      item->set_label(fmt::format("{}x{}@{}Hz{}", m.width, m.height, m.refresh, preferred));
+      item->signal_activate().connect([&o, m] { o.set_mode(m); });
+      menu->append(*item);
+    }
+    menu->show_all();
+    return menu;
+  }
+
+  Gtk::Menu* transform_menu_for(Output& o)
+  {
+    auto menu = Gtk::make_managed<Gtk::Menu>();
+    for (int i = 0; i < 8; i++) {
+      Transform t = static_cast<Transform>(i);
+      auto item = Gtk::make_managed<Gtk::RadioMenuItem>();
+      item->set_active(o.transform == t);
+      item->set_label(to_string(t));
+      item->signal_activate().connect([&o, t] { o.set_transform(t); });
+      menu->append(*item);
+    }
+    menu->show_all();
+    return menu;
+  }
+
+  Gtk::Menu* Outputs::menu_for(Output& o)
+  {
+    auto menu = Gtk::make_managed<Gtk::Menu>();
+    auto res_item = Gtk::make_managed<Gtk::MenuItem>("Resolution");
+    res_item->set_submenu(*resolution_menu_for(o));
+    menu->append(*res_item);
+    auto trans_item = Gtk::make_managed<Gtk::MenuItem>("Transform");
+    trans_item->set_submenu(*transform_menu_for(o));
+    menu->append(*trans_item);
+    menu->show_all();
+    menu->accelerate(*this);
+    return menu;
   }
 } // namespace cloth::outputs::widgets

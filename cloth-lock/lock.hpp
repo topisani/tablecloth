@@ -39,7 +39,6 @@ namespace cloth::lock {
 
   struct LockScreen {
     LockScreen(Client& client, std::unique_ptr<wl::output_t>&& output, bool show_widget);
-
     LockScreen(const LockScreen&) = delete;
 
     Client& client;

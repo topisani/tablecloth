@@ -41,6 +41,8 @@ namespace cloth::outputs::widgets {
       Coords grab_coords;
     } drag;
 
+    Output* current = nullptr;
+
     Coords current_drag_coords() const;
 
     double xscale = 0;
@@ -57,6 +59,8 @@ namespace cloth::outputs::widgets {
     Output* output_at(Coords) const;
 
     void draw_output_box(const Cairo::RefPtr<Cairo::Context>& cr, Output& o);
+
+    Gtk::Menu* menu_for(Output& o);
   };
 
 } // namespace cloth::outputs::widgets
