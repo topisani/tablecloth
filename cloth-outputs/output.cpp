@@ -75,6 +75,7 @@ namespace cloth::outputs {
     case Transform::flipped_180: return "flipped_180";
     case Transform::flipped_270: return "flipped_270";
     }
+    return NULL;
   }
 
   Transform transform_from_string(std::string s)

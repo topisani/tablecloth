@@ -203,7 +203,7 @@ namespace cloth::notifications {
       auto w = image_data.first->get_width();
       auto h = image_data.first->get_height();
       cloth_debug("Image data now: {}, {}", w, h);
-      if (w > max_image_width || h > max_image_height) {
+      if (w > (int) max_image_width || h > (int) max_image_height) {
         auto scale = std::min(max_image_width / float(w), max_image_height / float(h));
         this->pixbuf =
           image_data.first->scale_simple(w * scale, h * scale, Gdk::InterpType::INTERP_BILINEAR);
@@ -240,7 +240,7 @@ namespace cloth::notifications {
       cloth_debug("Configured {}x{}", width, height);
       layer_surface.ack_configure(serial);
       window.show_all();
-      if (width != window.get_width()) {
+      if ((int) width != window.get_width()) {
         this->height = window.get_height();
         layer_surface.set_size(window.get_width(), window.get_height());
         layer_surface.set_exclusive_zone(0);

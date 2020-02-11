@@ -43,7 +43,7 @@ namespace cloth::lock {
     layer_surface.on_configure() = [&](uint32_t serial, uint32_t width, uint32_t height) {
       window.show_all();
       layer_surface.ack_configure(serial);
-      if (this->height != height || this->width != width) {
+      if (this->height != (int) height || this->width != (int) width) {
         width = this->width;
         height = this->height;
         cloth_debug("New size: {}, {}", width, height);

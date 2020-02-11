@@ -1,7 +1,12 @@
 project('tablecloth', 'cpp', 'c', default_options : ['cpp_std=c++17'])
 
 cpp = meson.get_compiler('cpp')
-cpp_args = []
+cpp_args = [
+	# Caused by DBus generated code
+	'-Wno-unused-but-set-variable',
+	# Caused by Clang pragmas in logging.cpp and others
+	'-Wno-unknown-pragmas'
+]
 cpp_link_args = []
 
 if false # libc++
