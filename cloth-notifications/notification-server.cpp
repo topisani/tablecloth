@@ -25,7 +25,9 @@ namespace cloth::notifications {
         if (util::starts_with("file://", key)) key = key.substr(7);
         return std::pair(Gdk::Pixbuf::create_from_file(key), is_icon);
       } else if (!key.empty()) {
-        auto [width, height, rowstride, has_alpha, bits_per_sample, channels, image_data, _] =
+        // This looks terrible, I know. But I don't know how to do it better, please fix it :)
+        auto [width, height, rowstride, has_alpha, bits_per_sample, channels, image_data,
+            ign1, ign2, ign3, ign4, ign5, ign6, ign7, ign8, ign9] =
           DBus::Struct<int, int, int, bool, int, int, std::vector<uint8_t>>(hints.at("image-data"));
         cloth_debug("Image data: {}, {}, {}, {}, {}, {}", width, height, rowstride, has_alpha,
                     bits_per_sample, channels);
@@ -41,7 +43,7 @@ namespace cloth::notifications {
     return std::pair(Glib::RefPtr<Gdk::Pixbuf>{}, false);
   }
 
-  auto NotificationServer::GetCapabilities(DBus::Error& e) -> std::vector<std::string>
+  auto NotificationServer::GetCapabilities() -> std::vector<std::string>
   {
     return {"body", "actions", "icon-static"};
   }
@@ -53,8 +55,7 @@ namespace cloth::notifications {
                                   const std::string& body,
                                   const std::vector<std::string>& actions,
                                   const std::map<std::string, ::DBus::Variant>& hints,
-                                  const int32_t& expire_timeout_in,
-                                  DBus::Error& err) -> uint32_t
+                                  const int32_t& expire_timeout_in) -> uint32_t
   {
     try {
       unsigned notification_id = not_id_in;
@@ -112,12 +113,11 @@ namespace cloth::notifications {
       return notification_id;
     } catch (std::exception& e) {
       cloth_error("NotificationServer::Notify: {}", e.what());
-      err = DBus::ErrorFailed(e.what());
       return not_id_in;
     }
   }
 
-  auto NotificationServer::CloseNotification(const uint32_t& id, DBus::Error& e) -> void
+  auto NotificationServer::CloseNotification(const uint32_t& id) -> void
   {
     Glib::signal_idle().connect_once([this, id = id] {
       auto found = util::find_if(notifications, [id](Notification& n) { return n.id == id; });
@@ -131,8 +131,7 @@ namespace cloth::notifications {
   auto NotificationServer::GetServerInformation(std::string& name,
                                                 std::string& vendor,
                                                 std::string& version,
-                                                std::string& spec_version,
-                                                DBus::Error& e) -> void
+                                                std::string& spec_version) -> void
   {
     name = "cloth-notifications";
     vendor = "topisani";

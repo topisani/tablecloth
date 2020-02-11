@@ -74,17 +74,17 @@ namespace cloth::notifications {
       : DBus::ObjectAdaptor(connection, server_path), client(client)
     {}
 
-    auto GetCapabilities(DBus::Error& e) -> std::vector<std::string> override;
-    auto Notify(const std::string&,
+    virtual auto GetCapabilities() -> std::vector<std::string> override;
+    virtual auto Notify(const std::string&,
                 const uint32_t&,
                 const std::string&,
                 const std::string&,
                 const std::string&,
                 const std::vector<std::string>&,
                 const std::map<std::string, ::DBus::Variant>&,
-                const int32_t&, DBus::Error& e) -> uint32_t override;
-    auto CloseNotification(const uint32_t&, DBus::Error& e) -> void override;
-    auto GetServerInformation(std::string&, std::string&, std::string&, std::string&, DBus::Error& e)
+                const int32_t&) -> uint32_t override;
+    virtual auto CloseNotification(const uint32_t&) -> void override;
+    virtual auto GetServerInformation(std::string&, std::string&, std::string&, std::string&)
       -> void override;
 
     Client& client;

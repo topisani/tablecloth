@@ -1,5 +1,6 @@
 #include "client.hpp"
 
+#include <dbus/dbus.h>
 #include <iostream>
 
 #include "util/logging.hpp"
@@ -26,10 +27,11 @@ namespace cloth::notifications {
     DBus::default_dispatcher = &dispatcher;
 
     DBus::Connection conn = DBus::Connection::SessionBus();
-    bool status = conn.acquire_name(NotificationServer::server_name.c_str());
-    if (!status) {
-      cloth_error("Could not acquire notification server name");
-    };
+    try {
+        conn.request_name(NotificationServer::server_name.c_str(), DBUS_NAME_FLAG_REPLACE_EXISTING);
+    } catch (...) {
+        cloth_error("Could not acquire notification server name");
+    }
 
     NotificationServer server(*this, conn);
 
