@@ -127,7 +127,7 @@ namespace cloth::kbd {
     layer_surface.on_configure() = [&](uint32_t serial, uint32_t width, uint32_t height) {
       window.show_all();
       layer_surface.ack_configure(serial);
-      if (window.get_height() != height) {
+      if (window.get_height() != (int) height) {
         width = window.get_width();
         height = window.get_height();
         cloth_debug("New size: {}, {}", width, height);
