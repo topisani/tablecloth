@@ -29,4 +29,19 @@ sources += protocol_sources
 
 pam_dep =meson.get_compiler('cpp').find_library('pam')
 
-executable('cloth-lock', sources, dependencies : [thread_dep, fmt, wlroots, libinput, wayland_cursor_dep, dep_cloth_common, waylandpp, gtkmm, pam_dep])
+executable(
+	'cloth-lock',
+	sources,
+	dependencies: [
+		thread_dep,
+		fmt,
+		wlroots,
+		libinput,
+		wayland_cursor_dep,
+		dep_cloth_common,
+		waylandpp,
+		gtkmm,
+		pam_dep
+	],
+	install: true
+)

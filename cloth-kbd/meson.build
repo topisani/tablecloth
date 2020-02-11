@@ -27,4 +27,19 @@ protocol_sources = custom_target('kbd-protocols',
 
 sources += protocol_sources
 
-executable('cloth-kbd', sources, dependencies : [thread_dep, fmt, wlroots, libinput, wayland_cursor_dep, dep_cloth_common, waylandpp, gtkmm, xkbcommon])
+executable(
+	'cloth-kbd',
+	sources,
+	dependencies: [
+		thread_dep,
+		fmt,
+		wlroots,
+		libinput,
+		wayland_cursor_dep,
+		dep_cloth_common,
+		waylandpp,
+		gtkmm,
+		xkbcommon
+	],
+	install: true
+)

@@ -29,4 +29,18 @@ protocol_sources = custom_target('outputs-protocols',
 
 sources += protocol_sources
 
-executable('cloth-outputs', sources, dependencies : [thread_dep, fmt, wlroots, libinput, wayland_cursor_dep, dep_cloth_common, waylandpp, gtkmm])
+executable(
+	'cloth-outputs',
+	sources,
+	dependencies: [
+		thread_dep,
+		fmt,
+		wlroots,
+		libinput,
+		wayland_cursor_dep,
+		dep_cloth_common,
+		waylandpp,
+		gtkmm
+	],
+	install: true
+)

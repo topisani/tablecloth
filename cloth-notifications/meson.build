@@ -32,4 +32,20 @@ dbus_sources = custom_target('gen-notifications-dbus',
 
 sources += dbus_sources
 
-executable('cloth-notifications', sources, dependencies : [thread_dep, dbus_dep, dbus_c_dep, fmt, wlroots, libinput, wayland_cursor_dep, dep_cloth_common, waylandpp, gtkmm])
+executable(
+	'cloth-notifications',
+	sources,
+	dependencies: [
+		thread_dep,
+		dbus_dep,
+		dbus_c_dep,
+		fmt,
+		wlroots,
+		libinput,
+		wayland_cursor_dep,
+		dep_cloth_common,
+		waylandpp,
+		gtkmm
+	],
+	install: true
+)
