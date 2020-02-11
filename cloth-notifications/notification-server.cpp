@@ -45,7 +45,7 @@ namespace cloth::notifications {
 
   auto NotificationServer::GetCapabilities() -> std::vector<std::string>
   {
-    return {"body", "actions", "icon-static"};
+    return {"body", "actions", "icon-static", "body-hyperlinks", "body-markup"};
   }
 
   auto NotificationServer::Notify(const std::string& app_name,
