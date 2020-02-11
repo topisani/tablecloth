@@ -5,7 +5,9 @@ cpp_args = [
 	# Caused by DBus generated code
 	'-Wno-unused-but-set-variable',
 	# Caused by Clang pragmas in logging.cpp and others
-	'-Wno-unknown-pragmas'
+	'-Wno-unknown-pragmas',
+	# Ignore "system" function call ignored result
+	'-Wno-unused-result',
 ]
 cpp_link_args = []
 
