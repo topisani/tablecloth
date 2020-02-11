@@ -38,6 +38,13 @@ namespace cloth::notifications {
     dispatcher.enter();
   }
 
+  auto Client::setup_css() -> void
+  {
+    if (!css_provider->load_from_path(css_file)) {
+      cloth_error("Error loading CSS file");
+    }
+  }
+
   int Client::main(int argc, char* argv[])
   {
     auto cli = make_cli();
@@ -51,6 +58,8 @@ namespace cloth::notifications {
       std::cout << cli;
       return 1;
     }
+
+    setup_css();
 
     bind_interfaces();
 
