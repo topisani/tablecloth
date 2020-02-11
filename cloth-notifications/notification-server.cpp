@@ -175,7 +175,14 @@ namespace cloth::notifications {
     title.get_style_context()->add_class("title");
     body.get_style_context()->add_class("body");
 
-    body.set_text(body_str);
+    // Set alignment (maybe we should export it as a CSS property)
+    title.set_justify(Gtk::Justification::JUSTIFY_LEFT);
+    body.set_justify(Gtk::Justification::JUSTIFY_LEFT);
+    title.set_halign(Gtk::Align::ALIGN_START);
+    body.set_halign(Gtk::Align::ALIGN_START);
+    
+    body.set_markup(body_str);
+
     body.set_line_wrap(true);
     body.set_max_width_chars(80);
     auto& actions_box = *Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL));
