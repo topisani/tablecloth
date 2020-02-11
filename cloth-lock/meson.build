@@ -1,6 +1,6 @@
 sources = run_command('find', '.', '-name', '*.cpp').stdout().strip().split('\n')
 
-wlr_protocol_dir = '../subprojects/wlroots/protocol/'
+wlr_protocol_dir = '../wlr-proto/'
 cloth_protocol_dir = '../protocol/'
 
 protocols = [
@@ -29,4 +29,4 @@ sources += protocol_sources
 
 pam_dep =meson.get_compiler('cpp').find_library('pam')
 
-executable('cloth-lock', sources, dependencies : [thread_dep, fmt, wlroots, wlr_protos, libinput, wayland_cursor_dep, dep_cloth_common, waylandpp, gtkmm, pam_dep])
+executable('cloth-lock', sources, dependencies : [thread_dep, fmt, wlroots, libinput, wayland_cursor_dep, dep_cloth_common, waylandpp, gtkmm, pam_dep])

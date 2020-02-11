@@ -1,6 +1,6 @@
 sources = run_command('find', '.', '-name', '*.cpp').stdout().strip().split('\n')
 
-wlr_protocol_dir = '../subprojects/wlroots/protocol/'
+wlr_protocol_dir = '../wlr-proto/'
 cloth_protocol_dir = '../protocol/'
 
 protocols = [
@@ -32,4 +32,4 @@ dbus_sources = custom_target('gen-notifications-dbus',
 
 sources += dbus_sources
 
-executable('cloth-notifications', sources, dependencies : [thread_dep, dbus_dep, fmt, wlroots, wlr_protos, libinput, wayland_cursor_dep, dep_cloth_common, waylandpp, gtkmm])
+executable('cloth-notifications', sources, dependencies : [thread_dep, dbus_dep, dbus_c_dep, fmt, wlroots, libinput, wayland_cursor_dep, dep_cloth_common, waylandpp, gtkmm])
