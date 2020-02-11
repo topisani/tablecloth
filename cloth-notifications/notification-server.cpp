@@ -170,6 +170,11 @@ namespace cloth::notifications {
                                                          GTK_STYLE_PROVIDER_PRIORITY_USER);
 
     title.set_markup(fmt::format("<b>{}</b>", title_str));
+
+    // Add CSS classes for easier styling
+    title.get_style_context()->add_class("title");
+    body.get_style_context()->add_class("body");
+
     body.set_text(body_str);
     body.set_line_wrap(true);
     body.set_max_width_chars(80);
