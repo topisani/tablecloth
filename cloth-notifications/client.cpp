@@ -1,5 +1,6 @@
 #include "client.hpp"
 
+#include <dbus/dbus.h>
 #include <iostream>
 
 #include "util/logging.hpp"
@@ -26,14 +27,22 @@ namespace cloth::notifications {
     DBus::default_dispatcher = &dispatcher;
 
     DBus::Connection conn = DBus::Connection::SessionBus();
-    bool status = conn.acquire_name(NotificationServer::server_name.c_str());
-    if (!status) {
-      cloth_error("Could not acquire notification server name");
-    };
+    try {
+        conn.request_name(NotificationServer::server_name.c_str(), DBUS_NAME_FLAG_REPLACE_EXISTING);
+    } catch (...) {
+        cloth_error("Could not acquire notification server name");
+    }
 
     NotificationServer server(*this, conn);
 
     dispatcher.enter();
+  }
+
+  auto Client::setup_css() -> void
+  {
+    if (!css_provider->load_from_path(css_file)) {
+      cloth_error("Error loading CSS file");
+    }
   }
 
   int Client::main(int argc, char* argv[])
@@ -49,6 +58,8 @@ namespace cloth::notifications {
       std::cout << cli;
       return 1;
     }
+
+    setup_css();
 
     bind_interfaces();
 

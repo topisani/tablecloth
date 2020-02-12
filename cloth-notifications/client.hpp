@@ -43,17 +43,13 @@ namespace cloth::notifications {
         display(gdk_wayland_display_get_wl_display(gdk_display->gobj())),
         style_context(Gtk::StyleContext::create()),
         css_provider(Gtk::CssProvider::create())
-    {
-      if (!css_provider->load_from_path(css_file)) {
-        cloth_error("Error loading CSS file");
-      }
-    }
+    {}
 
     auto dbus_main() -> void;
 
     auto bind_interfaces();
 
-    auto setup_css();
+    auto setup_css() -> void;
 
     auto make_cli()
     {

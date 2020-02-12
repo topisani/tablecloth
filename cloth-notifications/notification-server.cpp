@@ -5,27 +5,41 @@
 #include "gdkwayland.hpp"
 #include "util/iterators.hpp"
 
+#include <unistd.h>
+
 namespace cloth::notifications {
 
   auto get_image(const std::map<std::string, ::DBus::Variant>& hints, const std::string& app_icon)
     -> std::pair<Glib::RefPtr<Gdk::Pixbuf>, bool>
   {
     try {
-      auto [key, is_path, is_icon] = [&]() -> std::tuple<std::string, bool, bool> {
+      // Priority according to https://developer.gnome.org/notification-spec/#id2776582
+      auto [image_value, is_path, is_icon] = [&]() -> std::tuple<std::string, bool, bool> {
+        // Raw image data struct
         if (hints.count("image-data")) return {"image-data", false, false};
-        if (hints.count("image_data")) return {"image_data", false, false}; // deprecated
+        // Filesystem image path
         if (hints.count("image-path")) return {hints.at("image-path"), true, false};
+        if (!app_icon.empty() && access(app_icon.c_str(), F_OK) != -1) return {app_icon, true, true};
+        if (!app_icon.empty()) return {app_icon, false, true};
+        if (hints.count("icon_data")) return {"icon_data", false, true}; // deprecated
+        if (hints.count("image_data")) return {"image_data", false, false}; // deprecated
         if (hints.count("image_path")) return {hints.at("image_path"), true, false}; // deprecated
-        if (!app_icon.empty()) return {app_icon, true, true};
-        if (hints.count("icon_data")) return {"icon_data", false, true};
         return {"", true, false};
       }();
 
-      if (is_path && !key.empty()) {
-        if (util::starts_with("file://", key)) key = key.substr(7);
-        return std::pair(Gdk::Pixbuf::create_from_file(key), is_icon);
-      } else if (!key.empty()) {
-        auto [width, height, rowstride, has_alpha, bits_per_sample, channels, image_data, _] =
+      if (is_path && !image_value.empty()) {
+        if (util::starts_with("file://", image_value)) image_value = image_value.substr(7);
+        return std::pair(Gdk::Pixbuf::create_from_file(image_value), is_icon);
+      } else if (!is_path && is_icon && !image_value.empty()) {
+        auto themedicon = Gio::ThemedIcon::create(image_value, true);
+        auto icon_theme = Gtk::IconTheme::get_default();
+        auto iconinfo = icon_theme->lookup_icon(themedicon, 48, Gtk::IconLookupFlags::ICON_LOOKUP_USE_BUILTIN);
+        auto pixbuf = iconinfo.load_icon();
+        return std::pair(pixbuf, is_icon);
+      } else if (!image_value.empty()) {
+        // This looks terrible, I know. But I don't know how to do it better, please fix it :)
+        auto [width, height, rowstride, has_alpha, bits_per_sample, channels, image_data,
+            ign1, ign2, ign3, ign4, ign5, ign6, ign7, ign8, ign9] =
           DBus::Struct<int, int, int, bool, int, int, std::vector<uint8_t>>(hints.at("image-data"));
         cloth_debug("Image data: {}, {}, {}, {}, {}, {}", width, height, rowstride, has_alpha,
                     bits_per_sample, channels);
@@ -41,9 +55,9 @@ namespace cloth::notifications {
     return std::pair(Glib::RefPtr<Gdk::Pixbuf>{}, false);
   }
 
-  auto NotificationServer::GetCapabilities(DBus::Error& e) -> std::vector<std::string>
+  auto NotificationServer::GetCapabilities() -> std::vector<std::string>
   {
-    return {"body", "actions", "icon-static"};
+    return {"body", "actions", "icon-static", "body-hyperlinks", "body-markup"};
   }
 
   auto NotificationServer::Notify(const std::string& app_name,
@@ -53,8 +67,7 @@ namespace cloth::notifications {
                                   const std::string& body,
                                   const std::vector<std::string>& actions,
                                   const std::map<std::string, ::DBus::Variant>& hints,
-                                  const int32_t& expire_timeout_in,
-                                  DBus::Error& err) -> uint32_t
+                                  const int32_t& expire_timeout_in) -> uint32_t
   {
     try {
       unsigned notification_id = not_id_in;
@@ -87,8 +100,8 @@ namespace cloth::notifications {
 
       if (expire_timeout < 0) {
         switch (urgency) {
-        case Urgency::Low: expire_timeout = 5; break;
-        case Urgency::Normal: expire_timeout = 10; break;
+        case Urgency::Low: expire_timeout = 5000; break;
+        case Urgency::Normal: expire_timeout = 1000; break;
         case Urgency::Critical: expire_timeout = 0; break;
         }
       }
@@ -112,12 +125,11 @@ namespace cloth::notifications {
       return notification_id;
     } catch (std::exception& e) {
       cloth_error("NotificationServer::Notify: {}", e.what());
-      err = DBus::ErrorFailed(e.what());
       return not_id_in;
     }
   }
 
-  auto NotificationServer::CloseNotification(const uint32_t& id, DBus::Error& e) -> void
+  auto NotificationServer::CloseNotification(const uint32_t& id) -> void
   {
     Glib::signal_idle().connect_once([this, id = id] {
       auto found = util::find_if(notifications, [id](Notification& n) { return n.id == id; });
@@ -131,8 +143,7 @@ namespace cloth::notifications {
   auto NotificationServer::GetServerInformation(std::string& name,
                                                 std::string& vendor,
                                                 std::string& version,
-                                                std::string& spec_version,
-                                                DBus::Error& e) -> void
+                                                std::string& spec_version) -> void
   {
     name = "cloth-notifications";
     vendor = "topisani";
@@ -171,7 +182,19 @@ namespace cloth::notifications {
                                                          GTK_STYLE_PROVIDER_PRIORITY_USER);
 
     title.set_markup(fmt::format("<b>{}</b>", title_str));
-    body.set_text(body_str);
+
+    // Add CSS classes for easier styling
+    title.get_style_context()->add_class("title");
+    body.get_style_context()->add_class("body");
+
+    // Set alignment (maybe we should export it as a CSS property)
+    title.set_justify(Gtk::Justification::JUSTIFY_LEFT);
+    body.set_justify(Gtk::Justification::JUSTIFY_LEFT);
+    title.set_halign(Gtk::Align::ALIGN_START);
+    body.set_halign(Gtk::Align::ALIGN_START);
+    
+    body.set_markup(body_str);
+
     body.set_line_wrap(true);
     body.set_max_width_chars(80);
     auto& actions_box = *Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL));
@@ -204,7 +227,7 @@ namespace cloth::notifications {
       auto w = image_data.first->get_width();
       auto h = image_data.first->get_height();
       cloth_debug("Image data now: {}, {}", w, h);
-      if (w > max_image_width || h > max_image_height) {
+      if (w > (int) max_image_width || h > (int) max_image_height) {
         auto scale = std::min(max_image_width / float(w), max_image_height / float(h));
         this->pixbuf =
           image_data.first->scale_simple(w * scale, h * scale, Gdk::InterpType::INTERP_BILINEAR);
@@ -241,7 +264,7 @@ namespace cloth::notifications {
       cloth_debug("Configured {}x{}", width, height);
       layer_surface.ack_configure(serial);
       window.show_all();
-      if (width != window.get_width()) {
+      if ((int) width != window.get_width()) {
         this->height = window.get_height();
         layer_surface.set_size(window.get_width(), window.get_height());
         layer_surface.set_exclusive_zone(0);
@@ -260,7 +283,7 @@ namespace cloth::notifications {
     surface.commit();
 
     sleeper_thread = [this, expire_timeout] {
-      sleeper_thread.sleep_for(chrono::seconds(expire_timeout));
+      sleeper_thread.sleep_for(chrono::milliseconds(expire_timeout));
       if (expire_timeout > 0 && sleeper_thread.running()) {
         Glib::signal_idle().connect_once([this] {
           auto keep_around = util::erase_this(this->server.notifications, this);

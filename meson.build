@@ -1,7 +1,14 @@
 project('tablecloth', 'cpp', 'c', default_options : ['cpp_std=c++17'])
 
 cpp = meson.get_compiler('cpp')
-cpp_args = []
+cpp_args = [
+	# Caused by DBus generated code
+	'-Wno-unused-but-set-variable',
+	# Caused by Clang pragmas in logging.cpp and others
+	'-Wno-unknown-pragmas',
+	# Ignore "system" function call ignored result
+	'-Wno-unused-result',
+]
 cpp_link_args = []
 
 if false # libc++
@@ -26,20 +33,20 @@ wayland_cursor_dep = dependency('wayland-cursor')
 libinput = dependency('libinput')
 
 wayland_protocols = dependency('wayland-protocols')
-wayland_wall = dependency('wayland-wall')
 wlroots = dependency('wlroots', fallback: ['wlroots', 'wlroots'])
-wlr_protos = dependency('wlr_protos', fallback: ['wlroots', 'wlr_protos'])
 fmt = dependency('fmt', fallback: ['fmtlib', 'fmt_dep'])
 gtk = dependency('gtk+-3.0')
 gtkmm = dependency('gtkmm-3.0')
+xkbcommon = dependency('xkbcommon')
 wp_protocol_dir = wayland_protocols.get_pkgconfig_variable('pkgdatadir')
-ww_protocol_dir = wayland_wall.get_pkgconfig_variable('pkgdatadir')
 
 wayland_scanner_prog = find_program('wayland-scanner')
 wayland_scanner_client = generator(wayland_scanner_prog, output: '@BASENAME@-client-protocol.h', arguments: ['client-header', '@INPUT@', '@OUTPUT@'])
 wayland_scanner_server = generator(wayland_scanner_prog, output: '@BASENAME@-server-protocol.h', arguments: ['server-header', '@INPUT@', '@OUTPUT@'])
 wayland_scanner_code = generator(wayland_scanner_prog, output: '@BASENAME@-protocol.c', arguments: ['code', '@INPUT@', '@OUTPUT@'])
 
+
+dbus_c_dep = dependency('dbus-1')
 dbus_dep = dependency('dbus-c++-1')
 dbus_proxy = generator(find_program('dbusxx-xml2cpp'), output: '@BASENAME@-proxy.hpp', arguments: ['@INPUT@', '--proxy=@OUTPUT@'])
 dbus_adaptor = generator(find_program('dbusxx-xml2cpp'), output: '@BASENAME@-adaptor.hpp', arguments: ['@INPUT@', '--adaptor=@OUTPUT@'])
@@ -58,5 +65,5 @@ subdir('common')
 #subdir('cloth-bar')
 subdir('cloth-notifications')
 subdir('cloth-lock')
-#subdir('cloth-kbd')
+subdir('cloth-kbd')
 subdir('cloth-outputs')
