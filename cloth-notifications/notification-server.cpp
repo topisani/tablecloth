@@ -5,26 +5,38 @@
 #include "gdkwayland.hpp"
 #include "util/iterators.hpp"
 
+#include <unistd.h>
+
 namespace cloth::notifications {
 
   auto get_image(const std::map<std::string, ::DBus::Variant>& hints, const std::string& app_icon)
     -> std::pair<Glib::RefPtr<Gdk::Pixbuf>, bool>
   {
     try {
-      auto [key, is_path, is_icon] = [&]() -> std::tuple<std::string, bool, bool> {
+      // Priority according to https://developer.gnome.org/notification-spec/#id2776582
+      auto [image_value, is_path, is_icon] = [&]() -> std::tuple<std::string, bool, bool> {
+        // Raw image data struct
         if (hints.count("image-data")) return {"image-data", false, false};
-        if (hints.count("image_data")) return {"image_data", false, false}; // deprecated
+        // Filesystem image path
         if (hints.count("image-path")) return {hints.at("image-path"), true, false};
+        if (!app_icon.empty() && access(app_icon.c_str(), F_OK) != -1) return {app_icon, true, true};
+        if (!app_icon.empty()) return {app_icon, false, true};
+        if (hints.count("icon_data")) return {"icon_data", false, true}; // deprecated
+        if (hints.count("image_data")) return {"image_data", false, false}; // deprecated
         if (hints.count("image_path")) return {hints.at("image_path"), true, false}; // deprecated
-        if (!app_icon.empty()) return {app_icon, true, true};
-        if (hints.count("icon_data")) return {"icon_data", false, true};
         return {"", true, false};
       }();
 
-      if (is_path && !key.empty()) {
-        if (util::starts_with("file://", key)) key = key.substr(7);
-        return std::pair(Gdk::Pixbuf::create_from_file(key), is_icon);
-      } else if (!key.empty()) {
+      if (is_path && !image_value.empty()) {
+        if (util::starts_with("file://", image_value)) image_value = image_value.substr(7);
+        return std::pair(Gdk::Pixbuf::create_from_file(image_value), is_icon);
+      } else if (!is_path && is_icon && !image_value.empty()) {
+        auto themedicon = Gio::ThemedIcon::create(image_value, true);
+        auto icon_theme = Gtk::IconTheme::get_default();
+        auto iconinfo = icon_theme->lookup_icon(themedicon, 48, Gtk::IconLookupFlags::ICON_LOOKUP_USE_BUILTIN);
+        auto pixbuf = iconinfo.load_icon();
+        return std::pair(pixbuf, is_icon);
+      } else if (!image_value.empty()) {
         // This looks terrible, I know. But I don't know how to do it better, please fix it :)
         auto [width, height, rowstride, has_alpha, bits_per_sample, channels, image_data,
             ign1, ign2, ign3, ign4, ign5, ign6, ign7, ign8, ign9] =
