@@ -100,8 +100,8 @@ namespace cloth::notifications {
 
       if (expire_timeout < 0) {
         switch (urgency) {
-        case Urgency::Low: expire_timeout = 5; break;
-        case Urgency::Normal: expire_timeout = 10; break;
+        case Urgency::Low: expire_timeout = 5000; break;
+        case Urgency::Normal: expire_timeout = 1000; break;
         case Urgency::Critical: expire_timeout = 0; break;
         }
       }
@@ -283,7 +283,7 @@ namespace cloth::notifications {
     surface.commit();
 
     sleeper_thread = [this, expire_timeout] {
-      sleeper_thread.sleep_for(chrono::seconds(expire_timeout));
+      sleeper_thread.sleep_for(chrono::milliseconds(expire_timeout));
       if (expire_timeout > 0 && sleeper_thread.running()) {
         Glib::signal_idle().connect_once([this] {
           auto keep_around = util::erase_this(this->server.notifications, this);
